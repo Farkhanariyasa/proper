@@ -1,6 +1,8 @@
 services:
   web:
-    build: .
+    build:
+      context: .
+      target: frontend
     container_name: proper-web
 
     ports:
@@ -10,4 +12,27 @@ services:
       - .:/app
       - /app/node_modules
 
+    environment:
+      - API_URL=http://api:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+
+    depends_on:
+      - api
+
     command: npm run dev
+
+  api:
+    build:
+      context: .
+      target: backend
+    container_name: proper-api
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - ./api:/app
+      - /app/vendor
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
