@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  Bone,
   UserCheck,
   GitMerge,
   Briefcase,
@@ -37,6 +38,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const [dashboardOpen, setDashboardOpen] = useState(false);
+  const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileContainerRef = useRef<HTMLDivElement>(null);
 
@@ -44,6 +46,9 @@ export default function Sidebar({
   useEffect(() => {
     if (pathname.startsWith('/dashboard')) {
       setDashboardOpen(true);
+    }
+    if (pathname.startsWith('/taxonomy')) {
+      setTaxonomyOpen(true);
     }
   }, [pathname]);
 
@@ -71,17 +76,23 @@ export default function Sidebar({
     };
   }, [profileMenuOpen]);
 
-  const navItems = [
+  const navItemsBeforeTaxonomy = [
     {
       label: 'Profil Skill',
       href: '/profil-skill',
       icon: UserCheck,
     },
+  ];
+
+  const taxonomySubItems = [
     {
-      label: 'Taxonomy',
-      href: '/taxonomy',
-      icon: GitMerge,
+      label: 'ESCO Skill',
+      href: '/taxonomy/esco-skills',
+      icon: Bone,
     },
+  ];
+
+  const navItemsAfterTaxonomy = [
     {
       label: 'Lowongan',
       href: '/lowongan',
@@ -166,6 +177,7 @@ export default function Sidebar({
   };
 
   const isDashboardActive = pathname.startsWith('/dashboard');
+  const isTaxonomyActive = pathname.startsWith('/taxonomy');
 
   return (
     <>
@@ -277,8 +289,90 @@ export default function Sidebar({
             )}
           </div>
 
-          {/* 2. Menu Navigasi Lainnya */}
-          {navItems.map((item) => {
+          {/* 2. Menu Navigasi Sebelum Taxonomy (Profil Skill) */}
+          {navItemsBeforeTaxonomy.map((item) => {
+            const active = isItemActive(item.href);
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+                  active
+                    ? 'bg-[#1F5A88] text-white shadow-xs font-semibold'
+                    : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+                }`}
+              >
+                <Icon
+                  className={`h-4 w-4 shrink-0 transition-colors ${
+                    active ? 'text-amber-300' : 'text-blue-200 group-hover:text-white'
+                  }`}
+                />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            );
+          })}
+
+          {/* 3. Taxonomy Accordion Dropdown */}
+          <div className="pb-1">
+            <button
+              type="button"
+              onClick={() => setTaxonomyOpen(!taxonomyOpen)}
+              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer ${
+                isTaxonomyActive
+                  ? 'text-white font-semibold'
+                  : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+              }`}
+              aria-expanded={taxonomyOpen}
+            >
+              <div className="flex items-center gap-3">
+                <GitMerge
+                  className={`h-4 w-4 shrink-0 ${
+                    isTaxonomyActive ? 'text-amber-300' : 'text-blue-200'
+                  }`}
+                />
+                <span>Taxonomy</span>
+              </div>
+              <ChevronDown
+                className={`h-4 w-4 text-blue-300 transition-transform duration-200 ${
+                  taxonomyOpen ? 'rotate-180 text-white' : ''
+                }`}
+              />
+            </button>
+
+            {/* Submenu ESCO Skill */}
+            {taxonomyOpen && (
+              <div className="mt-1 space-y-1 pl-7 pr-1">
+                {taxonomySubItems.map((sub) => {
+                  const subActive = pathname === sub.href;
+                  const SubIcon = sub.icon;
+
+                  return (
+                    <Link
+                      key={sub.href}
+                      href={sub.href}
+                      className={`group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
+                        subActive
+                          ? 'bg-[#1F5A88] text-white font-semibold shadow-xs'
+                          : 'text-blue-200 hover:bg-[#1F5A88]/40 hover:text-white'
+                      }`}
+                    >
+                      <SubIcon
+                        className={`h-3.5 w-3.5 shrink-0 ${
+                          subActive ? 'text-amber-300' : 'text-blue-300 group-hover:text-white'
+                        }`}
+                      />
+                      <span className="truncate">{sub.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 4. Menu Navigasi Setelah Taxonomy */}
+          {navItemsAfterTaxonomy.map((item) => {
             const active = isItemActive(item.href);
             const Icon = item.icon;
 
