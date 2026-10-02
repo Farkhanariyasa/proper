@@ -421,9 +421,6 @@ export default function JobSeekerFormModal({
             </div>
             <div>
               <h3 className="text-base font-bold">Registrasi Profil Pencari Kerja</h3>
-              <p className="text-xs text-sky-100">
-                Pendaftaran data kandidat terstandar Kepmendagri & Taksonomi ESCO
-              </p>
             </div>
           </div>
           <button

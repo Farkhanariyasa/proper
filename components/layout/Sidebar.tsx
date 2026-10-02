@@ -123,14 +123,14 @@ export default function Sidebar({
 
   const dashboardSubItems = [
     {
-      label: 'Dashboard Pimpinan',
-      href: '/dashboard/pimpinan',
-      icon: BarChart3,
-    },
-    {
       label: 'Dashboard Operator',
       href: '/dashboard/operator',
       icon: ShieldCheck,
+    },
+    {
+      label: 'Dashboard Pimpinan',
+      href: '/dashboard/pimpinan',
+      icon: BarChart3,
     },
   ];
 
@@ -138,43 +138,25 @@ export default function Sidebar({
     {
       id: 'operator',
       label: 'Operator Pengantar Kerja',
-      roleTitle: 'Petugas Verifikator',
+      roleTitle: 'Operator Pengantar Kerja',
       unit: 'Pusat Pasar Kerja',
       href: '/dashboard/operator',
       icon: ShieldCheck,
     },
     {
       id: 'pimpinan',
-      label: 'Pimpinan / Eksekutif',
-      roleTitle: 'Direktur Bina Penempatan',
+      label: 'Pimpinan',
+      roleTitle: 'Pimpinan',
       unit: 'Ditjen Binapenta Kemnaker',
       href: '/dashboard/pimpinan',
       icon: BarChart3,
     },
-    {
-      id: 'pencari-kerja',
-      label: 'Pencari Kerja',
-      roleTitle: 'Kandidat Talenta',
-      unit: 'Portal SIAPkerja',
-      href: '/profil-skill',
-      icon: UserCheck,
-    },
-    {
-      id: 'perusahaan',
-      label: 'Perusahaan Mitra',
-      roleTitle: 'Pemberi Kerja',
-      unit: 'Kemitraan Industri',
-      href: '/lowongan',
-      icon: Building2,
-    },
   ];
 
-  // Tentukan role saat ini berdasarkan rute aktif
+  // Tentukan role saat ini berdasarkan rute aktif (Hanya 2 Role)
   const getCurrentRole = () => {
     if (pathname.includes('/pimpinan')) return availableRoles[1];
-    if (pathname.includes('/profil-skill')) return availableRoles[2];
-    if (pathname.includes('/lowongan')) return availableRoles[3];
-    return availableRoles[0]; // Default ke Operator
+    return availableRoles[0]; // Default ke Operator Pengantar Kerja
   };
 
   const currentRole = getCurrentRole();
