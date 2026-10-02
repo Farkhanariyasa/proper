@@ -104,9 +104,6 @@ export default function ProfilSkillPage() {
             <Users className="w-6 h-6 text-[#0E385E]" />
             <span>Profil Skill Pencari Kerja</span>
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Database kandidat pencari kerja, domisili standar Kepmendagri, dan pemetaan keahlian taksonomi ESCO.
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <button
