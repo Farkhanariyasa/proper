@@ -98,4 +98,16 @@ class SkillNode extends Model
             'parent_id'
         )->withPivot('sort_order');
     }
+    /**
+     * Relasi ke pencari kerja yang memiliki keahlian ini
+     */
+    public function jobSeekers(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            JobSeeker::class,
+            'job_seeker_skills',
+            'esco_skill_id',
+            'job_seeker_id'
+        );
+    }
 }

@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy dependency definitions
 COPY package*.json ./
 
-# Install all dependencies (including devDependencies for build)
-RUN npm install
+# Install ALL dependencies including devDependencies (Tailwind, PostCSS, Typescript)
+RUN npm install --include=dev
 
 # Copy source code
 COPY . .
@@ -15,11 +15,16 @@ COPY . .
 # Ensure public directory exists
 RUN mkdir -p /app/public
 
-# Disable telemetry and set production environment for build
+# Accept API URL build argument and default to Zeabur API domain
+ARG NEXT_PUBLIC_API_URL="https://proper-api.zeabur.app"
+ARG API_URL="https://proper-api.zeabur.app"
+
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV API_URL=$API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Build Next.js application
+# Build Next.js application (bakes NEXT_PUBLIC_API_URL into client JS bundle)
 RUN npm run build
 
 # ---- Production Runner ----
@@ -27,6 +32,11 @@ FROM node:22-alpine AS runner
 
 WORKDIR /app
 
+ARG NEXT_PUBLIC_API_URL="https://proper-api.zeabur.app"
+ARG API_URL="https://proper-api.zeabur.app"
+
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV API_URL=$API_URL
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
