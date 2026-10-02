@@ -23,6 +23,7 @@ import {
   X,
   FileText,
   VectorPolygon,
+  IdCard,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -89,6 +90,11 @@ export default function Sidebar({
       label: 'ESCO Skill',
       href: '/taxonomy/esco-skills',
       icon: Bone,
+    },
+    {
+      label: 'KBJI (Jabatan)',
+      href: '/taxonomy/kbji',
+      icon: IdCard,
     },
   ];
 
@@ -341,7 +347,7 @@ export default function Sidebar({
               />
             </button>
 
-            {/* Submenu ESCO Skill */}
+            {/* Submenu ESCO Skill & KBJI */}
             {taxonomyOpen && (
               <div className="mt-1 space-y-1 pl-7 pr-1">
                 {taxonomySubItems.map((sub) => {
