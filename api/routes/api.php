@@ -42,3 +42,36 @@ Route::prefix('v1')->group(function () {
     Route::get('kbji/{code}/children', [KbjiController::class, 'children']);
     Route::get('kbji/{code}', [KbjiController::class, 'show']);
 });
+
+// Autentikasi (Sanctum)
+Route::prefix('auth')->group(function () {
+    Route::post('login', [\App\Http\Controllers\Api\Auth\AuthController::class, 'login']);
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('logout', [\App\Http\Controllers\Api\Auth\AuthController::class, 'logout']);
+        Route::get('me', [\App\Http\Controllers\Api\Auth\AuthController::class, 'me']);
+    });
+});
+
+// Admin Manajemen Pengguna, Role, dan Hak Akses
+Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
+    // Users Management
+    Route::get('users', [\App\Http\Controllers\Api\Admin\UserController::class, 'index'])->middleware('permission:users.view');
+    Route::post('users', [\App\Http\Controllers\Api\Admin\UserController::class, 'store'])->middleware('permission:users.create');
+    Route::get('users/{id}', [\App\Http\Controllers\Api\Admin\UserController::class, 'show'])->middleware('permission:users.view');
+    Route::put('users/{id}', [\App\Http\Controllers\Api\Admin\UserController::class, 'update'])->middleware('permission:users.edit');
+    Route::delete('users/{id}', [\App\Http\Controllers\Api\Admin\UserController::class, 'destroy'])->middleware('permission:users.delete');
+    Route::post('users/{id}/toggle-active', [\App\Http\Controllers\Api\Admin\UserController::class, 'toggleActive'])->middleware('permission:users.edit');
+
+    // Roles Management
+    Route::get('roles', [\App\Http\Controllers\Api\Admin\RoleController::class, 'index'])->middleware('permission:roles.view');
+    Route::post('roles', [\App\Http\Controllers\Api\Admin\RoleController::class, 'store'])->middleware('permission:roles.create');
+    Route::get('roles/{id}', [\App\Http\Controllers\Api\Admin\RoleController::class, 'show'])->middleware('permission:roles.view');
+    Route::put('roles/{id}', [\App\Http\Controllers\Api\Admin\RoleController::class, 'update'])->middleware('permission:roles.edit');
+    Route::delete('roles/{id}', [\App\Http\Controllers\Api\Admin\RoleController::class, 'destroy'])->middleware('permission:roles.delete');
+    Route::put('roles/{id}/permissions', [\App\Http\Controllers\Api\Admin\RoleController::class, 'syncPermissions'])->middleware('permission:permissions.assign');
+
+    // Permissions List
+    Route::get('permissions', [\App\Http\Controllers\Api\Admin\PermissionController::class, 'index'])->middleware('permission:roles.view');
+});
+
