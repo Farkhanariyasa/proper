@@ -549,7 +549,7 @@ export default function LowonganPage() {
           </div>
 
           {/* Pagination Footer */}
-          {totalPages > 1 && (
+          {totalItems > 0 && (
             <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
               <span>
                 Menampilkan {vacancies.length} dari {totalItems} total lowongan

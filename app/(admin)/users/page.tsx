@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AuthGuard from '@/components/auth/AuthGuard';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -27,6 +27,8 @@ import {
   Users,
   X,
   Lock,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 export default function UsersManagementPage() {
@@ -42,6 +44,10 @@ export default function UsersManagementPage() {
   const [search, setSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // State Modal Form (Create / Edit)
   const [modalOpen, setModalOpen] = useState(false);
@@ -94,6 +100,17 @@ export default function UsersManagementPage() {
       setLoading(false);
     }
   }, [search, selectedRole, selectedStatus]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedRole, selectedStatus]);
+
+  const totalItems = users.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedUsers = useMemo<UserItem[]>(() => {
+    return users.slice(startIndex, startIndex + itemsPerPage);
+  }, [users, startIndex, itemsPerPage]);
 
   useEffect(() => {
     fetchRoles();
@@ -376,7 +393,7 @@ export default function UsersManagementPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-800">
-                  {users.map((u) => {
+                  {paginatedUsers.map((u) => {
                     const isSelf = u.id === currentUser?.id;
 
                     return (
@@ -506,6 +523,45 @@ export default function UsersManagementPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Pagination Footer */}
+          {totalItems > 0 && (
+            <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+              <div>
+                Menampilkan{' '}
+                <span className="font-semibold text-slate-800">
+                  {startIndex + 1} - {Math.min(startIndex + itemsPerPage, totalItems)}
+                </span>{' '}
+                dari <span className="font-semibold text-slate-800">{totalItems}</span> total pengguna
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium shadow-2xs"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Sebelumnya</span>
+                </button>
+
+                <div className="px-3 py-1.5 font-semibold text-slate-800 bg-white rounded-md border border-slate-200">
+                  {currentPage} / {totalPages}
+                </div>
+
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium shadow-2xs"
+                >
+                  <span>Selanjutnya</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           )}
         </div>

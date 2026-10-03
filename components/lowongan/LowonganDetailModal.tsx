@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import {
   X,
   Building2,
@@ -31,6 +32,8 @@ export default function LowonganDetailModal({
   lowongan,
   onEdit,
 }: LowonganDetailModalProps) {
+  const router = useRouter();
+
   if (!isOpen || !lowongan) return null;
 
   const formatCurrency = (val: number | null | undefined) => {
@@ -320,6 +323,10 @@ export default function LowonganDetailModal({
 
             <button
               type="button"
+              onClick={() => {
+                onClose();
+                router.push(`/rekomendasi?lowongan_id=${lowongan.id}`);
+              }}
               className="inline-flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold rounded-md bg-[#0E385E] text-white hover:bg-[#163A5F] transition-colors shadow-xs"
             >
               <Flame className="w-4 h-4 text-amber-400" />
