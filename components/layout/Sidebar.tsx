@@ -24,7 +24,10 @@ import {
   FileText,
   VectorPolygon,
   IdCard,
+  Users,
+  KeyRound,
 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -38,6 +41,7 @@ export default function Sidebar({
   desktopOpen,
 }: SidebarProps) {
   const pathname = usePathname();
+  const { user: authUser, logout, hasPermission } = useAuth();
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -383,6 +387,52 @@ export default function Sidebar({
               </Link>
             );
           })}
+
+          {/* 5. Menu Manajemen Akses & Pengguna (Hanya Tampil Jika Memiliki Izin) */}
+          {(hasPermission('users.view') || hasPermission('roles.view')) && (
+            <div className="pt-3">
+              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-blue-300/70">
+                Manajemen Akses
+              </div>
+              <div className="space-y-1">
+                {hasPermission('users.view') && (
+                  <Link
+                    href="/users"
+                    className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+                      isItemActive('/users')
+                        ? 'bg-[#1F5A88] text-white shadow-xs font-semibold'
+                        : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+                    }`}
+                  >
+                    <Users
+                      className={`h-4 w-4 shrink-0 transition-colors ${
+                        isItemActive('/users') ? 'text-amber-300' : 'text-blue-200 group-hover:text-white'
+                      }`}
+                    />
+                    <span className="truncate">Pengguna</span>
+                  </Link>
+                )}
+
+                {hasPermission('roles.view') && (
+                  <Link
+                    href="/roles"
+                    className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+                      isItemActive('/roles')
+                        ? 'bg-[#1F5A88] text-white shadow-xs font-semibold'
+                        : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+                    }`}
+                  >
+                    <KeyRound
+                      className={`h-4 w-4 shrink-0 transition-colors ${
+                        isItemActive('/roles') ? 'text-amber-300' : 'text-blue-200 group-hover:text-white'
+                      }`}
+                    />
+                    <span className="truncate">Peran & Hak Akses</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer Profil Pengguna dengan Sub-banner / Popover Switch Role */}
@@ -396,14 +446,14 @@ export default function Sidebar({
               {/* Header Info Akun */}
               <div className="flex items-center gap-2.5 pb-2.5 border-b border-[#1F5A88]/80">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1F5A88] text-white font-bold text-xs border border-blue-300/30">
-                  <User className="h-4 w-4 text-amber-300" />
+                  {authUser?.name ? authUser.name.charAt(0).toUpperCase() : <User className="h-4 w-4 text-amber-300" />}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-bold text-white truncate">
-                    {currentRole.roleTitle}
+                    {authUser?.name || currentRole.roleTitle}
                   </div>
                   <div className="text-[10px] text-blue-300 truncate">
-                    {currentRole.unit}
+                    {authUser ? `@${authUser.username} (${authUser.role_names?.[0] || 'Pengguna'})` : currentRole.unit}
                   </div>
                 </div>
               </div>
@@ -455,7 +505,7 @@ export default function Sidebar({
                   type="button"
                   onClick={() => {
                     setProfileMenuOpen(false);
-                    alert('Berhasil keluar dari akun.');
+                    logout();
                   }}
                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-300 hover:bg-red-950/60 hover:text-red-100 transition-colors cursor-pointer"
                 >
@@ -482,15 +532,17 @@ export default function Sidebar({
             title="Klik untuk membuka menu akun & pindah peran"
           >
             <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1F5A88] text-white border border-blue-300/30">
-              <User className="h-4 w-4 text-blue-200" />
+              <span className="text-xs font-bold text-amber-300">
+                {authUser?.name ? authUser.name.charAt(0).toUpperCase() : <User className="h-4 w-4 text-blue-200" />}
+              </span>
               <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#0E385E]" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-white">
-                {currentRole.roleTitle}
+                {authUser?.name || currentRole.roleTitle}
               </p>
               <p className="truncate text-[10px] text-blue-300">
-                {currentRole.unit}
+                {authUser ? `${authUser.role_names?.[0] || 'Pengguna'}` : currentRole.unit}
               </p>
             </div>
             <ChevronsUpDown className="h-4 w-4 text-blue-300 shrink-0" />
