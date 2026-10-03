@@ -20,6 +20,8 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             WilayahSeeder::class,
             EducationLevelSeeder::class,
+            KbjiSeeder::class,
+            LowonganKerjaSeeder::class,
         ]);
     }
 }
