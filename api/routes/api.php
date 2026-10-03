@@ -43,6 +43,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Mesin Penjodohan & Rekomendasi (Smart Matching Engine)
 Route::prefix('rekomendasi')->group(function () {
+    Route::get('pairs', [MatchingController::class, 'unifiedPairs']);
     Route::get('jobs-for-seeker/{jobSeekerId}', [MatchingController::class, 'jobsForSeeker']);
     Route::get('candidates-for-job/{lowonganId}', [MatchingController::class, 'candidatesForJob']);
     Route::get('analysis', [MatchingController::class, 'pairAnalysis']);

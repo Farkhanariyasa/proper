@@ -415,6 +415,151 @@ class MatchingEngineService
     }
 
     /**
+     * Rekomendasi Terpadu Pasangan (Unified Pairwise Recommendations)
+     * Mengkombinasikan perspektif pelamar dan lowongan ke dalam satu dataset terpadu
+     * Mendukung filter per pelamar, per lowongan, kata kunci pencarian, dan klasifikasi skor.
+     */
+    public function getUnifiedRecommendations(array $filters = []): array
+    {
+        // 1. Query Pencari Kerja
+        $seekerQuery = JobSeeker::query()
+            ->with([
+                'skills:id,title,title_en',
+                'educationLevel:id,name',
+                'regency.province',
+            ]);
+
+        if (!empty($filters['job_seeker_id'])) {
+            $seekerQuery->where('id', $filters['job_seeker_id']);
+        }
+
+        $seekers = $seekerQuery->get();
+
+        // 2. Query Lowongan Kerja
+        $jobQuery = LowonganKerja::query()
+            ->with([
+                'skills:id,title,title_en',
+                'kbji:id,code,title',
+                'educationLevel:id,name',
+                'province:id,name',
+                'regency:id,name',
+            ])
+            ->where('status_lowongan', 'Published');
+
+        if (!empty($filters['lowongan_id'])) {
+            $jobQuery->where('id', $filters['lowongan_id']);
+        }
+
+        $vacancies = $jobQuery->get();
+
+        $search = !empty($filters['search']) ? mb_strtolower(trim($filters['search'])) : null;
+        $categoryFilter = !empty($filters['category']) ? $filters['category'] : null;
+        $minScore = isset($filters['min_score']) && is_numeric($filters['min_score']) ? (int) $filters['min_score'] : null;
+
+        $results = [];
+
+        foreach ($seekers as $candidate) {
+            $candidateSkills = $candidate->skills;
+            $candidateSkillIds = $candidateSkills->pluck('id')->toArray();
+
+            foreach ($vacancies as $job) {
+                // Filter pencarian teks jika diberikan
+                if ($search) {
+                    $matchedText = str_contains(mb_strtolower($candidate->full_name), $search)
+                        || str_contains(mb_strtolower($candidate->nik), $search)
+                        || str_contains(mb_strtolower($candidate->desired_occupation ?? ''), $search)
+                        || str_contains(mb_strtolower($job->judul_lowongan), $search)
+                        || str_contains(mb_strtolower($job->nama_perusahaan), $search);
+
+                    if (!$matchedText) {
+                        continue;
+                    }
+                }
+
+                $requiredSkills = $job->skills;
+                $totalRequired = $requiredSkills->count();
+
+                $matchedSkills = [];
+                $gapSkills = [];
+
+                foreach ($requiredSkills as $reqSkill) {
+                    $matchResult = $this->evaluateSkillMatch($reqSkill, $candidateSkills, $candidateSkillIds);
+
+                    if ($matchResult['is_matched']) {
+                        $matchedSkills[] = [
+                            'id' => $reqSkill->id,
+                            'title' => $reqSkill->title,
+                            'tipe_keahlian' => $reqSkill->pivot->tipe_keahlian ?? 'wajib',
+                            'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
+                            'match_type' => $matchResult['match_type'],
+                            'matched_with' => $matchResult['matched_with_title'],
+                        ];
+                    } else {
+                        $gapSkills[] = [
+                            'id' => $reqSkill->id,
+                            'title' => $reqSkill->title,
+                            'tipe_keahlian' => $reqSkill->pivot->tipe_keahlian ?? 'wajib',
+                            'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
+                        ];
+                    }
+                }
+
+                $totalMatched = count($matchedSkills);
+                $score = $totalRequired > 0 ? (int) round(($totalMatched / $totalRequired) * 100) : 100;
+                $classification = $this->classifyScore($score);
+
+                // Filter kategori jika diberikan
+                if ($categoryFilter && $classification['category'] !== $categoryFilter) {
+                    continue;
+                }
+
+                // Filter minimal skor jika diberikan
+                if ($minScore !== null && $score < $minScore) {
+                    continue;
+                }
+
+                $results[] = [
+                    'id' => $candidate->id . '_' . $job->id,
+                    'score' => $score,
+                    'total_required' => $totalRequired,
+                    'total_matched' => $totalMatched,
+                    'total_gap' => count($gapSkills),
+                    'classification' => $classification,
+                    'candidate' => [
+                        'id' => $candidate->id,
+                        'nik' => $candidate->nik,
+                        'full_name' => $candidate->full_name,
+                        'phone' => $candidate->phone,
+                        'education_level' => $candidate->educationLevel?->name,
+                        'desired_occupation' => $candidate->desired_occupation,
+                        'location' => ($candidate->regency?->name ?? '') . ', ' . ($candidate->regency?->province?->name ?? ''),
+                    ],
+                    'job' => [
+                        'id' => $job->id,
+                        'slug' => $job->slug,
+                        'judul_lowongan' => $job->judul_lowongan,
+                        'nama_perusahaan' => $job->nama_perusahaan,
+                        'tipe_pekerjaan' => $job->tipe_pekerjaan,
+                        'sistem_kerja' => $job->sistem_kerja,
+                        'education_level' => $job->educationLevel?->name,
+                        'location' => ($job->regency?->name ?? '') . ', ' . ($job->province?->name ?? ''),
+                        'gaji_tampilkan' => $job->gaji_tampilkan,
+                        'gaji_minimal' => $job->gaji_minimal,
+                        'gaji_maksimal' => $job->gaji_maksimal,
+                    ],
+                    'matched_skills' => $matchedSkills,
+                    'gap_skills' => $gapSkills,
+                ];
+            }
+        }
+
+        // Urutkan dari skor tertinggi
+        usort($results, fn ($a, $b) => $b['score'] <=> $a['score']);
+
+        return $results;
+    }
+
+    /**
      * Standar Aturan Keputusan (Decision Rules Sesuai Diagram Alur)
      * Skor >= 70%: Siap Ditempatkan Langsung (Rekomendasikan ke Perusahaan)
      * 40% <= Skor < 70%: Perlu Pelatihan Skill Gap (Daftarkan ke BPVP / BLK)
