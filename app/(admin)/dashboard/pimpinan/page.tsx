@@ -31,7 +31,7 @@ export default function DashboardPimpinanPage() {
   ];
 
   return (
-    <AuthGuard requiredRole="pimpinan">
+    <AuthGuard requiredPermission="dashboard.pimpinan.view">
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div>

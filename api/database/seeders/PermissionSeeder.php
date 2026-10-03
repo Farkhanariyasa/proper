@@ -46,6 +46,10 @@ class PermissionSeeder extends Seeder
             ['name' => 'laporan.view',   'display_name' => 'Lihat Laporan',   'group' => 'Laporan'],
             ['name' => 'laporan.export', 'display_name' => 'Export Laporan',  'group' => 'Laporan'],
 
+            // Dashboard
+            ['name' => 'dashboard.operator.view', 'display_name' => 'Lihat Dashboard Operator', 'group' => 'Dashboard'],
+            ['name' => 'dashboard.pimpinan.view', 'display_name' => 'Lihat Dashboard Pimpinan', 'group' => 'Dashboard'],
+
             // Taksonomi
             ['name' => 'taxonomy.manage', 'display_name' => 'Kelola Taksonomi', 'group' => 'Taksonomi'],
         ];
@@ -73,6 +77,7 @@ class PermissionSeeder extends Seeder
 
         // Operator
         $operatorPerms = Permission::whereIn('name', [
+            'dashboard.operator.view',
             'lowongan.view', 'lowongan.create', 'lowongan.edit', 'lowongan.delete',
             'pelatihan.view', 'pelatihan.create', 'pelatihan.edit', 'pelatihan.delete',
             'job_seekers.view', 'job_seekers.create', 'job_seekers.edit', 'job_seekers.delete',
@@ -82,7 +87,10 @@ class PermissionSeeder extends Seeder
 
         // Pimpinan
         $pimpinanPerms = Permission::whereIn('name', [
+            'dashboard.pimpinan.view',
             'job_seekers.view',
+            'lowongan.view',
+            'pelatihan.view',
             'laporan.view',
             'laporan.export',
         ])->pluck('id');

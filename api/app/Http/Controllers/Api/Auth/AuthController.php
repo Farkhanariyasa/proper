@@ -53,16 +53,7 @@ class AuthController extends Controller
             'message' => 'Login berhasil.',
             'data'    => [
                 'token' => $token,
-                'user'  => [
-                    'id'          => $user->id,
-                    'name'        => $user->name,
-                    'username'    => $user->username,
-                    'email'       => $user->email,
-                    'is_active'   => $user->is_active,
-                    'roles'       => $user->roles->pluck('name'),
-                    'role_names'  => $user->roles->pluck('display_name'),
-                    'permissions' => $user->getAllPermissions(),
-                ],
+                'user'  => $this->formatUserData($user),
             ],
         ]);
     }
@@ -93,16 +84,49 @@ class AuthController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => [
-                'id'          => $user->id,
-                'name'        => $user->name,
-                'username'    => $user->username,
-                'email'       => $user->email,
-                'is_active'   => $user->is_active,
-                'roles'       => $user->roles->pluck('name'),
-                'role_names'  => $user->roles->pluck('display_name'),
-                'permissions' => $user->getAllPermissions(),
-            ],
+            'data'   => $this->formatUserData($user),
         ]);
+    }
+
+    /**
+     * Format struktur data user lengkap beserta role_permissions untuk multi-role switching
+     */
+    private function formatUserData(User $user): array
+    {
+        $isSuperadmin = $user->hasRole('superadmin');
+
+        if ($isSuperadmin) {
+            $allRoles = \App\Models\Role::with('permissions')->orderBy('id', 'asc')->get();
+        } else {
+            $allRoles = $user->roles()->with('permissions')->get();
+        }
+
+        $rolePermissions = [];
+        foreach ($allRoles as $r) {
+            $rolePermissions[$r->name] = $r->permissions->pluck('name')->toArray();
+        }
+
+        if ($isSuperadmin) {
+            $allPermNames = \App\Models\Permission::pluck('name')->toArray();
+            $rolePermissions['superadmin'] = $allPermNames;
+        }
+
+        return [
+            'id'               => $user->id,
+            'name'             => $user->name,
+            'username'         => $user->username,
+            'email'            => $user->email,
+            'is_active'        => $user->is_active,
+            'roles'            => $user->roles->pluck('name')->toArray(),
+            'role_names'       => $user->roles->pluck('display_name')->toArray(),
+            'available_roles'  => $allRoles->map(fn ($r) => [
+                'id'           => $r->name,
+                'label'        => $r->display_name,
+                'roleTitle'    => $r->display_name,
+                'description'  => $r->description,
+            ])->values()->toArray(),
+            'role_permissions' => $rolePermissions,
+            'permissions'      => $user->getAllPermissions(),
+        ];
     }
 }

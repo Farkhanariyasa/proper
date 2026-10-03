@@ -18,6 +18,13 @@ export interface Role {
   updated_at?: string;
 }
 
+export interface AvailableRoleItem {
+  id: string;
+  label: string;
+  roleTitle: string;
+  description?: string | null;
+}
+
 export interface AuthUser {
   id: number;
   name: string;
@@ -26,6 +33,8 @@ export interface AuthUser {
   is_active: boolean;
   roles: string[];
   role_names: string[];
+  available_roles?: AvailableRoleItem[];
+  role_permissions?: Record<string, string[]>;
   permissions: string[];
   last_login_at?: string | null;
 }

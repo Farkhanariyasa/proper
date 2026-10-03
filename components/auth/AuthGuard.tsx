@@ -16,7 +16,7 @@ export default function AuthGuard({
   requiredPermission,
   requiredRole,
 }: AuthGuardProps) {
-  const { user, loading, isAuthenticated, hasPermission, hasRole } = useAuth();
+  const { user, loading, isAuthenticated, hasPermission, hasRole, activeRole } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export default function AuthGuard({
     );
   }
 
-  if (requiredRole && !hasRole(requiredRole)) {
+  if (requiredRole && !hasRole(requiredRole) && activeRole !== 'superadmin') {
     return (
       <div className="max-w-2xl mx-auto my-12 p-8 bg-white border border-red-200 rounded-xl shadow-xs text-center space-y-4">
         <div className="w-14 h-14 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto">

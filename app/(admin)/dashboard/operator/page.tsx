@@ -31,7 +31,7 @@ export default function DashboardOperatorPage() {
   ];
 
   return (
-    <AuthGuard requiredRole="operator">
+    <AuthGuard requiredPermission="dashboard.operator.view">
       <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div>

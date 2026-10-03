@@ -184,8 +184,7 @@ export default function LoginPage() {
           {/* Quick Demo Accounts Helper */}
           <div className="mt-8 pt-6 border-t border-slate-200">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 mb-3">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Akun Uji Coba Cepat:</span>
+              <span>Pilih Akun :</span>
             </div>
             <div className="grid grid-cols-3 gap-2">
               <button

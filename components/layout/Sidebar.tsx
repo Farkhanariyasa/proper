@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Bone,
   UserCheck,
@@ -21,7 +21,6 @@ import {
   Building2,
   ChevronsUpDown,
   X,
-  FileText,
   VectorPolygon,
   IdCard,
   Users,
@@ -40,8 +39,16 @@ export default function Sidebar({
   onMobileClose,
   desktopOpen,
 }: SidebarProps) {
+  const router = useRouter();
   const pathname = usePathname();
-  const { user: authUser, logout, hasPermission, hasRole } = useAuth();
+  const {
+    user: authUser,
+    logout,
+    hasPermission,
+    hasRole,
+    activeRole,
+    setActiveRole,
+  } = useAuth();
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -124,12 +131,6 @@ export default function Sidebar({
       icon: VectorPolygon,
       permission: 'job_seekers.view',
     },
-    {
-      label: 'Laporan & Statistik',
-      href: '/laporan',
-      icon: FileText,
-      permission: 'laporan.view',
-    },
   ];
 
   const dashboardSubItems = [
@@ -137,20 +138,21 @@ export default function Sidebar({
       label: 'Dashboard Operator',
       href: '/dashboard/operator',
       icon: ShieldCheck,
+      permission: 'dashboard.operator.view',
       role: 'operator',
     },
     {
       label: 'Dashboard Pimpinan',
       href: '/dashboard/pimpinan',
       icon: BarChart3,
+      permission: 'dashboard.pimpinan.view',
       role: 'pimpinan',
     },
   ];
 
-  // Filter item yang boleh dilihat user saat ini
+  // Filter item dashboard berdasarkan hak akses permission
   const visibleDashboardItems = dashboardSubItems.filter((sub) => {
-    if (hasRole('superadmin')) return true;
-    return hasRole(sub.role);
+    return hasPermission(sub.permission);
   });
 
   const visibleNavBeforeTaxonomy = navItemsBeforeTaxonomy.filter((item) => {
@@ -197,9 +199,11 @@ export default function Sidebar({
     },
   };
 
-  // Hanya tampilkan role yang benar-benar dimiliki akun ini (atau semua jika superadmin)
+  // Akun superadmin berhak beralih ke semua role; akun lainnya sesuai role yang dimiliki
+  const isSuperadminAccount = authUser?.roles?.includes('superadmin');
+
   const availableRoles = (() => {
-    if (hasRole('superadmin')) {
+    if (isSuperadminAccount) {
       return Object.values(allRoleMeta);
     }
     const userRoleNames = authUser?.roles || ['operator'];
@@ -209,16 +213,15 @@ export default function Sidebar({
     return matched.length > 0 ? matched : [allRoleMeta.operator];
   })();
 
-  // Tentukan role saat ini berdasarkan rute aktif atau role utama user
-  const getCurrentRole = () => {
-    if (pathname.includes('/pimpinan')) return allRoleMeta.pimpinan;
-    if (pathname.includes('/users') || pathname.includes('/roles')) return allRoleMeta.superadmin;
-    if (hasRole('pimpinan') && !hasRole('operator')) return allRoleMeta.pimpinan;
-    if (hasRole('superadmin')) return allRoleMeta.superadmin;
-    return allRoleMeta.operator;
+  // Peran aktif yang saat ini sedang berlaku
+  const currentRole = allRoleMeta[activeRole] || allRoleMeta.operator;
+
+  const handleSwitchRole = (roleId: string, targetHref: string) => {
+    setActiveRole(roleId);
+    setProfileMenuOpen(false);
+    router.push(targetHref);
   };
 
-  const currentRole = getCurrentRole();
   const isItemActive = (href: string) => {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
@@ -512,7 +515,7 @@ export default function Sidebar({
                     {authUser?.name || currentRole.roleTitle}
                   </div>
                   <div className="text-[10px] text-blue-300 truncate">
-                    {authUser ? `@${authUser.username} (${authUser.role_names?.[0] || 'Pengguna'})` : currentRole.unit}
+                    {authUser ? `@${authUser.username} (${currentRole.roleTitle})` : currentRole.unit}
                   </div>
                 </div>
               </div>
@@ -524,14 +527,14 @@ export default function Sidebar({
                 </div>
                 <div className="space-y-1">
                   {availableRoles.map((r) => {
-                    const isSelected = currentRole.id === r.id;
+                    const isSelected = activeRole === r.id;
 
                     return (
-                      <Link
+                      <button
                         key={r.id}
-                        href={r.href}
-                        onClick={() => setProfileMenuOpen(false)}
-                        className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                        type="button"
+                        onClick={() => handleSwitchRole(r.id, r.href)}
+                        className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer text-left ${
                           isSelected
                             ? 'bg-[#1F5A88] text-white font-semibold shadow-xs'
                             : 'text-blue-100 hover:bg-[#163A5F] hover:text-white'
@@ -543,7 +546,7 @@ export default function Sidebar({
                             Aktif
                           </span>
                         )}
-                      </Link>
+                      </button>
                     );
                   })}
                 </div>
@@ -601,7 +604,7 @@ export default function Sidebar({
                 {authUser?.name || currentRole.roleTitle}
               </p>
               <p className="truncate text-[10px] text-blue-300">
-                {authUser ? `${authUser.role_names?.[0] || 'Pengguna'}` : currentRole.unit}
+                {currentRole.roleTitle}
               </p>
             </div>
             <ChevronsUpDown className="h-4 w-4 text-blue-300 shrink-0" />
