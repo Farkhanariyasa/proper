@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\EducationLevelController;
 use App\Http\Controllers\Api\EscoSkillController;
 use App\Http\Controllers\Api\JobSeekerController;
+use App\Http\Controllers\Api\LowonganController;
+use App\Http\Controllers\Api\MatchingController;
 use App\Http\Controllers\Api\WilayahController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\KbjiController;
@@ -26,6 +28,25 @@ Route::get('esco-skills', [EscoSkillController::class, 'search']);
 // Profil Pencari Kerja & Skill
 Route::get('job-seekers/options', [JobSeekerController::class, 'options']);
 Route::apiResource('job-seekers', JobSeekerController::class)->only(['index', 'store', 'show']);
+
+// Modul Lowongan Kerja
+Route::get('lowongan/options', [LowonganController::class, 'options']);
+Route::get('lowongan', [LowonganController::class, 'index']);
+Route::get('lowongan/{id}', [LowonganController::class, 'show']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('lowongan', [LowonganController::class, 'store'])->middleware('permission:lowongan.create');
+    Route::put('lowongan/{id}', [LowonganController::class, 'update'])->middleware('permission:lowongan.edit');
+    Route::delete('lowongan/{id}', [LowonganController::class, 'destroy'])->middleware('permission:lowongan.delete');
+    Route::patch('lowongan/{id}/status', [LowonganController::class, 'toggleStatus'])->middleware('permission:lowongan.edit');
+});
+
+// Mesin Penjodohan & Rekomendasi (Smart Matching Engine)
+Route::prefix('rekomendasi')->group(function () {
+    Route::get('jobs-for-seeker/{jobSeekerId}', [MatchingController::class, 'jobsForSeeker']);
+    Route::get('candidates-for-job/{lowonganId}', [MatchingController::class, 'candidatesForJob']);
+    Route::get('analysis', [MatchingController::class, 'pairAnalysis']);
+});
 
 // REST API Mandiri Taksonomi Keahlian (v1)
 Route::prefix('v1')->group(function () {
