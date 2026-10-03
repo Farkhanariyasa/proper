@@ -45,6 +45,7 @@ class JobSeeker extends Model
         'study_field_detail',
         'experience_range',
         'desired_occupation',
+        'kbji_id',
         'trainings',
         'certifications',
         'created_by',
@@ -55,6 +56,11 @@ class JobSeeker extends Model
         'trainings' => 'array',
         'certifications' => 'array',
     ];
+
+    public function kbji(): BelongsTo
+    {
+        return $this->belongsTo(KbjiClassification::class, 'kbji_id');
+    }
 
     public function regency(): BelongsTo
     {

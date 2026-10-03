@@ -49,6 +49,7 @@ export interface JobSeeker {
   study_field_detail?: string | null;
   experience_range: 'fresh_graduate' | '<1' | '1-3' | '3-5' | '>5';
   desired_occupation?: string | null;
+  kbji_id?: number | null;
   trainings?: TrainingItem[] | null;
   certifications?: CertificationItem[] | null;
   created_by?: number | null;
@@ -57,6 +58,12 @@ export interface JobSeeker {
   skills_count?: number;
   regency?: Regency;
   education_level?: EducationLevel;
+  kbji?: {
+    id: number;
+    code: string;
+    title: string;
+    description?: string;
+  } | null;
   skills?: EscoSkillItem[];
 }
 
@@ -72,6 +79,7 @@ export interface CreateJobSeekerPayload {
   study_field_detail?: string;
   experience_range: 'fresh_graduate' | '<1' | '1-3' | '3-5' | '>5';
   desired_occupation?: string;
+  kbji_id?: number | null;
   trainings?: TrainingItem[];
   certifications?: CertificationItem[];
   skills: number[];

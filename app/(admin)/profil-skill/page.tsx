@@ -258,8 +258,13 @@ export default function ProfilSkillPage() {
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-slate-600">
-                      <div className="font-medium text-slate-800">
-                        {item.desired_occupation || '-'}
+                      <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                        {item.kbji && (
+                          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                            {item.kbji.code}
+                          </span>
+                        )}
+                        <span className="line-clamp-1">{item.kbji?.title || item.desired_occupation || '-'}</span>
                       </div>
                       <div className="text-[11px] text-slate-400">
                         Pengalaman:{' '}

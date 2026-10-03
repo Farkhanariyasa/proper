@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\JobSeeker;
 use App\Models\SkillNode;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Carbon;
 
 class JobSeekerSeeder extends Seeder
 {
@@ -24,13 +23,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Teknik Informatika',
                 'experience_range' => '3-5',
                 'desired_occupation' => 'Fullstack Web Developer',
+                'kbji_id' => 56, // 2512.03 - Pengembang Web Fullstack JavaScript
                 'trainings' => [
                     ['name' => 'Fullstack Web Engineering', 'organizer' => 'Hacktiv8', 'year' => 2021],
                 ],
                 'certifications' => [
                     ['name' => 'AWS Certified Developer', 'type' => 'Internasional', 'year' => 2023],
                 ],
-                'skills' => [3986, 8034, 118, 491, 119], // Javascript, Typescript, DB Design, Programming, Software Dev
+                'skills' => [3986, 8034, 118, 491, 119],
             ],
             [
                 'nik' => '3174022405970002',
@@ -44,13 +44,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Statistika Terapan',
                 'experience_range' => '1-3',
                 'desired_occupation' => 'Data Analyst',
+                'kbji_id' => 59, // 2521.01 - Analis Data & Pemodel Statistik
                 'trainings' => [
                     ['name' => 'Data Science Bootcamp', 'organizer' => 'DQLab', 'year' => 2023],
                 ],
                 'certifications' => [
                     ['name' => 'Google Data Analytics Professional', 'type' => 'Internasional', 'year' => 2024],
                 ],
-                'skills' => [11810, 3735, 2700, 7153, 277], // Python, Statistical Analysis, Data Mining, SQL, Analysing Data
+                'skills' => [11810, 3735, 2700, 7153, 277],
             ],
             [
                 'nik' => '3273031508980003',
@@ -64,13 +65,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Sistem Informasi',
                 'experience_range' => '1-3',
                 'desired_occupation' => 'Frontend Developer',
+                'kbji_id' => 56, // 2512.03 - Pengembang Web Fullstack JavaScript
                 'trainings' => [
                     ['name' => 'React & Next.js Advanced', 'organizer' => 'Binar Academy', 'year' => 2023],
                 ],
                 'certifications' => [
                     ['name' => 'Meta Front-End Developer', 'type' => 'Internasional', 'year' => 2024],
                 ],
-                'skills' => [3986, 8034, 3153, 491], // Javascript, Typescript, Visual Design, Programming
+                'skills' => [3986, 8034, 3153, 491],
             ],
             [
                 'nik' => '3171041903960004',
@@ -84,13 +86,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Ilmu Komunikasi & Hubungan Masyarakat',
                 'experience_range' => '3-5',
                 'desired_occupation' => 'Digital Marketing Specialist',
+                'kbji_id' => 53, // 2431.01 - Spesialis Pemasaran Digital
                 'trainings' => [
                     ['name' => 'Performance Marketing & SEO', 'organizer' => 'RevoU', 'year' => 2022],
                 ],
                 'certifications' => [
                     ['name' => 'Google Ads Search Certification', 'type' => 'Internasional', 'year' => 2023],
                 ],
-                'skills' => [4344, 10173, 11879, 3031], // Digital Marketing, Advertising Campaigns, Copywriting, Social Media
+                'skills' => [4344, 10173, 11879, 3031],
             ],
             [
                 'nik' => '3174051211940005',
@@ -104,13 +107,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Teknik Komputer',
                 'experience_range' => '>5',
                 'desired_occupation' => 'DevOps Engineer',
+                'kbji_id' => 57, // 2519.01 - Spesialis DevOps & Cloud Infrastructure
                 'trainings' => [
                     ['name' => 'Cloud Architecture Masterclass', 'organizer' => 'Purwadhika', 'year' => 2020],
                 ],
                 'certifications' => [
                     ['name' => 'Certified Kubernetes Administrator (CKA)', 'type' => 'Internasional', 'year' => 2023],
                 ],
-                'skills' => [13729, 1182, 118, 11810], // Devops, Cloud Migration, DB/Network Design, Python
+                'skills' => [13729, 1182, 118, 11810],
             ],
             [
                 'nik' => '3578062804970006',
@@ -124,13 +128,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Manajemen Informatika',
                 'experience_range' => '1-3',
                 'desired_occupation' => 'Database Administrator',
+                'kbji_id' => 60, // 2521.02 - Database Administrator
                 'trainings' => [
                     ['name' => 'PostgreSQL Database Administration', 'organizer' => 'Brainmatics', 'year' => 2023],
                 ],
                 'certifications' => [
                     ['name' => 'Oracle Database Certified Associate', 'type' => 'Internasional', 'year' => 2024],
                 ],
-                'skills' => [118, 4882, 7153, 290], // Database Design, MySQL, Query Languages, Accessing Data
+                'skills' => [118, 4882, 7153, 290],
             ],
             [
                 'nik' => '3471071409990007',
@@ -144,13 +149,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Desain Komunikasi Visual',
                 'experience_range' => 'fresh_graduate',
                 'desired_occupation' => 'UI/UX Designer',
+                'kbji_id' => 38, // 2512 - Software Developers / Designer
                 'trainings' => [
                     ['name' => 'UI/UX Product Design Intensive', 'organizer' => 'Skilvul', 'year' => 2024],
                 ],
                 'certifications' => [
                     ['name' => 'Figma UI/UX Specialist', 'type' => 'Nasional', 'year' => 2024],
                 ],
-                'skills' => [7680, 1758, 3153], // Graphic Design, Photoshop, Visual Design
+                'skills' => [7680, 1758, 3153],
             ],
             [
                 'nik' => '3276082201010008',
@@ -164,13 +170,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Teknik Komputer',
                 'experience_range' => 'fresh_graduate',
                 'desired_occupation' => 'Junior Software Engineer',
+                'kbji_id' => 54, // 2512.01 - Pengembang Piranti Lunak
                 'trainings' => [
                     ['name' => 'Pelatihan Pemrograman Python Dasar', 'organizer' => 'BBPVP Bekasi Kemnaker', 'year' => 2024],
                 ],
                 'certifications' => [
                     ['name' => 'Sertifikasi BNSP Junior Web Developer', 'type' => 'Nasional', 'year' => 2024],
                 ],
-                'skills' => [11810, 491, 7153], // Python, Programming, Query Languages
+                'skills' => [11810, 491, 7153],
             ],
             [
                 'nik' => '3171091107980009',
@@ -184,13 +191,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Administrasi Bisnis / Perkantoran',
                 'experience_range' => '1-3',
                 'desired_occupation' => 'Staf Administrasi Perkantoran',
+                'kbji_id' => 67, // 4110.01 - Staf Administrasi Perkantoran
                 'trainings' => [
                     ['name' => 'Administrasi Perkantoran Modern & Kearsipan', 'organizer' => 'Kemnaker BBPVP Serang', 'year' => 2022],
                 ],
                 'certifications' => [
                     ['name' => 'BNSP Tenaga Administrasi Perkantoran', 'type' => 'Nasional', 'year' => 2023],
                 ],
-                'skills' => [6499, 11206, 1804], // Office Administration, Document Management, Customer Service
+                'skills' => [6499, 11206, 1804],
             ],
             [
                 'nik' => '3374100512960010',
@@ -204,13 +212,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Akuntansi Keuangan',
                 'experience_range' => '3-5',
                 'desired_occupation' => 'Accounting & Tax Specialist',
+                'kbji_id' => 46, // 4110 - Administrasi Umum
                 'trainings' => [
                     ['name' => 'Brevet Pajak A & B Terpadu', 'organizer' => 'Ikatan Akuntan Indonesia', 'year' => 2021],
                 ],
                 'certifications' => [
                     ['name' => 'Certified Tax Technician (CTT)', 'type' => 'Nasional', 'year' => 2023],
                 ],
-                'skills' => [73, 3304, 1098], // Accounting and Taxation, Bookkeeping, Statistical Financial Records
+                'skills' => [73, 3304, 1098],
             ],
             [
                 'nik' => '3273111706990011',
@@ -224,13 +233,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Sastra Indonesia & Jurnalistik',
                 'experience_range' => '1-3',
                 'desired_occupation' => 'Content Writer & Copywriter',
+                'kbji_id' => 37, // 2431 - Periklanan dan Pemasaran
                 'trainings' => [
                     ['name' => 'Creative & Advertising Copywriting', 'organizer' => 'Tempo Institute', 'year' => 2023],
                 ],
                 'certifications' => [
                     ['name' => 'BNSP Penulis Konten Kreatif', 'type' => 'Nasional', 'year' => 2024],
                 ],
-                'skills' => [11879, 254, 551, 4344], // Copywriting, Artistic Writing, Digital Tools, Digital Marketing
+                'skills' => [11879, 254, 551, 4344],
             ],
             [
                 'nik' => '3173122903970012',
@@ -244,13 +254,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Desain Grafis Multimedia',
                 'experience_range' => '1-3',
                 'desired_occupation' => 'Graphic Designer',
+                'kbji_id' => 37, // 2431 - Periklanan dan Pemasaran
                 'trainings' => [
                     ['name' => 'Branding & Social Media Visuals', 'organizer' => 'Creative Hub Jakarta', 'year' => 2023],
                 ],
                 'certifications' => [
                     ['name' => 'Adobe Certified Professional in Graphic Design', 'type' => 'Internasional', 'year' => 2023],
                 ],
-                'skills' => [7680, 1758, 3153], // Graphic Design, Photoshop, Visual Design
+                'skills' => [7680, 1758, 3153],
             ],
             [
                 'nik' => '3671131010000013',
@@ -264,13 +275,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'SMK Bisnis Manajemen',
                 'experience_range' => '1-3',
                 'desired_occupation' => 'Customer Care & Call Center',
+                'kbji_id' => 68, // 4222.01 - Representatif Layanan Pelanggan
                 'trainings' => [
                     ['name' => 'Service Excellence & Contact Center', 'organizer' => 'Indonesia Contact Center Association', 'year' => 2022],
                 ],
                 'certifications' => [
                     ['name' => 'BNSP Customer Service Representative', 'type' => 'Nasional', 'year' => 2023],
                 ],
-                'skills' => [1804, 9038, 11206], // Customer Service, CRM Software, Document Management
+                'skills' => [1804, 9038, 11206],
             ],
             [
                 'nik' => '3175142104950014',
@@ -284,13 +296,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Psikologi Industri & Organisasi',
                 'experience_range' => '3-5',
                 'desired_occupation' => 'HR & Talent Acquisition Officer',
+                'kbji_id' => 35, // 1219 - Manajer Pelayanan Bisnis
                 'trainings' => [
                     ['name' => 'Strategic Human Resource Management', 'organizer' => 'PPM Manajemen', 'year' => 2021],
                 ],
                 'certifications' => [
                     ['name' => 'BNSP Staf Sumber Daya Manusia (SDM)', 'type' => 'Nasional', 'year' => 2023],
                 ],
-                'skills' => [280, 1614, 6499], // HR Management, Personnel Advice, Office Administration
+                'skills' => [280, 1614, 6499],
             ],
             [
                 'nik' => '3275150808970015',
@@ -304,13 +317,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Teknik Elektro Industri',
                 'experience_range' => '3-5',
                 'desired_occupation' => 'Teknisi Otomasi & Listrik',
+                'kbji_id' => 62, // 3114.01 - Teknisi Otomasi Industri & PLC
                 'trainings' => [
                     ['name' => 'Pelatihan PLC & Kelistrikan Industri', 'organizer' => 'BBPVP Bekasi Kemnaker', 'year' => 2021],
                 ],
                 'certifications' => [
                     ['name' => 'Sertifikat Kompetensi Otomasi Industri BNSP', 'type' => 'Nasional', 'year' => 2022],
                 ],
-                'skills' => [4058, 5574, 4210], // Electrical Engineering, Technical Drawings, Safety Standards
+                'skills' => [4058, 5574, 4210],
             ],
             [
                 'nik' => '3674161802990016',
@@ -324,13 +338,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Desain Pemodelan & Informasi Bangunan (DPIB)',
                 'experience_range' => '1-3',
                 'desired_occupation' => 'Drafter CAD & 3D Modeling',
+                'kbji_id' => 63, // 3118.01 - Juru Gambar CAD
                 'trainings' => [
                     ['name' => 'AutoCAD & Building Information Modeling (BIM)', 'organizer' => 'Autodesk Training Center', 'year' => 2023],
                 ],
                 'certifications' => [
                     ['name' => 'Autodesk Certified Professional AutoCAD', 'type' => 'Internasional', 'year' => 2024],
                 ],
-                'skills' => [5574, 3153, 6499], // Technical Drawings, Visual Design, Office Admin
+                'skills' => [5574, 3153, 6499],
             ],
             [
                 'nik' => '3172171405980017',
@@ -344,13 +359,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Teknik Logistik Pergudangan',
                 'experience_range' => '1-3',
                 'desired_occupation' => 'Staf Pergudangan & Inventory',
+                'kbji_id' => 69, // 4321.01 - Staf Pergudangan dan Logistik
                 'trainings' => [
                     ['name' => 'Manajemen Gudang & Operator Forklift', 'organizer' => 'BBPVP Serang Kemnaker', 'year' => 2022],
                 ],
                 'certifications' => [
                     ['name' => 'SIO Forklift Kemnaker RI', 'type' => 'Nasional', 'year' => 2023],
                 ],
-                'skills' => [1077, 5609, 10440], // Warehouse Operations, Inventory Management, Stock Control
+                'skills' => [1077, 5609, 10440],
             ],
             [
                 'nik' => '3671182309960018',
@@ -364,13 +380,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Kesehatan Masyarakat (K3)',
                 'experience_range' => '3-5',
                 'desired_occupation' => 'Ahli Keselamatan Kerja (HSE Officer)',
+                'kbji_id' => 64, // 3151.01 - Ahli K3
                 'trainings' => [
                     ['name' => 'Pembinaan Calon Ahli K3 Umum', 'organizer' => 'PT Safe Tra Mandiri Kemnaker', 'year' => 2021],
                 ],
                 'certifications' => [
                     ['name' => 'Sertifikat Ahli K3 Umum Kemnaker RI', 'type' => 'Nasional', 'year' => 2022],
                 ],
-                'skills' => [205, 4210, 11206], // Health and Safety, Safety Standards, Document Management
+                'skills' => [205, 4210, 11206],
             ],
             [
                 'nik' => '3275191206970019',
@@ -384,13 +401,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Teknik Mesin Manufaktur',
                 'experience_range' => '1-3',
                 'desired_occupation' => 'Quality Control Inspector',
+                'kbji_id' => 65, // 3152.01 - Staf Pengendalian Mutu
                 'trainings' => [
                     ['name' => 'Pengendalian Kualitas Statistik (SPC) & Six Sigma', 'organizer' => 'Politeknik Manufaktur', 'year' => 2023],
                 ],
                 'certifications' => [
                     ['name' => 'Six Sigma Yellow Belt', 'type' => 'Internasional', 'year' => 2023],
                 ],
-                'skills' => [5574, 5609, 4210], // Technical Drawings, Inventory Rules, Safety Standards
+                'skills' => [5574, 5609, 4210],
             ],
             [
                 'nik' => '3271203004950020',
@@ -404,13 +422,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Ilmu Keperawatan (Profesi Ners)',
                 'experience_range' => '3-5',
                 'desired_occupation' => 'Perawat Medis Klinis',
+                'kbji_id' => 52, // 2221.01 - Perawat Klinis Medis
                 'trainings' => [
                     ['name' => 'Basic Trauma Cardiac Life Support (BTCLS)', 'organizer' => 'Persatuan Perawat Nasional Indonesia (PPNI)', 'year' => 2022],
                 ],
                 'certifications' => [
                     ['name' => 'Surat Tanda Registrasi (STR) Perawat Aktif', 'type' => 'Nasional', 'year' => 2023],
                 ],
-                'skills' => [406, 2793, 205], // Medical/Nursing Care, Patient Care Team, Occupational Health & Safety
+                'skills' => [406, 2793, 205],
             ],
             [
                 'nik' => '5171211112980021',
@@ -424,13 +443,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Manajemen Perhotelan & Restoran',
                 'experience_range' => '1-3',
                 'desired_occupation' => 'Supervisor Restoran & Kafe',
+                'kbji_id' => 70, // 5151.01 - Supervisor Restoran
                 'trainings' => [
                     ['name' => 'Food & Beverage Service Leadership', 'organizer' => 'Politeknik Pariwisata Bali', 'year' => 2023],
                 ],
                 'certifications' => [
                     ['name' => 'BNSP Supervisor Restoran', 'type' => 'Nasional', 'year' => 2024],
                 ],
-                'skills' => [10907, 1804, 5609], // Food Service Operations, Customer Service, Inventory Management
+                'skills' => [10907, 1804, 5609],
             ],
             [
                 'nik' => '3174220503960022',
@@ -444,13 +464,14 @@ class JobSeekerSeeder extends Seeder
                 'study_field_detail' => 'Manajemen Pemasaran',
                 'experience_range' => '3-5',
                 'desired_occupation' => 'B2B Corporate Sales Representative',
+                'kbji_id' => 66, // 3322.01 - Eksekutif Penjualan Komersial
                 'trainings' => [
                     ['name' => 'Consultative Selling & Negotiation Skills', 'organizer' => 'MarkPlus Institute', 'year' => 2022],
                 ],
                 'certifications' => [
                     ['name' => 'Certified Sales Professional (CSP)', 'type' => 'Internasional', 'year' => 2023],
                 ],
-                'skills' => [9038, 1804, 10173, 4344], // CRM Software, Customer Service, Advertising Campaigns, Digital Marketing
+                'skills' => [9038, 1804, 10173, 4344],
             ],
         ];
 

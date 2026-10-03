@@ -20,7 +20,7 @@ class JobSeekerController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = JobSeeker::query()
-            ->with(['regency.province', 'educationLevel'])
+            ->with(['regency.province', 'educationLevel', 'kbji:id,code,title'])
             ->withCount('skills');
 
         // Filter pencarian nama / NIK
@@ -99,6 +99,7 @@ class JobSeekerController extends Controller
             $jobSeeker->load([
                 'regency.province',
                 'educationLevel',
+                'kbji:id,code,title',
                 'skills:id,code,title,title_en,type',
             ]);
 
@@ -128,6 +129,7 @@ class JobSeekerController extends Controller
         $jobSeeker = JobSeeker::with([
             'regency.province',
             'educationLevel',
+            'kbji:id,code,title,description',
             'skills:id,code,title,title_en,type',
             'creator:id,name,email',
         ])->find($id);
