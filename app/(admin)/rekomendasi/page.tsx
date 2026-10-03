@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sparkles, Target, ArrowRight, CheckCircle2, AlertTriangle, Layers } from 'lucide-react';
+import AuthGuard from '@/components/auth/AuthGuard';
 
 export default function RekomendasiPage() {
   const matches = [
@@ -24,7 +25,8 @@ export default function RekomendasiPage() {
   ];
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+    <AuthGuard requiredPermission="job_seekers.view">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       <div>
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
           Rekomendasi & Semantic Matching
@@ -111,5 +113,6 @@ export default function RekomendasiPage() {
         ))}
       </div>
     </div>
-  );
+  </AuthGuard>
+);
 }

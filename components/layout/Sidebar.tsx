@@ -41,7 +41,7 @@ export default function Sidebar({
   desktopOpen,
 }: SidebarProps) {
   const pathname = usePathname();
-  const { user: authUser, logout, hasPermission } = useAuth();
+  const { user: authUser, logout, hasPermission, hasRole } = useAuth();
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -86,6 +86,7 @@ export default function Sidebar({
       label: 'Profil Skill',
       href: '/profil-skill',
       icon: UserCheck,
+      permission: 'job_seekers.view',
     },
   ];
 
@@ -94,11 +95,13 @@ export default function Sidebar({
       label: 'ESCO Skill',
       href: '/taxonomy/esco-skills',
       icon: Bone,
+      permission: 'taxonomy.manage',
     },
     {
       label: 'KBJI (Jabatan)',
       href: '/taxonomy/kbji',
       icon: IdCard,
+      permission: 'taxonomy.manage',
     },
   ];
 
@@ -107,21 +110,25 @@ export default function Sidebar({
       label: 'Lowongan',
       href: '/lowongan',
       icon: Briefcase,
+      permission: 'lowongan.view',
     },
     {
       label: 'Pelatihan',
       href: '/pelatihan',
       icon: GraduationCap,
+      permission: 'pelatihan.view',
     },
     {
       label: 'Rekomendasi & Matching',
       href: '/rekomendasi',
       icon: VectorPolygon,
+      permission: 'job_seekers.view',
     },
     {
       label: 'Laporan & Statistik',
       href: '/laporan',
       icon: FileText,
+      permission: 'laporan.view',
     },
   ];
 
@@ -130,37 +137,85 @@ export default function Sidebar({
       label: 'Dashboard Operator',
       href: '/dashboard/operator',
       icon: ShieldCheck,
+      role: 'operator',
     },
     {
       label: 'Dashboard Pimpinan',
       href: '/dashboard/pimpinan',
       icon: BarChart3,
+      role: 'pimpinan',
     },
   ];
 
-  const availableRoles = [
-    {
+  // Filter item yang boleh dilihat user saat ini
+  const visibleDashboardItems = dashboardSubItems.filter((sub) => {
+    if (hasRole('superadmin')) return true;
+    return hasRole(sub.role);
+  });
+
+  const visibleNavBeforeTaxonomy = navItemsBeforeTaxonomy.filter((item) => {
+    if (!item.permission) return true;
+    return hasPermission(item.permission);
+  });
+
+  const visibleTaxonomySubItems = taxonomySubItems.filter((item) => {
+    if (hasRole('superadmin') || hasRole('operator')) return true;
+    if (!item.permission) return true;
+    return hasPermission(item.permission);
+  });
+
+  const visibleNavAfterTaxonomy = navItemsAfterTaxonomy.filter((item) => {
+    if (!item.permission) return true;
+    return hasPermission(item.permission);
+  });
+
+  // Metadata role untuk role switcher
+  const allRoleMeta: Record<
+    string,
+    { id: string; label: string; roleTitle: string; unit: string; href: string }
+  > = {
+    superadmin: {
+      id: 'superadmin',
+      label: 'Super Administrator',
+      roleTitle: 'Super Administrator',
+      unit: 'Pusat TI & Pasar Kerja',
+      href: '/users',
+    },
+    operator: {
       id: 'operator',
       label: 'Operator Pengantar Kerja',
       roleTitle: 'Operator Pengantar Kerja',
       unit: 'Pusat Pasar Kerja',
       href: '/dashboard/operator',
-      icon: ShieldCheck,
     },
-    {
+    pimpinan: {
       id: 'pimpinan',
-      label: 'Pimpinan',
+      label: 'Pimpinan Eksekutif',
       roleTitle: 'Pimpinan',
       unit: 'Ditjen Binapenta Kemnaker',
       href: '/dashboard/pimpinan',
-      icon: BarChart3,
     },
-  ];
+  };
 
-  // Tentukan role saat ini berdasarkan rute aktif (Hanya 2 Role)
+  // Hanya tampilkan role yang benar-benar dimiliki akun ini (atau semua jika superadmin)
+  const availableRoles = (() => {
+    if (hasRole('superadmin')) {
+      return Object.values(allRoleMeta);
+    }
+    const userRoleNames = authUser?.roles || ['operator'];
+    const matched = userRoleNames
+      .map((rName) => allRoleMeta[rName])
+      .filter(Boolean);
+    return matched.length > 0 ? matched : [allRoleMeta.operator];
+  })();
+
+  // Tentukan role saat ini berdasarkan rute aktif atau role utama user
   const getCurrentRole = () => {
-    if (pathname.includes('/pimpinan')) return availableRoles[1];
-    return availableRoles[0]; // Default ke Operator Pengantar Kerja
+    if (pathname.includes('/pimpinan')) return allRoleMeta.pimpinan;
+    if (pathname.includes('/users') || pathname.includes('/roles')) return allRoleMeta.superadmin;
+    if (hasRole('pimpinan') && !hasRole('operator')) return allRoleMeta.pimpinan;
+    if (hasRole('superadmin')) return allRoleMeta.superadmin;
+    return allRoleMeta.operator;
   };
 
   const currentRole = getCurrentRole();
@@ -224,65 +279,67 @@ export default function Sidebar({
             Menu Utama
           </div>
 
-          {/* 1. Dashboard Paling Atas */}
-          <div className="pb-1">
-            <button
-              type="button"
-              onClick={() => setDashboardOpen(!dashboardOpen)}
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer ${
-                isDashboardActive
-                  ? 'text-white font-semibold'
-                  : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
-              }`}
-              aria-expanded={dashboardOpen}
-            >
-              <div className="flex items-center gap-3">
-                <LayoutDashboard
-                  className={`h-4 w-4 shrink-0 ${
-                    isDashboardActive ? 'text-amber-300' : 'text-blue-200'
+          {/* 1. Dashboard Paling Atas (Tampil jika ada dashboard yang berhak diakses) */}
+          {visibleDashboardItems.length > 0 && (
+            <div className="pb-1">
+              <button
+                type="button"
+                onClick={() => setDashboardOpen(!dashboardOpen)}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer ${
+                  isDashboardActive
+                    ? 'text-white font-semibold'
+                    : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+                }`}
+                aria-expanded={dashboardOpen}
+              >
+                <div className="flex items-center gap-3">
+                  <LayoutDashboard
+                    className={`h-4 w-4 shrink-0 ${
+                      isDashboardActive ? 'text-amber-300' : 'text-blue-200'
+                    }`}
+                  />
+                  <span>Dashboard</span>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 text-blue-300 transition-transform duration-200 ${
+                    dashboardOpen ? 'rotate-180 text-white' : ''
                   }`}
                 />
-                <span>Dashboard</span>
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 text-blue-300 transition-transform duration-200 ${
-                  dashboardOpen ? 'rotate-180 text-white' : ''
-                }`}
-              />
-            </button>
+              </button>
 
-            {/* Submenu Dropdown / Accordion */}
-            {dashboardOpen && (
-              <div className="mt-1 space-y-1 pl-7 pr-1">
-                {dashboardSubItems.map((sub) => {
-                  const subActive = pathname === sub.href;
-                  const SubIcon = sub.icon;
+              {/* Submenu Dropdown / Accordion */}
+              {dashboardOpen && (
+                <div className="mt-1 space-y-1 pl-7 pr-1">
+                  {visibleDashboardItems.map((sub) => {
+                    const subActive = pathname === sub.href;
+                    const SubIcon = sub.icon;
 
-                  return (
-                    <Link
-                      key={sub.href}
-                      href={sub.href}
-                      className={`group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                        subActive
-                          ? 'bg-[#1F5A88] text-white font-semibold shadow-xs'
-                          : 'text-blue-200 hover:bg-[#1F5A88]/40 hover:text-white'
-                      }`}
-                    >
-                      <SubIcon
-                        className={`h-3.5 w-3.5 shrink-0 ${
-                          subActive ? 'text-amber-300' : 'text-blue-300 group-hover:text-white'
+                    return (
+                      <Link
+                        key={sub.href}
+                        href={sub.href}
+                        className={`group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
+                          subActive
+                            ? 'bg-[#1F5A88] text-white font-semibold shadow-xs'
+                            : 'text-blue-200 hover:bg-[#1F5A88]/40 hover:text-white'
                         }`}
-                      />
-                      <span className="truncate">{sub.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                      >
+                        <SubIcon
+                          className={`h-3.5 w-3.5 shrink-0 ${
+                            subActive ? 'text-amber-300' : 'text-blue-300 group-hover:text-white'
+                          }`}
+                        />
+                        <span className="truncate">{sub.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 2. Menu Navigasi Sebelum Taxonomy (Profil Skill) */}
-          {navItemsBeforeTaxonomy.map((item) => {
+          {visibleNavBeforeTaxonomy.map((item) => {
             const active = isItemActive(item.href);
             const Icon = item.icon;
 
@@ -306,65 +363,67 @@ export default function Sidebar({
             );
           })}
 
-          {/* 3. Taxonomy Accordion Dropdown */}
-          <div className="pb-1">
-            <button
-              type="button"
-              onClick={() => setTaxonomyOpen(!taxonomyOpen)}
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer ${
-                isTaxonomyActive
-                  ? 'text-white font-semibold'
-                  : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
-              }`}
-              aria-expanded={taxonomyOpen}
-            >
-              <div className="flex items-center gap-3">
-                <GitMerge
-                  className={`h-4 w-4 shrink-0 ${
-                    isTaxonomyActive ? 'text-amber-300' : 'text-blue-200'
+          {/* 3. Taxonomy Accordion Dropdown (Tampil jika ada sub-item yang berhak diakses) */}
+          {visibleTaxonomySubItems.length > 0 && (
+            <div className="pb-1">
+              <button
+                type="button"
+                onClick={() => setTaxonomyOpen(!taxonomyOpen)}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer ${
+                  isTaxonomyActive
+                    ? 'text-white font-semibold'
+                    : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+                }`}
+                aria-expanded={taxonomyOpen}
+              >
+                <div className="flex items-center gap-3">
+                  <GitMerge
+                    className={`h-4 w-4 shrink-0 ${
+                      isTaxonomyActive ? 'text-amber-300' : 'text-blue-200'
+                    }`}
+                  />
+                  <span>Taxonomy</span>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 text-blue-300 transition-transform duration-200 ${
+                    taxonomyOpen ? 'rotate-180 text-white' : ''
                   }`}
                 />
-                <span>Taxonomy</span>
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 text-blue-300 transition-transform duration-200 ${
-                  taxonomyOpen ? 'rotate-180 text-white' : ''
-                }`}
-              />
-            </button>
+              </button>
 
-            {/* Submenu ESCO Skill & KBJI */}
-            {taxonomyOpen && (
-              <div className="mt-1 space-y-1 pl-7 pr-1">
-                {taxonomySubItems.map((sub) => {
-                  const subActive = pathname === sub.href;
-                  const SubIcon = sub.icon;
+              {/* Submenu ESCO Skill & KBJI */}
+              {taxonomyOpen && (
+                <div className="mt-1 space-y-1 pl-7 pr-1">
+                  {visibleTaxonomySubItems.map((sub) => {
+                    const subActive = pathname === sub.href;
+                    const SubIcon = sub.icon;
 
-                  return (
-                    <Link
-                      key={sub.href}
-                      href={sub.href}
-                      className={`group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                        subActive
-                          ? 'bg-[#1F5A88] text-white font-semibold shadow-xs'
-                          : 'text-blue-200 hover:bg-[#1F5A88]/40 hover:text-white'
-                      }`}
-                    >
-                      <SubIcon
-                        className={`h-3.5 w-3.5 shrink-0 ${
-                          subActive ? 'text-amber-300' : 'text-blue-300 group-hover:text-white'
+                    return (
+                      <Link
+                        key={sub.href}
+                        href={sub.href}
+                        className={`group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
+                          subActive
+                            ? 'bg-[#1F5A88] text-white font-semibold shadow-xs'
+                            : 'text-blue-200 hover:bg-[#1F5A88]/40 hover:text-white'
                         }`}
-                      />
-                      <span className="truncate">{sub.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                      >
+                        <SubIcon
+                          className={`h-3.5 w-3.5 shrink-0 ${
+                            subActive ? 'text-amber-300' : 'text-blue-300 group-hover:text-white'
+                          }`}
+                        />
+                        <span className="truncate">{sub.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 4. Menu Navigasi Setelah Taxonomy */}
-          {navItemsAfterTaxonomy.map((item) => {
+          {visibleNavAfterTaxonomy.map((item) => {
             const active = isItemActive(item.href);
             const Icon = item.icon;
 
