@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             EducationLevelSeeder::class,
             KbjiSeeder::class,
             LowonganKerjaSeeder::class,
+            JobSeekerSeeder::class,
         ]);
     }
 }
