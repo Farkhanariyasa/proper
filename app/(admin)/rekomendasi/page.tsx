@@ -87,7 +87,7 @@ function RekomendasiContent() {
     loadMasters();
   }, []);
 
-  // 2. Fetch Unified Recommendations
+  // 2. Fetch Unified Recommendations (Pasti pada 2 level KBJI: exact atau unit_group)
   const fetchUnifiedRecommendations = useCallback(async () => {
     setLoadingResults(true);
     setError(null);
@@ -95,17 +95,16 @@ function RekomendasiContent() {
       const res = await getUnifiedRecommendationsApi({
         job_seeker_id: selectedSeekerId ? Number(selectedSeekerId) : undefined,
         lowongan_id: selectedLowonganId || undefined,
-        category: selectedCategory || undefined,
         search: searchQuery.trim() || undefined,
       });
       setRecommendations(res.data || []);
-      setCurrentPage(1); // Reset to page 1 on filter change
+      setCurrentPage(1); // Reset to page 1 on search / candidate / vacancy change
     } catch (err: any) {
       setError(err.message || 'Gagal memuat rekomendasi terpadu.');
     } finally {
       setLoadingResults(false);
     }
-  }, [selectedSeekerId, selectedLowonganId, selectedCategory, searchQuery]);
+  }, [selectedSeekerId, selectedLowonganId, searchQuery]);
 
   useEffect(() => {
     fetchUnifiedRecommendations();
@@ -134,7 +133,7 @@ function RekomendasiContent() {
     ];
   }, [vacanciesList]);
 
-  // KPI Statistics Summary
+  // KPI Statistics Summary (Dihitung dari semua pasangan terdaftar)
   const stats = useMemo(() => {
     const total = recommendations.length;
     const ready = recommendations.filter((r) => r.score >= 70).length;
@@ -143,13 +142,41 @@ function RekomendasiContent() {
     return { total, ready, gap, low };
   }, [recommendations]);
 
+  // Saring hasil berdasarkan kategori skor yang dipilih (bisa dari klik card KPI atau select dropdown)
+  const filteredRecommendations = useMemo(() => {
+    if (!selectedCategory) return recommendations;
+    if (selectedCategory === 'ready' || selectedCategory === 'high') {
+      return recommendations.filter((r) => r.score >= 70);
+    }
+    if (selectedCategory === 'perfect') {
+      return recommendations.filter((r) => r.score === 100);
+    }
+    if (selectedCategory === 'gap') {
+      return recommendations.filter((r) => r.score >= 40 && r.score < 70);
+    }
+    if (selectedCategory === 'low') {
+      return recommendations.filter((r) => r.score < 40);
+    }
+    return recommendations.filter((r) => r.classification.category === selectedCategory);
+  }, [recommendations, selectedCategory]);
+
   // Pagination calculation
-  const totalItems = recommendations.length;
+  const totalItems = filteredRecommendations.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentItems = useMemo(() => {
-    return recommendations.slice(startIndex, startIndex + itemsPerPage);
-  }, [recommendations, startIndex, itemsPerPage]);
+    return filteredRecommendations.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredRecommendations, startIndex, itemsPerPage]);
+
+  // Handler klik kartu ringkasan untuk filter otomatis
+  const handleCardCategoryClick = (cat: string) => {
+    if (selectedCategory === cat) {
+      setSelectedCategory('');
+    } else {
+      setSelectedCategory(cat);
+    }
+    setCurrentPage(1);
+  };
 
   // Handler for Pairwise Analysis Modal
   const handleOpenAnalysisModal = async (seekerId: number, lowonganId: string) => {
@@ -175,15 +202,7 @@ function RekomendasiContent() {
     setSelectedLowonganId('');
     setSelectedCategory('');
     setSearchQuery('');
-  };
-
-  const formatCurrency = (val: number | null | undefined) => {
-    if (val === null || val === undefined) return '-';
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0,
-    }).format(val);
+    setCurrentPage(1);
   };
 
   return (
@@ -208,52 +227,127 @@ function RekomendasiContent() {
             className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs self-start sm:self-auto disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loadingResults ? 'animate-spin text-[#0E385E]' : ''}`} />
-            <span>Segarkan Perhitungan</span>
           </button>
         </div>
 
-        {/* KPI Summary Cards */}
+        {/* KPI Summary Cards (Bisa Diklik Untuk Auto-Filter) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <div className="p-4 rounded-xl border border-slate-200 bg-white shadow-2xs">
-            <span className="text-slate-500 text-xs font-medium block">Total Pasangan Dievaluasi</span>
+          {/* Card 1: Total */}
+          <button
+            type="button"
+            onClick={() => handleCardCategoryClick('')}
+            className={`text-left p-4 rounded-xl border transition-all cursor-pointer relative group ${
+              selectedCategory === ''
+                ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/30 shadow-xs'
+                : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs'
+            }`}
+            title="Klik untuk melihat semua kombinasi rekomendasi"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500 text-xs font-medium block">Total</span>
+              {selectedCategory === '' ? (
+                <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
+                  Semua
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-400 group-hover:text-blue-600 transition-colors">
+                  Filter
+                </span>
+              )}
+            </div>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-2xl font-extrabold text-slate-900">{stats.total}</span>
-              <span className="text-[11px] text-slate-400">Kombinasi</span>
             </div>
-          </div>
+          </button>
 
-          <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 shadow-2xs">
-            <span className="text-emerald-800 text-xs font-medium block">Siap Ditempatkan (≥70%)</span>
+          {/* Card 2: Siap Ditempatkan */}
+          <button
+            type="button"
+            onClick={() => handleCardCategoryClick('ready')}
+            className={`text-left p-4 rounded-xl border transition-all cursor-pointer relative group ${
+              selectedCategory === 'ready' || selectedCategory === 'high' || selectedCategory === 'perfect'
+                ? 'border-emerald-500 bg-emerald-100/60 ring-2 ring-emerald-500/40 shadow-xs'
+                : 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 hover:border-emerald-300 hover:shadow-xs'
+            }`}
+            title="Klik untuk memfilter pasangan siap kerja (skor ≥ 70%)"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-emerald-800 text-xs font-medium block">Siap Ditempatkan (≥70%)</span>
+              {(selectedCategory === 'ready' || selectedCategory === 'high' || selectedCategory === 'perfect') ? (
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-200/90 px-1.5 py-0.5 rounded">
+                  ✓ Aktif
+                </span>
+              ) : (
+                <span className="text-[10px] text-emerald-600/70 group-hover:text-emerald-700 transition-colors">
+                  Filter
+                </span>
+              )}
+            </div>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-2xl font-extrabold text-emerald-700">{stats.ready}</span>
-              <span className="text-[11px] font-semibold text-emerald-600">Prioritas Match</span>
             </div>
-          </div>
+          </button>
 
-          <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/50 shadow-2xs">
-            <span className="text-amber-800 text-xs font-medium block">Perlu Peningkatan (40-69%)</span>
+          {/* Card 3: Perlu Peningkatan Skill */}
+          <button
+            type="button"
+            onClick={() => handleCardCategoryClick('gap')}
+            className={`text-left p-4 rounded-xl border transition-all cursor-pointer relative group ${
+              selectedCategory === 'gap'
+                ? 'border-amber-500 bg-amber-100/60 ring-2 ring-amber-500/40 shadow-xs'
+                : 'border-amber-200 bg-amber-50/50 hover:bg-amber-50 hover:border-amber-300 hover:shadow-xs'
+            }`}
+            title="Klik untuk memfilter pasangan yang perlu peningkatan skill (skor 40-69%)"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-amber-800 text-xs font-medium block">Perlu Peningkatan (40-69%)</span>
+              {selectedCategory === 'gap' ? (
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-200/90 px-1.5 py-0.5 rounded">
+                  ✓ Aktif
+                </span>
+              ) : (
+                <span className="text-[10px] text-amber-600/70 group-hover:text-amber-700 transition-colors">
+                  Filter
+                </span>
+              )}
+            </div>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-2xl font-extrabold text-amber-700">{stats.gap}</span>
-              <span className="text-[11px] font-semibold text-amber-600">Pelatihan Gap</span>
             </div>
-          </div>
+          </button>
 
-          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 shadow-2xs">
-            <span className="text-slate-600 text-xs font-medium block">Belum Sesuai (&lt;40%)</span>
+          {/* Card 4: Belum Sesuai */}
+          <button
+            type="button"
+            onClick={() => handleCardCategoryClick('low')}
+            className={`text-left p-4 rounded-xl border transition-all cursor-pointer relative group ${
+              selectedCategory === 'low'
+                ? 'border-slate-500 bg-slate-200/80 ring-2 ring-slate-500/40 shadow-xs'
+                : 'border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 hover:shadow-xs'
+            }`}
+            title="Klik untuk memfilter pasangan yang belum sesuai (skor < 40%)"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-slate-600 text-xs font-medium block">Belum Sesuai (&lt;40%)</span>
+              {selectedCategory === 'low' ? (
+                <span className="text-[10px] font-bold text-slate-800 bg-slate-300 px-1.5 py-0.5 rounded">
+                  ✓ Aktif
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-400 group-hover:text-slate-600 transition-colors">
+                  Filter
+                </span>
+              )}
+            </div>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-2xl font-extrabold text-slate-700">{stats.low}</span>
-              <span className="text-[11px] text-slate-500">Bimbingan Karir</span>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Filter Control Bar */}
         <div className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-4">
           <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
-              <SlidersHorizontal className="w-4 h-4 text-[#0E385E]" />
-              <span>Saring Berdasarkan Pelamar, Lowongan & Kategori</span>
-            </div>
             {(selectedSeekerId || selectedLowonganId || selectedCategory || searchQuery) && (
               <button
                 type="button"
@@ -324,12 +418,14 @@ function RekomendasiContent() {
               </label>
               <select
                 value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full py-2 px-3 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-600 text-slate-800"
               >
                 <option value="">Semua Kategori Skor</option>
-                <option value="perfect">100% Siap Kerja (Perfect Match)</option>
-                <option value="high">≥ 70% Siap Ditempatkan (High Match)</option>
+                <option value="ready">≥ 70% Siap Ditempatkan (High Match)</option>
                 <option value="gap">40% - 69% Perlu Peningkatan Skill</option>
                 <option value="low">&lt; 40% Belum Sesuai</option>
               </select>
@@ -348,14 +444,6 @@ function RekomendasiContent() {
         {/* Main Unified Recommendations Table */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
           <div className="px-5 py-3.5 border-b border-slate-200 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                Daftar Pasangan Hasil Matching & Rekomendasi
-              </h2>
-              <p className="text-xs text-slate-500">
-                Diurutkan berdasarkan skor kesesuaian keahlian tertinggi dari algoritma matching engine
-              </p>
-            </div>
 
             {/* Selector Items Per Page */}
             <div className="flex items-center gap-2 text-xs text-slate-600 self-end sm:self-auto">
@@ -379,12 +467,12 @@ function RekomendasiContent() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[11px] tracking-wider">
-                  <th className="py-3 px-3.5 text-center w-12">#</th>
-                  <th className="py-3 px-4 min-w-[220px]">Pencari Kerja (Kandidat)</th>
-                  <th className="py-3 px-4 min-w-[250px]">Formasi Lowongan & Perusahaan</th>
-                  <th className="py-3 px-4 min-w-[170px] text-center">Skor & Kesiapan</th>
-                  <th className="py-3 px-4 min-w-[190px]">Kesesuaian Skill ESCO</th>
-                  <th className="py-3 px-4 text-right min-w-[160px]">Aksi</th>
+                  <th className="py-3 px-3 text-center w-10">#</th>
+                  <th className="py-3 px-4 min-w-[200px]">Pencari Kerja</th>
+                  <th className="py-3 px-4 min-w-[220px]">Formasi Lowongan</th>
+                  <th className="py-3 px-4 min-w-[150px] text-center">Skor Match</th>
+                  <th className="py-3 px-4 min-w-[160px]">Keahlian Terpenuhi</th>
+                  <th className="py-3 px-4 text-right min-w-[130px]">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -428,142 +516,75 @@ function RekomendasiContent() {
                         className="hover:bg-slate-50/70 transition-colors border-b border-slate-100"
                       >
                         {/* 1. Nomor Urut */}
-                        <td className="py-3.5 px-3.5 text-center font-mono text-slate-400 text-xs">
+                        <td className="py-3.5 px-3 text-center font-mono text-slate-400 text-xs">
                           {rowNumber}
                         </td>
 
                         {/* 2. Profil Pelamar */}
                         <td className="py-3.5 px-4">
-                          <div className="space-y-1">
-                            <div className="font-bold text-slate-900 hover:text-blue-700 transition-colors">
-                              {pair.candidate.full_name}
-                            </div>
-                            <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
-                              <span className="font-mono bg-slate-100 px-1 py-0.2 rounded text-[10px] text-slate-600">
-                                {pair.candidate.nik}
-                              </span>
-                              <span>•</span>
-                              <span>{pair.candidate.desired_occupation || 'Pencari Kerja'}</span>
-                            </div>
-                            <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                              <MapPin className="w-3 h-3 shrink-0" />
-                              <span className="truncate max-w-[200px]">{pair.candidate.location || '-'}</span>
-                            </div>
+                          <div className="font-semibold text-slate-900">
+                            {pair.candidate.full_name}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            <span>{pair.candidate.desired_occupation || 'Pencari Kerja'}</span>
+                            {pair.candidate.location && (
+                              <>
+                                <span className="mx-1">•</span>
+                                <span>{pair.candidate.location.split(',')[0]}</span>
+                              </>
+                            )}
                           </div>
                         </td>
 
                         {/* 3. Formasi Lowongan & Perusahaan */}
                         <td className="py-3.5 px-4">
-                          <div className="space-y-1">
-                            <div className="font-bold text-slate-900 line-clamp-1">
-                              {pair.job.judul_lowongan}
-                            </div>
-                            <div className="text-[11px] text-slate-600 flex items-center gap-1">
-                              <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
-                              <span className="font-medium">{pair.job.nama_perusahaan}</span>
-                            </div>
-                            <div className="text-[10px] text-slate-400 flex flex-wrap items-center gap-1.5">
-                              <span className="px-1.5 py-0.2 rounded bg-slate-100 font-medium text-slate-600">
-                                {pair.job.tipe_pekerjaan}
-                              </span>
-                              <span>•</span>
-                              <span>{pair.job.sistem_kerja}</span>
-                              {pair.job.gaji_tampilkan && pair.job.gaji_minimal && (
-                                <>
-                                  <span>•</span>
-                                  <span className="font-semibold text-emerald-700">
-                                    {formatCurrency(pair.job.gaji_minimal)}
-                                  </span>
-                                </>
-                              )}
-                            </div>
+                          <div className="font-semibold text-slate-900">
+                            {pair.job.judul_lowongan}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            <span className="font-medium text-slate-600">{pair.job.nama_perusahaan}</span>
+                            {pair.job.location && (
+                              <>
+                                <span className="mx-1">•</span>
+                                <span>{pair.job.location.split(',')[0]}</span>
+                              </>
+                            )}
                           </div>
                         </td>
 
                         {/* 4. Skor & Status Kesiapan */}
                         <td className="py-3.5 px-4 text-center">
-                          <div className="inline-flex flex-col items-center gap-1.5">
-                            {/* Score number and bar */}
-                            <div className="flex items-center gap-2">
-                              <div className="w-20 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
-                                <div
-                                  className={`h-full rounded-full transition-all duration-500 ${
-                                    pair.score >= 70
-                                      ? 'bg-emerald-500'
-                                      : pair.score >= 40
-                                      ? 'bg-amber-500'
-                                      : 'bg-slate-400'
-                                  }`}
-                                  style={{ width: `${pair.score}%` }}
-                                />
-                              </div>
-                              <span
-                                className={`text-xs font-black ${
-                                  pair.score >= 70
-                                    ? 'text-emerald-700'
-                                    : pair.score >= 40
-                                    ? 'text-amber-700'
-                                    : 'text-slate-600'
-                                }`}
-                              >
-                                {pair.score}%
-                              </span>
-                            </div>
-
-                            {/* Badge */}
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border inline-block whitespace-nowrap ${
-                                pair.classification.badge_color === 'emerald'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                  : pair.classification.badge_color === 'blue'
-                                  ? 'bg-blue-50 text-blue-800 border-blue-300'
-                                  : pair.classification.badge_color === 'amber'
-                                  ? 'bg-amber-50 text-amber-800 border-amber-300'
-                                  : 'bg-slate-100 text-slate-700 border-slate-300'
-                              }`}
-                            >
-                              {pair.classification.label}
-                            </span>
-                          </div>
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                              pair.score >= 70
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : pair.score >= 40
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            <span>{pair.score}%</span>
+                            <span className="font-normal opacity-50">•</span>
+                            <span>{pair.classification.label.replace('100% ', '')}</span>
+                          </span>
                         </td>
 
                         {/* 5. Detail Skill Cocok & Gap */}
                         <td className="py-3.5 px-4">
-                          <div className="space-y-1.5">
-                            <div className="flex items-center gap-2 text-[11px]">
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                <span>{pair.total_matched} Cocok</span>
-                              </span>
-                              {pair.total_gap > 0 ? (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-semibold">
-                                  <AlertTriangle className="w-3 h-3 text-amber-600" />
-                                  <span>{pair.total_gap} Gap</span>
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-emerald-600 font-medium">
-                                  (Kompetensi Lengkap)
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Skill names pill preview */}
-                            <div className="flex flex-wrap gap-1 max-w-[260px]">
-                              {pair.matched_skills.slice(0, 2).map((s) => (
-                                <span
-                                  key={s.id}
-                                  className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 truncate max-w-[120px]"
-                                  title={s.title}
-                                >
-                                  {s.title}
-                                </span>
-                              ))}
-                              {pair.matched_skills.length > 2 && (
-                                <span className="text-[9px] text-slate-400 self-center">
-                                  +{pair.matched_skills.length - 2} lainnya
-                                </span>
-                              )}
-                            </div>
+                          <div className="flex items-center gap-1.5 text-xs">
+                            {pair.total_gap === 0 ? (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span className="text-emerald-700 font-semibold">{pair.total_matched}/{pair.total_required} skill</span>
+                                <span className="text-[11px] text-slate-400">(Lengkap)</span>
+                              </>
+                            ) : (
+                              <>
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                <span className="text-slate-700 font-medium">{pair.total_matched}/{pair.total_required} skill</span>
+                                <span className="text-[11px] text-amber-600 font-normal">({pair.total_gap} gap)</span>
+                              </>
+                            )}
                           </div>
                         </td>
 
@@ -575,7 +596,7 @@ function RekomendasiContent() {
                               type="button"
                               onClick={() => handleOpenAnalysisModal(pair.candidate.id, pair.job.id)}
                               disabled={isAnalyzing}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 text-xs font-medium transition-colors shadow-2xs disabled:opacity-50"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 text-xs font-medium transition-colors shadow-2xs disabled:opacity-50"
                               title="Lihat Komparasi Skill & Gap Lengkap"
                             >
                               {isAnalyzing ? (
@@ -583,7 +604,7 @@ function RekomendasiContent() {
                               ) : (
                                 <Eye className="w-3 h-3 text-slate-500" />
                               )}
-                              <span>Analisis</span>
+                              <span>Detail</span>
                             </button>
 
                             {/* Tombol Rekomendasikan (Jika Score >= 70%) */}
@@ -591,7 +612,7 @@ function RekomendasiContent() {
                               <button
                                 type="button"
                                 onClick={() => handleRecommendCandidate(pair.candidate.full_name, pair.job.nama_perusahaan)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-[#0E385E] text-white hover:bg-[#163A5F] text-xs font-semibold transition-colors shadow-2xs"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0E385E] text-white hover:bg-[#163A5F] text-xs font-semibold transition-colors shadow-2xs"
                                 title="Rekomendasikan Pelamar ke Perusahaan Ini"
                               >
                                 <Send className="w-3 h-3" />

@@ -118,6 +118,14 @@ export default function SkillGapModal({
                 <div className="text-xs text-slate-500 font-mono">NIK: {candidate.nik}</div>
               </div>
               <div className="space-y-1 text-xs text-slate-600 pt-1">
+                {candidate.kbji && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-blue-700 font-bold bg-blue-50 px-1 rounded text-[10px]">
+                      {candidate.kbji.code}
+                    </span>
+                    <span className="truncate">{candidate.kbji.title}</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-1.5">
                   <GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span>{candidate.education_level || '-'}</span>
@@ -165,6 +173,42 @@ export default function SkillGapModal({
               </div>
             </div>
           </div>
+
+          {/* Status Keselarasan KBJI (2 Level Wajib) */}
+          {data.kbji_match && (
+            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 rounded-lg ${
+                  data.kbji_match.match_level === 'exact'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-blue-100 text-blue-700'
+                }`}>
+                  <Briefcase className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                    <span>Kesesuaian Profesi KBJI:</span>
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${
+                      data.kbji_match.match_level === 'exact'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-blue-50 text-blue-800 border-blue-200'
+                    }`}>
+                      {data.kbji_match.label}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {data.kbji_match.match_level === 'exact'
+                      ? 'Target jabatan pelamar dan formasi lowongan memiliki klasifikasi KBJI yang identik persis.'
+                      : 'Target jabatan pelamar dan formasi lowongan berada pada 4-digit sub-golongan profesi yang sama.'}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Skor Keselarasan</span>
+                <span className="text-sm font-black text-[#0E385E]">{data.kbji_match.compatibility_score}%</span>
+              </div>
+            </div>
+          )}
 
           {/* Rincian Komparasi Dua Kolom: Matched vs Gap */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -272,7 +316,7 @@ export default function SkillGapModal({
                 </div>
               ) : (
                 <div className="p-6 text-center text-xs text-emerald-700 bg-emerald-50 rounded-lg font-medium">
-                  Luar biasa! Tidak ada kesenjangan skill. Semua kualifikasi lowongan telah dipenuhi pelamar (100% Match).
+                 Semua kualifikasi lowongan telah dipenuhi pelamar.
                 </div>
               )}
             </div>

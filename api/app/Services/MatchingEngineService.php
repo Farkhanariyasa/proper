@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\JobSeeker;
 use App\Models\LowonganKerja;
+use App\Models\KbjiClassification;
 use Illuminate\Support\Facades\DB;
 
 class MatchingEngineService
@@ -27,22 +28,25 @@ class MatchingEngineService
             throw new \InvalidArgumentException('Lowongan kerja tidak ditemukan.');
         }
 
-        $jobSeeker = JobSeeker::with(['skills:id,title,title_en,code', 'educationLevel', 'regency.province'])
+        $jobSeeker = JobSeeker::with(['skills:id,title,title_en,code', 'educationLevel', 'regency.province', 'kbji:id,code,title'])
             ->find($jobSeekerId);
 
         if (!$jobSeeker) {
             throw new \InvalidArgumentException('Profil pencari kerja tidak ditemukan.');
         }
 
-        // 1. Muat skill yang disyaratkan oleh lowongan (S_required)
+        // 1. Evaluasi kesesuaian jabatan KBJI
+        $kbjiMatch = $this->evaluateKbjiMatch($jobSeeker->kbji, $lowongan->kbji);
+
+        // 2. Muat skill yang disyaratkan oleh lowongan (S_required)
         $requiredSkills = $lowongan->skills;
         $totalRequired = $requiredSkills->count();
 
-        // 2. Muat skill yang dimiliki pelamar (dengan metadata)
+        // 3. Muat skill yang dimiliki pelamar (dengan metadata)
         $candidateSkills = $jobSeeker->skills;
         $candidateSkillIds = $candidateSkills->pluck('id')->toArray();
 
-        // 3. Iterasi setiap skill yang dibutuhkan dan uji multi-layer matching
+        // 4. Iterasi setiap skill yang dibutuhkan dan uji multi-layer matching
         $matchedSkills = [];
         $gapSkills = [];
 
@@ -72,11 +76,11 @@ class MatchingEngineService
             }
         }
 
-        // 4. Hitung Persentase Match Score: round( (|S_matched| / |S_required|) * 100% )
+        // 5. Hitung Persentase Match Score: round( (|S_matched| / |S_required|) * 100% )
         $totalMatched = count($matchedSkills);
         $score = $totalRequired > 0 ? (int) round(($totalMatched / $totalRequired) * 100) : 100;
 
-        // 5. Klasifikasi Skor (Decision Rules)
+        // 6. Klasifikasi Skor (Decision Rules)
         $classification = $this->classifyScore($score);
 
         return [
@@ -87,6 +91,10 @@ class MatchingEngineService
                 'phone' => $jobSeeker->phone,
                 'education_level' => $jobSeeker->educationLevel?->name,
                 'desired_occupation' => $jobSeeker->desired_occupation,
+                'kbji' => $jobSeeker->kbji ? [
+                    'code' => $jobSeeker->kbji->code,
+                    'title' => $jobSeeker->kbji->title,
+                ] : null,
                 'location' => ($jobSeeker->regency?->name ?? '') . ', ' . ($jobSeeker->regency?->province?->name ?? ''),
             ],
             'job' => [
@@ -108,8 +116,64 @@ class MatchingEngineService
             'total_matched' => $totalMatched,
             'total_gap' => count($gapSkills),
             'classification' => $classification,
+            'kbji_match' => $kbjiMatch,
             'matched_skills' => $matchedSkills,
             'gap_skills' => $gapSkills,
+        ];
+    }
+
+    /**
+     * Mengevaluasi kesesuaian antara KBJI target pelamar dan KBJI lowongan kerja
+     * Wajib berada di salah satu dari 2 level:
+     * 1. Jabatan Identik (exact): Kode KBJI sama persis (misal: 2512.03 vs 2512.03)
+     * 2. Sub-Golongan Identik (unit_group): 4 digit pertama sama (misal: 2512.01 vs 2512.03)
+     */
+    public function evaluateKbjiMatch(?KbjiClassification $candidateKbji, ?KbjiClassification $jobKbji): array
+    {
+        if (!$candidateKbji || !$jobKbji) {
+            return [
+                'is_compatible' => false,
+                'match_level' => 'unspecified',
+                'label' => 'KBJI Belum Ditentukan',
+                'code' => null,
+                'compatibility_score' => 0,
+            ];
+        }
+
+        $cCode = trim($candidateKbji->code);
+        $jCode = trim($jobKbji->code);
+
+        // Level 1: Jabatan Identik (exact) - Kode KBJI sama persis
+        if ($cCode === $jCode) {
+            return [
+                'is_compatible' => true,
+                'match_level' => 'exact',
+                'label' => 'Jabatan Identik',
+                'code' => $cCode,
+                'compatibility_score' => 100,
+            ];
+        }
+
+        // Level 2: Sub-Golongan Identik (unit_group) - 4 digit pertama sama
+        $cUnit = substr($cCode, 0, 4);
+        $jUnit = substr($jCode, 0, 4);
+        if (strlen($cUnit) === 4 && strlen($jUnit) === 4 && $cUnit === $jUnit) {
+            return [
+                'is_compatible' => true,
+                'match_level' => 'unit_group',
+                'label' => 'Sub-Golongan Identik (' . $cUnit . ')',
+                'code' => $cUnit,
+                'compatibility_score' => 95,
+            ];
+        }
+
+        // Di luar 2 level di atas -> Tidak Kompatibel (Di-skip)
+        return [
+            'is_compatible' => false,
+            'match_level' => 'different_group',
+            'label' => 'Berbeda Sub-Golongan',
+            'code' => $cCode . ' vs ' . $jCode,
+            'compatibility_score' => 0,
         ];
     }
 
@@ -221,7 +285,7 @@ class MatchingEngineService
      */
     public function recommendJobsForSeeker(int $jobSeekerId, array $filters = []): array
     {
-        $jobSeeker = JobSeeker::with('skills:id,title,title_en')->find($jobSeekerId);
+        $jobSeeker = JobSeeker::with(['skills:id,title,title_en', 'kbji:id,code,title'])->find($jobSeekerId);
 
         if (!$jobSeeker) {
             throw new \InvalidArgumentException('Profil pencari kerja tidak ditemukan.');
@@ -254,10 +318,25 @@ class MatchingEngineService
             $query->where('tipe_pekerjaan', $filters['tipe_pekerjaan']);
         }
 
+        // Filter wajib pada 2 level KBJI: exact match atau 4-digit unit_group
+        if ($jobSeeker->kbji) {
+            $cUnit = substr(trim($jobSeeker->kbji->code), 0, 4);
+            if (strlen($cUnit) === 4) {
+                $query->whereHas('kbji', function ($kq) use ($cUnit) {
+                    $kq->where('code', 'like', $cUnit . '%');
+                });
+            }
+        }
+
         $vacancies = $query->get();
         $recommendations = [];
 
         foreach ($vacancies as $job) {
+            $kbjiMatch = $this->evaluateKbjiMatch($jobSeeker->kbji, $job->kbji);
+            if (!$kbjiMatch['is_compatible']) {
+                continue;
+            }
+
             $requiredSkills = $job->skills;
             $totalRequired = $requiredSkills->count();
 
@@ -314,6 +393,7 @@ class MatchingEngineService
                 'total_matched' => $totalMatched,
                 'total_gap' => count($gapSkills),
                 'classification' => $classification,
+                'kbji_match' => $kbjiMatch,
                 'matched_skills' => $matchedSkills,
                 'gap_skills' => $gapSkills,
             ];
@@ -330,7 +410,7 @@ class MatchingEngineService
      */
     public function recommendCandidatesForJob(string $lowonganId, array $filters = []): array
     {
-        $lowongan = LowonganKerja::with('skills:id,title,title_en')->find($lowonganId);
+        $lowongan = LowonganKerja::with(['skills:id,title,title_en', 'kbji:id,code,title'])->find($lowonganId);
 
         if (!$lowongan) {
             throw new \InvalidArgumentException('Lowongan kerja tidak ditemukan.');
@@ -339,22 +419,38 @@ class MatchingEngineService
         $requiredSkills = $lowongan->skills;
         $totalRequired = $requiredSkills->count();
 
-        // Ambil semua pencari kerja dengan skill mereka
+        // Ambil semua pencari kerja dengan skill & KBJI mereka
         $query = JobSeeker::query()
             ->with([
                 'skills:id,title,title_en',
                 'educationLevel:id,name',
                 'regency.province',
+                'kbji:id,code,title',
             ]);
 
         if (!empty($filters['regency_id'])) {
             $query->where('regency_id', $filters['regency_id']);
         }
 
+        // Filter wajib pada 2 level KBJI: exact match atau 4-digit unit_group
+        if ($lowongan->kbji) {
+            $jUnit = substr(trim($lowongan->kbji->code), 0, 4);
+            if (strlen($jUnit) === 4) {
+                $query->whereHas('kbji', function ($kq) use ($jUnit) {
+                    $kq->where('code', 'like', $jUnit . '%');
+                });
+            }
+        }
+
         $seekers = $query->get();
         $recommendations = [];
 
         foreach ($seekers as $candidate) {
+            $kbjiMatch = $this->evaluateKbjiMatch($candidate->kbji, $lowongan->kbji);
+            if (!$kbjiMatch['is_compatible']) {
+                continue;
+            }
+
             $candidateSkills = $candidate->skills;
             $candidateSkillIds = $candidateSkills->pluck('id')->toArray();
 
@@ -397,12 +493,18 @@ class MatchingEngineService
                 'study_field_group' => $candidate->study_field_group,
                 'experience_range' => $candidate->experience_range,
                 'desired_occupation' => $candidate->desired_occupation,
+                'kbji' => $candidate->kbji ? [
+                    'id' => $candidate->kbji->id,
+                    'code' => $candidate->kbji->code,
+                    'title' => $candidate->kbji->title,
+                ] : null,
                 'location' => ($candidate->regency?->name ?? '') . ', ' . ($candidate->regency?->province?->name ?? ''),
                 'score' => $score,
                 'total_required' => $totalRequired,
                 'total_matched' => $totalMatched,
                 'total_gap' => count($gapSkills),
                 'classification' => $classification,
+                'kbji_match' => $kbjiMatch,
                 'matched_skills' => $matchedSkills,
                 'gap_skills' => $gapSkills,
             ];
@@ -417,7 +519,7 @@ class MatchingEngineService
     /**
      * Rekomendasi Terpadu Pasangan (Unified Pairwise Recommendations)
      * Mengkombinasikan perspektif pelamar dan lowongan ke dalam satu dataset terpadu
-     * Mendukung filter per pelamar, per lowongan, kata kunci pencarian, dan klasifikasi skor.
+     * Wajib berada di 2 level KBJI: exact match atau 4-digit unit_group
      */
     public function getUnifiedRecommendations(array $filters = []): array
     {
@@ -427,6 +529,7 @@ class MatchingEngineService
                 'skills:id,title,title_en',
                 'educationLevel:id,name',
                 'regency.province',
+                'kbji:id,code,title',
             ]);
 
         if (!empty($filters['job_seeker_id'])) {
@@ -463,6 +566,13 @@ class MatchingEngineService
             $candidateSkillIds = $candidateSkills->pluck('id')->toArray();
 
             foreach ($vacancies as $job) {
+                // Wajib di 2 level KBJI: Jabatan Identik (exact) atau Sub-Golongan Identik (unit_group 4 digit)
+                $kbjiMatch = $this->evaluateKbjiMatch($candidate->kbji, $job->kbji);
+
+                if (!$kbjiMatch['is_compatible']) {
+                    continue;
+                }
+
                 // Filter pencarian teks jika diberikan
                 if ($search) {
                     $matchedText = str_contains(mb_strtolower($candidate->full_name), $search)
@@ -509,8 +619,14 @@ class MatchingEngineService
                 $classification = $this->classifyScore($score);
 
                 // Filter kategori jika diberikan
-                if ($categoryFilter && $classification['category'] !== $categoryFilter) {
-                    continue;
+                if ($categoryFilter) {
+                    if ($categoryFilter === 'ready' || $categoryFilter === 'high') {
+                        if ($score < 70) {
+                            continue;
+                        }
+                    } elseif ($classification['category'] !== $categoryFilter) {
+                        continue;
+                    }
                 }
 
                 // Filter minimal skor jika diberikan
@@ -525,6 +641,7 @@ class MatchingEngineService
                     'total_matched' => $totalMatched,
                     'total_gap' => count($gapSkills),
                     'classification' => $classification,
+                    'kbji_match' => $kbjiMatch,
                     'candidate' => [
                         'id' => $candidate->id,
                         'nik' => $candidate->nik,
@@ -532,6 +649,11 @@ class MatchingEngineService
                         'phone' => $candidate->phone,
                         'education_level' => $candidate->educationLevel?->name,
                         'desired_occupation' => $candidate->desired_occupation,
+                        'kbji' => $candidate->kbji ? [
+                            'id' => $candidate->kbji->id,
+                            'code' => $candidate->kbji->code,
+                            'title' => $candidate->kbji->title,
+                        ] : null,
                         'location' => ($candidate->regency?->name ?? '') . ', ' . ($candidate->regency?->province?->name ?? ''),
                     ],
                     'job' => [
@@ -541,6 +663,11 @@ class MatchingEngineService
                         'nama_perusahaan' => $job->nama_perusahaan,
                         'tipe_pekerjaan' => $job->tipe_pekerjaan,
                         'sistem_kerja' => $job->sistem_kerja,
+                        'kbji' => $job->kbji ? [
+                            'id' => $job->kbji->id,
+                            'code' => $job->kbji->code,
+                            'title' => $job->kbji->title,
+                        ] : null,
                         'education_level' => $job->educationLevel?->name,
                         'location' => ($job->regency?->name ?? '') . ', ' . ($job->province?->name ?? ''),
                         'gaji_tampilkan' => $job->gaji_tampilkan,

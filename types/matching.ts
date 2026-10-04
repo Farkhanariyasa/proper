@@ -27,6 +27,14 @@ export interface MatchClassification {
   description: string;
 }
 
+export interface KbjiMatchInfo {
+  is_compatible: boolean;
+  match_level: 'exact' | 'unit_group' | 'sub_major' | 'different_domain' | 'unspecified';
+  label: string;
+  code: string | null;
+  compatibility_score: number;
+}
+
 export interface JobRecommendationItem {
   job_id: string;
   slug: string;
@@ -51,6 +59,7 @@ export interface JobRecommendationItem {
   total_matched: number;
   total_gap: number;
   classification: MatchClassification;
+  kbji_match?: KbjiMatchInfo;
   matched_skills: MatchedSkillItem[];
   gap_skills: GapSkillItem[];
 }
@@ -65,12 +74,18 @@ export interface CandidateRecommendationItem {
   study_field_group?: string;
   experience_range?: string;
   desired_occupation?: string;
+  kbji?: {
+    id?: number;
+    code: string;
+    title: string;
+  } | null;
   location?: string;
   score: number;
   total_required: number;
   total_matched: number;
   total_gap: number;
   classification: MatchClassification;
+  kbji_match?: KbjiMatchInfo;
   matched_skills: MatchedSkillItem[];
   gap_skills: GapSkillItem[];
 }
@@ -83,6 +98,10 @@ export interface PairwiseAnalysisResponse {
     phone?: string;
     education_level?: string;
     desired_occupation?: string;
+    kbji?: {
+      code: string;
+      title: string;
+    } | null;
     location?: string;
   };
   job: {
@@ -104,6 +123,7 @@ export interface PairwiseAnalysisResponse {
   total_matched: number;
   total_gap: number;
   classification: MatchClassification;
+  kbji_match?: KbjiMatchInfo;
   matched_skills: MatchedSkillItem[];
   gap_skills: GapSkillItem[];
 }
@@ -115,6 +135,7 @@ export interface RecommendationPairItem {
   total_matched: number;
   total_gap: number;
   classification: MatchClassification;
+  kbji_match?: KbjiMatchInfo;
   candidate: {
     id: number;
     nik: string;
@@ -122,6 +143,11 @@ export interface RecommendationPairItem {
     phone?: string;
     education_level?: string;
     desired_occupation?: string;
+    kbji?: {
+      id?: number;
+      code: string;
+      title: string;
+    } | null;
     location: string;
   };
   job: {
@@ -131,6 +157,11 @@ export interface RecommendationPairItem {
     nama_perusahaan: string;
     tipe_pekerjaan: string;
     sistem_kerja: string;
+    kbji?: {
+      id?: number;
+      code: string;
+      title: string;
+    } | null;
     education_level?: string;
     location: string;
     gaji_tampilkan: boolean;
@@ -140,4 +171,3 @@ export interface RecommendationPairItem {
   matched_skills: MatchedSkillItem[];
   gap_skills: GapSkillItem[];
 }
-
