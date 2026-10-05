@@ -1,7 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  basePath: '/pembelajaran-lmi',
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/pembelajaran-lmi',
+        basePath: false,
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,https://proper.zeabur.app')),
+    'allowed_origins' => explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,https://proper.zeabur.app,https://e-pengantarkerja-kemnaker.web.id,https://www.e-pengantarkerja-kemnaker.web.id,http://e-pengantarkerja-kemnaker.web.id')),
 
     'allowed_origins_patterns' => [],
 
