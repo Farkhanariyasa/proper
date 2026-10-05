@@ -138,7 +138,7 @@ class LowonganController extends Controller
     public function show(string $idOrSlug): JsonResponse
     {
         $lowongan = LowonganKerja::with([
-            'kbji:id,code,title,level,isco_code',
+            'kbji:id,code,title,level',
             'educationLevel:id,name',
             'province:id,name',
             'regency:id,name',

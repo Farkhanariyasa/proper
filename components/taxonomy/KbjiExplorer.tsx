@@ -81,7 +81,7 @@ export default function KbjiExplorer({
               <span className="font-semibold text-slate-600">KBJI</span>
             </div>
             <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">
-              Klasifikasi Baku Jabatan Indonesia (KBJI 2020)
+              Klasifikasi Baku Jabatan Indonesia (KBJI 2026)
             </h1>
           </div>
         </div>

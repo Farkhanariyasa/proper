@@ -104,7 +104,7 @@ export default function KbjiSelector({
           {loading ? (
             <div className="p-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-              Mencari jabatan di KBJI 2020...
+              Mencari jabatan di KBJI 2026...
             </div>
           ) : results.length > 0 ? (
             <ul className="divide-y divide-slate-100">

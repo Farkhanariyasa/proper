@@ -45,7 +45,7 @@ class LowonganResource extends JsonResource
                     'code' => $this->kbji->code,
                     'title' => $this->kbji->title,
                     'level' => $this->kbji->level,
-                    'isco_code' => $this->kbji->isco_code,
+                    'isco_code' => null, // tabel kbji_classifications_2026 tidak memiliki isco_code
                 ];
             }),
             'education_level' => $this->whenLoaded('educationLevel', function () {

@@ -131,7 +131,7 @@ export default function LowonganDetailModal({
             <div className="p-3.5 rounded-lg border border-blue-100 bg-blue-50/40 space-y-1">
               <span className="text-[11px] font-bold text-blue-900 flex items-center gap-1">
                 <Briefcase className="w-3.5 h-3.5 text-blue-700" />
-                Standar Jabatan KBJI 2020:
+                Standar Jabatan KBJI 2026:
               </span>
               <div className="font-semibold text-slate-900">
                 {lowongan.kbji ? (
