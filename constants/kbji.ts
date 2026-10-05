@@ -1,7 +1,7 @@
 import { KbjiLevel } from '@/types/kbji';
 
 /**
- * Label & warna badge untuk setiap level hierarki KBJI 2020
+ * Label & warna badge untuk setiap level hierarki KBJI 2026
  */
 export const KBJI_LEVELS: Record<
   KbjiLevel,

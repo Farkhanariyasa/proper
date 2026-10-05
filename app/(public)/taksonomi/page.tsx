@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 const TABS = [
   { key: 'esco', label: 'Keahlian (ESCO)' },
-  { key: 'kbji', label: 'Jabatan (KBJI 2020)' },
+  { key: 'kbji', label: 'Jabatan (KBJI 2026)' },
 ] as const;
 
 export default async function PublicTaxonomyPage({
@@ -27,7 +27,7 @@ export default async function PublicTaxonomyPage({
           Skill Taxonomy Nasional
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          Telusuri struktur keahlian (ESCO) dan klasifikasi jabatan (KBJI 2020) yang dipakai untuk mencocokkan pencari kerja dengan lowongan.
+          Telusuri struktur keahlian (ESCO) dan klasifikasi jabatan (KBJI 2026) yang dipakai untuk mencocokkan pencari kerja dengan lowongan.
         </p>
 
         <nav className="mt-4 flex gap-1 border-b border-slate-200" aria-label="Jenis taksonomi">

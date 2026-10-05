@@ -18,7 +18,7 @@ class StoreLowonganRequest extends FormRequest
         return [
             'judul_lowongan' => ['required', 'string', 'max:150'],
             'nama_perusahaan' => ['required', 'string', 'max:150'],
-            'kbji_id' => ['required', 'integer', 'exists:kbji_classifications,id'],
+            'kbji_id' => ['required', 'integer', 'exists:kbji_classifications_2026,id'],
             'lapangan_usaha_id' => ['nullable', 'integer'],
             'deskripsi_pekerjaan' => ['required', 'string'],
             'tipe_pekerjaan' => ['required', 'string', 'in:Full-Time,Part-Time,Kontrak,Magang,Freelance'],

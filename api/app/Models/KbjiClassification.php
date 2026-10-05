@@ -10,7 +10,7 @@ class KbjiClassification extends Model
 {
     use HasFactory;
 
-    protected $table = 'kbji_classifications';
+    protected $table = 'kbji_classifications_2026';
 
     public $timestamps = false;
 
@@ -20,7 +20,6 @@ class KbjiClassification extends Model
         'level',
         'parent_code',
         'description',
-        'isco_code',
     ];
 
     public function lowongan(): HasMany

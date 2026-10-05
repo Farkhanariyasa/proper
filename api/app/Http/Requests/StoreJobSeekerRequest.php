@@ -40,7 +40,7 @@ class StoreJobSeekerRequest extends FormRequest
             'study_field_detail' => ['nullable', 'string', 'max:150'],
             'experience_range' => ['required', 'string', Rule::in(JobSeeker::EXPERIENCE_RANGES)],
             'desired_occupation' => ['nullable', 'string', 'max:150'],
-            'kbji_id' => ['nullable', 'integer', 'exists:kbji_classifications,id'],
+            'kbji_id' => ['nullable', 'integer', 'exists:kbji_classifications_2026,id'],
             'trainings' => ['nullable', 'array'],
             'trainings.*.name' => ['required_with:trainings', 'string', 'max:150'],
             'trainings.*.organizer' => ['nullable', 'string', 'max:150'],

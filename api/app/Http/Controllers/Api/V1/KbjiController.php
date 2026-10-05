@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\DB;
 class KbjiController extends Controller
 {
     /**
+     * Master KBJI (isi KBJI 2026). Tabel ini tidak memiliki kolom isco_code,
+     * sehingga iscoCode selalu null agar format respons API tetap sama.
+     */
+    private const TABLE = 'kbji_classifications_2026';
+
+    /**
      * Kolom dasar + flag apakah node memiliki turunan
      */
     private const NODE_COLUMNS = "
@@ -17,8 +23,8 @@ class KbjiController extends Controller
         k.code,
         k.title,
         k.level,
-        k.isco_code AS \"iscoCode\",
-        EXISTS(SELECT 1 FROM kbji_classifications c WHERE c.parent_code = k.code) AS \"hasChildren\"
+        NULL AS \"iscoCode\",
+        EXISTS(SELECT 1 FROM " . self::TABLE . " c WHERE c.parent_code = k.code) AS \"hasChildren\"
     ";
 
     /**
@@ -29,7 +35,7 @@ class KbjiController extends Controller
     {
         $rows = DB::select("
             SELECT " . self::NODE_COLUMNS . "
-            FROM kbji_classifications k
+            FROM " . self::TABLE . " k
             WHERE k.level = 'major_group'
             ORDER BY k.code::int
         ");
@@ -46,7 +52,7 @@ class KbjiController extends Controller
      */
     public function children(string $code): JsonResponse
     {
-        $parent = DB::table('kbji_classifications')
+        $parent = DB::table(self::TABLE)
             ->where('code', $code)
             ->first(['code', 'title', 'level']);
 
@@ -56,7 +62,7 @@ class KbjiController extends Controller
 
         $rows = DB::select("
             SELECT " . self::NODE_COLUMNS . "
-            FROM kbji_classifications k
+            FROM " . self::TABLE . " k
             WHERE k.parent_code = :code
             ORDER BY k.code
         ", ['code' => $code]);
@@ -81,9 +87,9 @@ class KbjiController extends Controller
      */
     public function show(string $code): JsonResponse
     {
-        $node = DB::table('kbji_classifications')
+        $node = DB::table(self::TABLE)
             ->where('code', $code)
-            ->first(['code', 'title', 'level', 'parent_code', 'description', 'isco_code']);
+            ->first(['code', 'title', 'level', 'parent_code', 'description']);
 
         if (!$node) {
             return $this->notFound();
@@ -93,11 +99,11 @@ class KbjiController extends Controller
         $ancestors = DB::select("
             WITH RECURSIVE chain AS (
                 SELECT code, title, level, parent_code, 1 AS depth
-                FROM kbji_classifications
+                FROM " . self::TABLE . "
                 WHERE code = :parent_code
                 UNION ALL
                 SELECT p.code, p.title, p.level, p.parent_code, chain.depth + 1
-                FROM kbji_classifications p
+                FROM " . self::TABLE . " p
                 JOIN chain ON p.code = chain.parent_code
                 WHERE chain.depth < 10
             )
@@ -106,7 +112,7 @@ class KbjiController extends Controller
 
         $children = DB::select("
             SELECT " . self::NODE_COLUMNS . "
-            FROM kbji_classifications k
+            FROM " . self::TABLE . " k
             WHERE k.parent_code = :code
             ORDER BY k.code
         ", ['code' => $code]);
@@ -119,7 +125,7 @@ class KbjiController extends Controller
                 'level' => $node->level,
                 'parentCode' => $node->parent_code,
                 'description' => $node->description,
-                'iscoCode' => $node->isco_code,
+                'iscoCode' => null,
                 'ancestors' => array_map(fn ($a) => [
                     'code' => $a->code,
                     'title' => $a->title,
@@ -156,12 +162,12 @@ class KbjiController extends Controller
         $where = "(k.title ILIKE :term OR k.code LIKE :code_prefix)";
 
         $total = (int) (DB::selectOne("
-            SELECT COUNT(*) AS total FROM kbji_classifications k WHERE {$where}
+            SELECT COUNT(*) AS total FROM " . self::TABLE . " k WHERE {$where}
         ", $params)->total ?? 0);
 
         $rows = DB::select("
             SELECT " . self::NODE_COLUMNS . "
-            FROM kbji_classifications k
+            FROM " . self::TABLE . " k
             WHERE {$where}
             ORDER BY
                 CASE
@@ -196,7 +202,7 @@ class KbjiController extends Controller
      */
     public function stats(): JsonResponse
     {
-        $counts = DB::table('kbji_classifications')
+        $counts = DB::table(self::TABLE)
             ->select('level', DB::raw('COUNT(*) AS total'))
             ->groupBy('level')
             ->pluck('total', 'level');
@@ -209,7 +215,7 @@ class KbjiController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'version' => 'KBJI 2020',
+            'version' => 'KBJI 2026',
             'total' => array_sum($byLevel),
             'byLevel' => $byLevel,
         ]);

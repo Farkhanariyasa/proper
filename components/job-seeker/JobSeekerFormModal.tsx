@@ -833,7 +833,7 @@ export default function JobSeekerFormModal({
                           error={fieldErrors.kbji_id?.[0]}
                         />
                         <p className="text-[11px] text-slate-400 mt-1">
-                          Pilih klasifikasi jabatan standar KBJI 2020 untuk meningkatkan akurasi penjodohan dengan lowongan kerja.
+                          Pilih klasifikasi jabatan standar KBJI 2026 untuk meningkatkan akurasi penjodohan dengan lowongan kerja.
                         </p>
                       </div>
 
