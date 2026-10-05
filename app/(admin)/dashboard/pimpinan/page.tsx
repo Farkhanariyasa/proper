@@ -1,5 +1,6 @@
 import React from 'react';
 import { BarChart3, TrendingUp, Users, Building2, CheckCircle2, ArrowUpRight } from 'lucide-react';
+import AuthGuard from '@/components/auth/AuthGuard';
 
 export default function DashboardPimpinanPage() {
   const stats = [
@@ -30,7 +31,8 @@ export default function DashboardPimpinanPage() {
   ];
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+    <AuthGuard requiredPermission="dashboard.pimpinan.view">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div>
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
@@ -126,5 +128,6 @@ export default function DashboardPimpinanPage() {
         </div>
       </div>
     </div>
-  );
+  </AuthGuard>
+);
 }

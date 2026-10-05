@@ -19,8 +19,11 @@ import { getJobSeekers, getJobSeekerOptions } from '@/services/job-seeker';
 import { getProvinces } from '@/services/wilayah';
 import JobSeekerFormModal from '@/components/job-seeker/JobSeekerFormModal';
 import JobSeekerDetailModal from '@/components/job-seeker/JobSeekerDetailModal';
+import AuthGuard from '@/components/auth/AuthGuard';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function ProfilSkillPage() {
+  const { hasPermission } = useAuth();
   const [jobSeekers, setJobSeekers] = useState<JobSeeker[]>([]);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [studyFieldGroups, setStudyFieldGroups] = useState<string[]>([]);
@@ -96,7 +99,8 @@ export default function ProfilSkillPage() {
   }, [loadJobSeekers]);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+    <AuthGuard requiredPermission="job_seekers.view">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -115,14 +119,16 @@ export default function ProfilSkillPage() {
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
-          <button
-            type="button"
-            onClick={() => setIsFormOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#0E385E] text-white text-xs sm:text-sm font-semibold hover:bg-[#163A5F] transition-colors shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Tambah Profil / Kandidat Baru</span>
-          </button>
+          {hasPermission('job_seekers.create') && (
+            <button
+              type="button"
+              onClick={() => setIsFormOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#0E385E] text-white text-xs sm:text-sm font-semibold hover:bg-[#163A5F] transition-colors shadow-xs"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tambah Profil / Kandidat Baru</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -252,8 +258,13 @@ export default function ProfilSkillPage() {
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-slate-600">
-                      <div className="font-medium text-slate-800">
-                        {item.desired_occupation || '-'}
+                      <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                        {item.kbji && (
+                          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                            {item.kbji.code}
+                          </span>
+                        )}
+                        <span className="line-clamp-1">{item.kbji?.title || item.desired_occupation || '-'}</span>
                       </div>
                       <div className="text-[11px] text-slate-400">
                         Pengalaman:{' '}
@@ -330,5 +341,6 @@ export default function ProfilSkillPage() {
         onClose={() => setDetailSeekerId(null)}
       />
     </div>
-  );
+  </AuthGuard>
+);
 }

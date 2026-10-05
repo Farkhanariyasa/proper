@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShieldCheck, CheckCircle2, Clock, AlertCircle, FileSearch, ArrowRight } from 'lucide-react';
+import AuthGuard from '@/components/auth/AuthGuard';
 
 export default function DashboardOperatorPage() {
   const tasks = [
@@ -30,7 +31,8 @@ export default function DashboardOperatorPage() {
   ];
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+    <AuthGuard requiredPermission="dashboard.operator.view">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div>
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
@@ -124,5 +126,6 @@ export default function DashboardOperatorPage() {
         </div>
       </div>
     </div>
-  );
+  </AuthGuard>
+);
 }

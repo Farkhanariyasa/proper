@@ -168,12 +168,24 @@ export default function JobSeekerDetailModal({
                         : `${data.experience_range} Tahun`}
                     </span>
                   </div>
-                  {data.desired_occupation && (
+                  {(data.desired_occupation || data.kbji) && (
                     <div className="sm:col-span-2">
-                      <span className="text-slate-500 block text-xs">Target Jabatan / Minat:</span>
-                      <span className="font-semibold text-blue-700">
-                        {data.desired_occupation}
-                      </span>
+                      <span className="text-slate-500 block text-xs">Target Jabatan / Minat Pekerjaan:</span>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        {data.kbji && (
+                          <span className="px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-mono font-bold">
+                            KBJI {data.kbji.code}
+                          </span>
+                        )}
+                        <span className="font-semibold text-slate-800 text-xs sm:text-sm">
+                          {data.kbji?.title || data.desired_occupation}
+                        </span>
+                        {data.kbji && data.desired_occupation && data.desired_occupation !== data.kbji.title && (
+                          <span className="text-xs text-slate-500 italic">
+                            ({data.desired_occupation})
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

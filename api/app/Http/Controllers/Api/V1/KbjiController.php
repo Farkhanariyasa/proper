@@ -13,6 +13,7 @@ class KbjiController extends Controller
      * Kolom dasar + flag apakah node memiliki turunan
      */
     private const NODE_COLUMNS = "
+        k.id,
         k.code,
         k.title,
         k.level,
@@ -217,6 +218,7 @@ class KbjiController extends Controller
     private function formatNode(object $row): array
     {
         return [
+            'id' => isset($row->id) ? (int) $row->id : null,
             'code' => $row->code,
             'title' => $row->title,
             'level' => $row->level,

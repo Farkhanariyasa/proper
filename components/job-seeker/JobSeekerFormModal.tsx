@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import SearchableSelect from '@/components/ui/SearchableSelect';
+import KbjiSelector from '@/components/lowongan/KbjiSelector';
 import {
   X,
   Plus,
@@ -78,6 +79,8 @@ export default function JobSeekerFormModal({
     study_field_detail: '',
     experience_range: 'fresh_graduate',
     desired_occupation: '',
+    kbji_id: null as number | null,
+    kbji_label: '',
   });
 
   const [selectedSkills, setSelectedSkills] = useState<EscoSkillItem[]>([]);
@@ -381,6 +384,7 @@ export default function JobSeekerFormModal({
       study_field_detail: formData.study_field_detail || undefined,
       experience_range: formData.experience_range as any,
       desired_occupation: formData.desired_occupation || undefined,
+      kbji_id: formData.kbji_id || undefined,
       trainings: trainings.filter((t) => t.name.trim() !== ''),
       certifications: certifications.filter((c) => c.name.trim() !== ''),
       skills: selectedSkills.map((s) => s.id),
@@ -813,22 +817,40 @@ export default function JobSeekerFormModal({
                       </select>
                     </div>
 
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Target Jabatan / Pekerjaan yang Diminati
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.desired_occupation}
-                        onChange={(e) =>
-                          setFormData({ ...formData, desired_occupation: e.target.value })
-                        }
-                        placeholder="Contoh: Backend Developer, Data Analyst, Admin HRD, Teknisi Listrik"
-                        className="w-full px-3 py-2 text-xs sm:text-sm rounded-md border border-slate-300 focus:outline-hidden focus:border-[#2563EB]"
-                      />
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        Jabatan ini akan dicocokkan dengan profil lowongan kerja yang relevan.
-                      </p>
+                    <div className="sm:col-span-2 space-y-3">
+                      <div>
+                        <KbjiSelector
+                          value={formData.kbji_id}
+                          selectedLabel={formData.kbji_label}
+                          onChange={(id, opt) => {
+                            setFormData({
+                              ...formData,
+                              kbji_id: id,
+                              kbji_label: `[${opt.code}] ${opt.title}`,
+                              desired_occupation: opt.title,
+                            });
+                          }}
+                          error={fieldErrors.kbji_id?.[0]}
+                        />
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          Pilih klasifikasi jabatan standar KBJI 2020 untuk meningkatkan akurasi penjodohan dengan lowongan kerja.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Detail Spesifik Posisi / Minat Pekerjaan (Opsional)
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.desired_occupation}
+                          onChange={(e) =>
+                            setFormData({ ...formData, desired_occupation: e.target.value })
+                          }
+                          placeholder="Contoh: Backend Golang Developer, Tax Accountant, Drafter ME"
+                          className="w-full px-3 py-2 text-xs sm:text-sm rounded-md border border-slate-300 focus:outline-hidden focus:border-[#2563EB]"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

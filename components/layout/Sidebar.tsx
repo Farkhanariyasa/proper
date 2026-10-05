@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Bone,
   UserCheck,
@@ -21,10 +21,12 @@ import {
   Building2,
   ChevronsUpDown,
   X,
-  FileText,
   VectorPolygon,
   IdCard,
+  Users,
+  KeyRound,
 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -37,7 +39,16 @@ export default function Sidebar({
   onMobileClose,
   desktopOpen,
 }: SidebarProps) {
+  const router = useRouter();
   const pathname = usePathname();
+  const {
+    user: authUser,
+    logout,
+    hasPermission,
+    hasRole,
+    activeRole,
+    setActiveRole,
+  } = useAuth();
   const [dashboardOpen, setDashboardOpen] = useState(false);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -82,6 +93,7 @@ export default function Sidebar({
       label: 'Profil Skill',
       href: '/profil-skill',
       icon: UserCheck,
+      permission: 'job_seekers.view',
     },
   ];
 
@@ -90,11 +102,13 @@ export default function Sidebar({
       label: 'ESCO Skill',
       href: '/taxonomy/esco-skills',
       icon: Bone,
+      permission: 'taxonomy.manage',
     },
     {
       label: 'KBJI (Jabatan)',
       href: '/taxonomy/kbji',
       icon: IdCard,
+      permission: 'taxonomy.manage',
     },
   ];
 
@@ -103,21 +117,19 @@ export default function Sidebar({
       label: 'Lowongan',
       href: '/lowongan',
       icon: Briefcase,
+      permission: 'lowongan.view',
     },
     {
       label: 'Pelatihan',
       href: '/pelatihan',
       icon: GraduationCap,
+      permission: 'pelatihan.view',
     },
     {
       label: 'Rekomendasi & Matching',
       href: '/rekomendasi',
       icon: VectorPolygon,
-    },
-    {
-      label: 'Laporan & Statistik',
-      href: '/laporan',
-      icon: FileText,
+      permission: 'job_seekers.view',
     },
   ];
 
@@ -126,40 +138,90 @@ export default function Sidebar({
       label: 'Dashboard Operator',
       href: '/dashboard/operator',
       icon: ShieldCheck,
+      permission: 'dashboard.operator.view',
+      role: 'operator',
     },
     {
       label: 'Dashboard Pimpinan',
       href: '/dashboard/pimpinan',
       icon: BarChart3,
+      permission: 'dashboard.pimpinan.view',
+      role: 'pimpinan',
     },
   ];
 
-  const availableRoles = [
-    {
+  // Filter item dashboard berdasarkan hak akses permission
+  const visibleDashboardItems = dashboardSubItems.filter((sub) => {
+    return hasPermission(sub.permission);
+  });
+
+  const visibleNavBeforeTaxonomy = navItemsBeforeTaxonomy.filter((item) => {
+    if (!item.permission) return true;
+    return hasPermission(item.permission);
+  });
+
+  const visibleTaxonomySubItems = taxonomySubItems.filter((item) => {
+    if (hasRole('superadmin') || hasRole('operator')) return true;
+    if (!item.permission) return true;
+    return hasPermission(item.permission);
+  });
+
+  const visibleNavAfterTaxonomy = navItemsAfterTaxonomy.filter((item) => {
+    if (!item.permission) return true;
+    return hasPermission(item.permission);
+  });
+
+  // Metadata role untuk role switcher
+  const allRoleMeta: Record<
+    string,
+    { id: string; label: string; roleTitle: string; unit: string; href: string }
+  > = {
+    superadmin: {
+      id: 'superadmin',
+      label: 'Super Administrator',
+      roleTitle: 'Super Administrator',
+      unit: 'Pusat TI & Pasar Kerja',
+      href: '/users',
+    },
+    operator: {
       id: 'operator',
       label: 'Operator Pengantar Kerja',
       roleTitle: 'Operator Pengantar Kerja',
       unit: 'Pusat Pasar Kerja',
       href: '/dashboard/operator',
-      icon: ShieldCheck,
     },
-    {
+    pimpinan: {
       id: 'pimpinan',
-      label: 'Pimpinan',
+      label: 'Pimpinan Eksekutif',
       roleTitle: 'Pimpinan',
       unit: 'Ditjen Binapenta Kemnaker',
       href: '/dashboard/pimpinan',
-      icon: BarChart3,
     },
-  ];
-
-  // Tentukan role saat ini berdasarkan rute aktif (Hanya 2 Role)
-  const getCurrentRole = () => {
-    if (pathname.includes('/pimpinan')) return availableRoles[1];
-    return availableRoles[0]; // Default ke Operator Pengantar Kerja
   };
 
-  const currentRole = getCurrentRole();
+  // Akun superadmin berhak beralih ke semua role; akun lainnya sesuai role yang dimiliki
+  const isSuperadminAccount = authUser?.roles?.includes('superadmin');
+
+  const availableRoles = (() => {
+    if (isSuperadminAccount) {
+      return Object.values(allRoleMeta);
+    }
+    const userRoleNames = authUser?.roles || ['operator'];
+    const matched = userRoleNames
+      .map((rName) => allRoleMeta[rName])
+      .filter(Boolean);
+    return matched.length > 0 ? matched : [allRoleMeta.operator];
+  })();
+
+  // Peran aktif yang saat ini sedang berlaku
+  const currentRole = allRoleMeta[activeRole] || allRoleMeta.operator;
+
+  const handleSwitchRole = (roleId: string, targetHref: string) => {
+    setActiveRole(roleId);
+    setProfileMenuOpen(false);
+    router.push(targetHref);
+  };
+
   const isItemActive = (href: string) => {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
@@ -220,65 +282,67 @@ export default function Sidebar({
             Menu Utama
           </div>
 
-          {/* 1. Dashboard Paling Atas */}
-          <div className="pb-1">
-            <button
-              type="button"
-              onClick={() => setDashboardOpen(!dashboardOpen)}
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer ${
-                isDashboardActive
-                  ? 'text-white font-semibold'
-                  : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
-              }`}
-              aria-expanded={dashboardOpen}
-            >
-              <div className="flex items-center gap-3">
-                <LayoutDashboard
-                  className={`h-4 w-4 shrink-0 ${
-                    isDashboardActive ? 'text-amber-300' : 'text-blue-200'
+          {/* 1. Dashboard Paling Atas (Tampil jika ada dashboard yang berhak diakses) */}
+          {visibleDashboardItems.length > 0 && (
+            <div className="pb-1">
+              <button
+                type="button"
+                onClick={() => setDashboardOpen(!dashboardOpen)}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer ${
+                  isDashboardActive
+                    ? 'text-white font-semibold'
+                    : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+                }`}
+                aria-expanded={dashboardOpen}
+              >
+                <div className="flex items-center gap-3">
+                  <LayoutDashboard
+                    className={`h-4 w-4 shrink-0 ${
+                      isDashboardActive ? 'text-amber-300' : 'text-blue-200'
+                    }`}
+                  />
+                  <span>Dashboard</span>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 text-blue-300 transition-transform duration-200 ${
+                    dashboardOpen ? 'rotate-180 text-white' : ''
                   }`}
                 />
-                <span>Dashboard</span>
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 text-blue-300 transition-transform duration-200 ${
-                  dashboardOpen ? 'rotate-180 text-white' : ''
-                }`}
-              />
-            </button>
+              </button>
 
-            {/* Submenu Dropdown / Accordion */}
-            {dashboardOpen && (
-              <div className="mt-1 space-y-1 pl-7 pr-1">
-                {dashboardSubItems.map((sub) => {
-                  const subActive = pathname === sub.href;
-                  const SubIcon = sub.icon;
+              {/* Submenu Dropdown / Accordion */}
+              {dashboardOpen && (
+                <div className="mt-1 space-y-1 pl-7 pr-1">
+                  {visibleDashboardItems.map((sub) => {
+                    const subActive = pathname === sub.href;
+                    const SubIcon = sub.icon;
 
-                  return (
-                    <Link
-                      key={sub.href}
-                      href={sub.href}
-                      className={`group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                        subActive
-                          ? 'bg-[#1F5A88] text-white font-semibold shadow-xs'
-                          : 'text-blue-200 hover:bg-[#1F5A88]/40 hover:text-white'
-                      }`}
-                    >
-                      <SubIcon
-                        className={`h-3.5 w-3.5 shrink-0 ${
-                          subActive ? 'text-amber-300' : 'text-blue-300 group-hover:text-white'
+                    return (
+                      <Link
+                        key={sub.href}
+                        href={sub.href}
+                        className={`group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
+                          subActive
+                            ? 'bg-[#1F5A88] text-white font-semibold shadow-xs'
+                            : 'text-blue-200 hover:bg-[#1F5A88]/40 hover:text-white'
                         }`}
-                      />
-                      <span className="truncate">{sub.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                      >
+                        <SubIcon
+                          className={`h-3.5 w-3.5 shrink-0 ${
+                            subActive ? 'text-amber-300' : 'text-blue-300 group-hover:text-white'
+                          }`}
+                        />
+                        <span className="truncate">{sub.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 2. Menu Navigasi Sebelum Taxonomy (Profil Skill) */}
-          {navItemsBeforeTaxonomy.map((item) => {
+          {visibleNavBeforeTaxonomy.map((item) => {
             const active = isItemActive(item.href);
             const Icon = item.icon;
 
@@ -302,65 +366,67 @@ export default function Sidebar({
             );
           })}
 
-          {/* 3. Taxonomy Accordion Dropdown */}
-          <div className="pb-1">
-            <button
-              type="button"
-              onClick={() => setTaxonomyOpen(!taxonomyOpen)}
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer ${
-                isTaxonomyActive
-                  ? 'text-white font-semibold'
-                  : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
-              }`}
-              aria-expanded={taxonomyOpen}
-            >
-              <div className="flex items-center gap-3">
-                <GitMerge
-                  className={`h-4 w-4 shrink-0 ${
-                    isTaxonomyActive ? 'text-amber-300' : 'text-blue-200'
+          {/* 3. Taxonomy Accordion Dropdown (Tampil jika ada sub-item yang berhak diakses) */}
+          {visibleTaxonomySubItems.length > 0 && (
+            <div className="pb-1">
+              <button
+                type="button"
+                onClick={() => setTaxonomyOpen(!taxonomyOpen)}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer ${
+                  isTaxonomyActive
+                    ? 'text-white font-semibold'
+                    : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+                }`}
+                aria-expanded={taxonomyOpen}
+              >
+                <div className="flex items-center gap-3">
+                  <GitMerge
+                    className={`h-4 w-4 shrink-0 ${
+                      isTaxonomyActive ? 'text-amber-300' : 'text-blue-200'
+                    }`}
+                  />
+                  <span>Taxonomy</span>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 text-blue-300 transition-transform duration-200 ${
+                    taxonomyOpen ? 'rotate-180 text-white' : ''
                   }`}
                 />
-                <span>Taxonomy</span>
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 text-blue-300 transition-transform duration-200 ${
-                  taxonomyOpen ? 'rotate-180 text-white' : ''
-                }`}
-              />
-            </button>
+              </button>
 
-            {/* Submenu ESCO Skill & KBJI */}
-            {taxonomyOpen && (
-              <div className="mt-1 space-y-1 pl-7 pr-1">
-                {taxonomySubItems.map((sub) => {
-                  const subActive = pathname === sub.href;
-                  const SubIcon = sub.icon;
+              {/* Submenu ESCO Skill & KBJI */}
+              {taxonomyOpen && (
+                <div className="mt-1 space-y-1 pl-7 pr-1">
+                  {visibleTaxonomySubItems.map((sub) => {
+                    const subActive = pathname === sub.href;
+                    const SubIcon = sub.icon;
 
-                  return (
-                    <Link
-                      key={sub.href}
-                      href={sub.href}
-                      className={`group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                        subActive
-                          ? 'bg-[#1F5A88] text-white font-semibold shadow-xs'
-                          : 'text-blue-200 hover:bg-[#1F5A88]/40 hover:text-white'
-                      }`}
-                    >
-                      <SubIcon
-                        className={`h-3.5 w-3.5 shrink-0 ${
-                          subActive ? 'text-amber-300' : 'text-blue-300 group-hover:text-white'
+                    return (
+                      <Link
+                        key={sub.href}
+                        href={sub.href}
+                        className={`group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
+                          subActive
+                            ? 'bg-[#1F5A88] text-white font-semibold shadow-xs'
+                            : 'text-blue-200 hover:bg-[#1F5A88]/40 hover:text-white'
                         }`}
-                      />
-                      <span className="truncate">{sub.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                      >
+                        <SubIcon
+                          className={`h-3.5 w-3.5 shrink-0 ${
+                            subActive ? 'text-amber-300' : 'text-blue-300 group-hover:text-white'
+                          }`}
+                        />
+                        <span className="truncate">{sub.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 4. Menu Navigasi Setelah Taxonomy */}
-          {navItemsAfterTaxonomy.map((item) => {
+          {visibleNavAfterTaxonomy.map((item) => {
             const active = isItemActive(item.href);
             const Icon = item.icon;
 
@@ -383,6 +449,52 @@ export default function Sidebar({
               </Link>
             );
           })}
+
+          {/* 5. Menu Manajemen Akses & Pengguna (Hanya Tampil Jika Memiliki Izin) */}
+          {(hasPermission('users.view') || hasPermission('roles.view')) && (
+            <div className="pt-3">
+              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-blue-300/70">
+                Manajemen Akses
+              </div>
+              <div className="space-y-1">
+                {hasPermission('users.view') && (
+                  <Link
+                    href="/users"
+                    className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+                      isItemActive('/users')
+                        ? 'bg-[#1F5A88] text-white shadow-xs font-semibold'
+                        : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+                    }`}
+                  >
+                    <Users
+                      className={`h-4 w-4 shrink-0 transition-colors ${
+                        isItemActive('/users') ? 'text-amber-300' : 'text-blue-200 group-hover:text-white'
+                      }`}
+                    />
+                    <span className="truncate">Pengguna</span>
+                  </Link>
+                )}
+
+                {hasPermission('roles.view') && (
+                  <Link
+                    href="/roles"
+                    className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+                      isItemActive('/roles')
+                        ? 'bg-[#1F5A88] text-white shadow-xs font-semibold'
+                        : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+                    }`}
+                  >
+                    <KeyRound
+                      className={`h-4 w-4 shrink-0 transition-colors ${
+                        isItemActive('/roles') ? 'text-amber-300' : 'text-blue-200 group-hover:text-white'
+                      }`}
+                    />
+                    <span className="truncate">Peran & Hak Akses</span>
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer Profil Pengguna dengan Sub-banner / Popover Switch Role */}
@@ -396,14 +508,14 @@ export default function Sidebar({
               {/* Header Info Akun */}
               <div className="flex items-center gap-2.5 pb-2.5 border-b border-[#1F5A88]/80">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1F5A88] text-white font-bold text-xs border border-blue-300/30">
-                  <User className="h-4 w-4 text-amber-300" />
+                  {authUser?.name ? authUser.name.charAt(0).toUpperCase() : <User className="h-4 w-4 text-amber-300" />}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-bold text-white truncate">
-                    {currentRole.roleTitle}
+                    {authUser?.name || currentRole.roleTitle}
                   </div>
                   <div className="text-[10px] text-blue-300 truncate">
-                    {currentRole.unit}
+                    {authUser ? `@${authUser.username} (${currentRole.roleTitle})` : currentRole.unit}
                   </div>
                 </div>
               </div>
@@ -415,14 +527,14 @@ export default function Sidebar({
                 </div>
                 <div className="space-y-1">
                   {availableRoles.map((r) => {
-                    const isSelected = currentRole.id === r.id;
+                    const isSelected = activeRole === r.id;
 
                     return (
-                      <Link
+                      <button
                         key={r.id}
-                        href={r.href}
-                        onClick={() => setProfileMenuOpen(false)}
-                        className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                        type="button"
+                        onClick={() => handleSwitchRole(r.id, r.href)}
+                        className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer text-left ${
                           isSelected
                             ? 'bg-[#1F5A88] text-white font-semibold shadow-xs'
                             : 'text-blue-100 hover:bg-[#163A5F] hover:text-white'
@@ -434,7 +546,7 @@ export default function Sidebar({
                             Aktif
                           </span>
                         )}
-                      </Link>
+                      </button>
                     );
                   })}
                 </div>
@@ -455,7 +567,7 @@ export default function Sidebar({
                   type="button"
                   onClick={() => {
                     setProfileMenuOpen(false);
-                    alert('Berhasil keluar dari akun.');
+                    logout();
                   }}
                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-300 hover:bg-red-950/60 hover:text-red-100 transition-colors cursor-pointer"
                 >
@@ -482,15 +594,17 @@ export default function Sidebar({
             title="Klik untuk membuka menu akun & pindah peran"
           >
             <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1F5A88] text-white border border-blue-300/30">
-              <User className="h-4 w-4 text-blue-200" />
+              <span className="text-xs font-bold text-amber-300">
+                {authUser?.name ? authUser.name.charAt(0).toUpperCase() : <User className="h-4 w-4 text-blue-200" />}
+              </span>
               <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-[#0E385E]" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-white">
-                {currentRole.roleTitle}
+                {authUser?.name || currentRole.roleTitle}
               </p>
               <p className="truncate text-[10px] text-blue-300">
-                {currentRole.unit}
+                {currentRole.roleTitle}
               </p>
             </div>
             <ChevronsUpDown className="h-4 w-4 text-blue-300 shrink-0" />
