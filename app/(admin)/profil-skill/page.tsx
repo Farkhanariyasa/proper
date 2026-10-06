@@ -26,7 +26,7 @@ export default function ProfilSkillPage() {
   const { hasPermission } = useAuth();
   const [jobSeekers, setJobSeekers] = useState<JobSeeker[]>([]);
   const [provinces, setProvinces] = useState<Province[]>([]);
-  const [studyFieldGroups, setStudyFieldGroups] = useState<string[]>([]);
+  const [pendidikanOptions, setPendidikanOptions] = useState<string[]>([]);
   const [meta, setMeta] = useState({
     current_page: 1,
     last_page: 1,
@@ -36,8 +36,14 @@ export default function ProfilSkillPage() {
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedProvince, setSelectedProvince] = useState('');
-  const [selectedFieldGroup, setSelectedFieldGroup] = useState('');
+  const [selectedPendidikan, setSelectedPendidikan] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // UI States
   const [isLoading, setIsLoading] = useState(true);
@@ -63,7 +69,7 @@ export default function ProfilSkillPage() {
     Promise.all([getProvinces(), getJobSeekerOptions()])
       .then(([provData, optData]) => {
         setProvinces(provData);
-        setStudyFieldGroups(optData.study_field_groups);
+        setPendidikanOptions(optData.pendidikan || []);
       })
       .catch((err) => {
         console.error('Gagal memuat filter options:', err);
@@ -78,9 +84,9 @@ export default function ProfilSkillPage() {
       try {
         const response = await getJobSeekers({
           page,
-          q: searchQuery.trim() || undefined,
+          q: debouncedSearch || undefined,
           province_id: selectedProvince || undefined,
-          study_field_group: selectedFieldGroup || undefined,
+          pendidikan: selectedPendidikan || undefined,
           per_page: 10,
         });
         setJobSeekers(response.data);
@@ -91,7 +97,7 @@ export default function ProfilSkillPage() {
         setIsLoading(false);
       }
     },
-    [searchQuery, selectedProvince, selectedFieldGroup]
+    [debouncedSearch, selectedProvince, selectedPendidikan]
   );
 
   useEffect(() => {
@@ -141,9 +147,9 @@ export default function ProfilSkillPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') loadJobSeekers(1);
+              if (e.key === 'Enter') setDebouncedSearch(searchQuery.trim());
             }}
-            placeholder="Cari NIK atau Nama kandidat..."
+            placeholder="Cari nama atau ID profil..."
             className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-md border border-slate-300 focus:outline-hidden focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
           />
         </div>
@@ -160,27 +166,34 @@ export default function ProfilSkillPage() {
             />
           </div>
 
-          {/* Filter Rumpun Pendidikan */}
+          {/* Filter Jenjang Pendidikan */}
           <select
-            value={selectedFieldGroup}
-            onChange={(e) => setSelectedFieldGroup(e.target.value)}
+            value={selectedPendidikan}
+            onChange={(e) => setSelectedPendidikan(e.target.value)}
             className="text-xs sm:text-sm py-2 px-3 rounded-md border border-slate-300 bg-white text-slate-700 focus:outline-hidden max-w-[220px]"
           >
-            <option value="">Semua Rumpun Bidang</option>
-            {studyFieldGroups.map((group) => (
-              <option key={group} value={group}>
-                {group}
+            <option value="">Semua Pendidikan</option>
+            {pendidikanOptions.map((p) => (
+              <option key={p} value={p}>
+                {p}
               </option>
             ))}
           </select>
 
-          <button
-            type="button"
-            onClick={() => loadJobSeekers(1)}
-            className="px-4 py-2 rounded-md bg-[#0E385E] text-white text-xs font-semibold hover:bg-[#163A5F] transition-colors"
-          >
-            Filter
-          </button>
+          {(searchQuery || selectedProvince || selectedPendidikan) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setDebouncedSearch('');
+                setSelectedProvince('');
+                setSelectedPendidikan('');
+              }}
+              className="px-3 py-2 rounded-md border border-slate-300 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors"
+            >
+              Reset
+            </button>
+          )}
         </div>
       </div>
 
@@ -198,19 +211,18 @@ export default function ProfilSkillPage() {
           <table className="w-full text-left text-xs sm:text-sm">
             <thead className="bg-[#F8FAFC] border-b border-[#DEE2E6] text-slate-700 font-semibold">
               <tr>
-                <th className="py-3 px-4">NIK</th>
+                <th className="py-3 px-4">ID</th>
                 <th className="py-3 px-4">Nama Lengkap</th>
                 <th className="py-3 px-4">Domisili (Kab/Kota)</th>
                 <th className="py-3 px-4">Pendidikan & Rumpun</th>
-                <th className="py-3 px-4">Target Pekerjaan</th>
-                <th className="py-3 px-4 text-center">Skill ESCO</th>
+                <th className="py-3 px-4">Keahlian Utama</th>
                 <th className="py-3 px-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Loader2 className="w-6 h-6 animate-spin text-[#0E385E]" />
                       <span className="text-xs">Memuat data pencari kerja...</span>
@@ -219,7 +231,7 @@ export default function ProfilSkillPage() {
                 </tr>
               ) : jobSeekers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
                     <p className="text-sm font-medium text-slate-500">
                       Belum ada profil pencari kerja yang cocok.
                     </p>
@@ -229,55 +241,41 @@ export default function ProfilSkillPage() {
                   </td>
                 </tr>
               ) : (
-                jobSeekers.map((item) => (
+                jobSeekers.map((item: any) => (
                   <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3.5 px-4 font-mono text-xs text-blue-700 font-medium">
-                      {item.nik}
+                      {item.profile_id || item.id}
                     </td>
                     <td className="py-3.5 px-4 font-medium text-slate-900">
-                      <div>{item.full_name}</div>
+                      <div>{item.name}</div>
                       <div className="text-[11px] text-slate-400">
-                        {item.gender === 'L' ? 'Laki-laki' : 'Perempuan'} • {item.phone}
+                        {item.jenis_kelamin || 'Tidak Diketahui'} • Umur {item.umur ? `${item.umur} Thn` : '-'}
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-slate-600">
                       <div className="font-medium text-slate-800">
-                        {item.regency?.name || item.regency_id}
+                        {item.regency?.name || item.kab_kota || '-'}
                       </div>
                       <div className="text-[11px] text-slate-400">
-                        {item.regency?.province?.name || ''}
+                        {item.regency?.province?.name || item.provinsi || ''}
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-slate-600">
                       <div className="font-medium text-slate-800">
-                        {item.education_level?.name || '-'}
+                        {item.education_level?.name || item.pendidikan || '-'}
                       </div>
                       <div className="text-[11px] text-slate-500">
-                        {item.study_field_group}
-                        {item.study_field_detail ? ` (${item.study_field_detail})` : ''}
+                        {item.jurusan ? `${item.jurusan}` : ''}
+                        {item.nama_sekolah ? ` (${item.nama_sekolah})` : ''}
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-slate-600">
                       <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                        {item.kbji && (
-                          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                            {item.kbji.code}
-                          </span>
-                        )}
-                        <span className="line-clamp-1">{item.kbji?.title || item.desired_occupation || '-'}</span>
+                        <span className="line-clamp-1">{item.keahlian || '-'}</span>
                       </div>
                       <div className="text-[11px] text-slate-400">
-                        Pengalaman:{' '}
-                        {item.experience_range === 'fresh_graduate'
-                          ? 'Fresh Graduate'
-                          : `${item.experience_range} Thn`}
+                        Pengalaman: {item.experience || '-'}
                       </div>
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-[#0E385E] border border-sky-200">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                        <span>{item.skills_count ?? 0} Skill</span>
-                      </span>
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <button
@@ -296,10 +294,10 @@ export default function ProfilSkillPage() {
         </div>
 
         {/* Pagination Footer */}
-        {meta.total > 0 && (
+        {jobSeekers.length > 0 && (
           <div className="px-4 py-3 bg-[#F8FAFC] border-t border-[#DEE2E6] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
             <div>
-              Menampilkan {jobSeekers.length} dari {meta.total} total pencari kerja
+              Menampilkan {jobSeekers.length} pencari kerja
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -311,11 +309,11 @@ export default function ProfilSkillPage() {
                 Sebelumnya
               </button>
               <span className="px-2 font-medium">
-                Halaman {meta.current_page} dari {meta.last_page}
+                Halaman {meta.current_page}
               </span>
               <button
                 type="button"
-                disabled={meta.current_page >= meta.last_page || isLoading}
+                disabled={!(meta as any).has_more_pages || isLoading}
                 onClick={() => loadJobSeekers(meta.current_page + 1)}
                 className="px-2.5 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >

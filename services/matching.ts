@@ -131,3 +131,33 @@ export async function getPairAnalysisApi(
   const json = await res.json();
   return json.data;
 }
+
+/**
+ * Mencari rekomendasi lowongan pekerjaan khusus untuk wizard operator
+ */
+export async function recommendLowonganApi(payload: {
+  pencaker_id: number;
+  kbji_code: string;
+  provinsi_id: string;
+  kabkota_id?: string;
+  skills: number[];
+}): Promise<any[]> {
+  const baseUrl = getApiBaseUrl();
+  const res = await fetch(`${baseUrl}/api/rekomendasi/lowongan`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(payload),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.message || `Gagal mencari rekomendasi lowongan (${res.status})`);
+  }
+
+  const json = await res.json();
+  return json.data || [];
+}

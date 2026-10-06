@@ -5,6 +5,7 @@ import {
   LowonganListParams,
   LowonganListResponse,
   LowonganOptionsResponse,
+  LowonganStatus,
   UpdateLowonganPayload,
 } from '@/types/lowongan';
 import { getAuthHeaders } from './auth';
@@ -140,7 +141,7 @@ export async function deleteLowonganApi(id: string): Promise<void> {
  */
 export async function toggleLowonganStatusApi(
   id: string,
-  status: 'Draft' | 'Published' | 'Closed' | 'Archived'
+  status: LowonganStatus
 ): Promise<void> {
   const baseUrl = getApiBaseUrl();
   const res = await fetch(`${baseUrl}/api/lowongan/${id}/status`, {

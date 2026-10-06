@@ -4,13 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class JobSeeker extends Model
 {
     use HasFactory;
 
+    protected $table = 'req_pk_pencaker';
+    public $timestamps = false; // Asumsi tidak ada created_at/updated_at di req_pk_pencaker
+
+    // Konstanta tetap dipertahankan agar tidak error di bagian lain
     public const STUDY_FIELD_GROUPS = [
         'Umum (SD / SMP / SMA)',
         'Pendidikan',
@@ -33,57 +36,78 @@ class JobSeeker extends Model
         '>5',
     ];
 
+    // Nilai persis kolom `pendidikan` di req_pk_pencaker, urut jenjang
+    public const PENDIDIKAN_OPTIONS = [
+        'Tidak Tamat SD/Tidak Sekolah',
+        'SD atau Sederajat',
+        'SMP atau Sederajat',
+        'SMA atau Sederajat',
+        'SMK',
+        'D1',
+        'D2',
+        'D3',
+        'D4',
+        'S1',
+        'Profesi',
+        'S2',
+        'S3',
+    ];
+
     protected $fillable = [
-        'nik',
-        'full_name',
-        'phone',
-        'birth_date',
-        'gender',
+        'profile_id',
+        'name',
+        'provinsi',
+        'province_id',
+        'kab_kota',
         'regency_id',
+        'region_name',
+        'umur',
+        'jenis_kelamin',
+        'kondisi_fisik',
+        'jenis_disabilitas',
+        'marital',
+        'status_bekerja',
+        'start_date',
+        'recent_start',
+        'status_sekarang',
+        'tanggal_kedaluwarsa',
+        'pendidikan',
         'education_level_id',
-        'study_field_group',
-        'study_field_detail',
-        'experience_range',
-        'desired_occupation',
-        'kbji_id',
-        'trainings',
-        'certifications',
-        'created_by',
+        'nama_sekolah',
+        'jurusan',
+        'experience',
+        'sertifikasi',
+        'lembaga_pelatihan',
+        'progpel',
+        'keahlian',
+        'bahasa',
+        'rencana_kerja_luar_negeri',
+        'country_wish',
+        'lamaran_diajukan',
     ];
 
-    protected $casts = [
-        'birth_date' => 'date',
-        'trainings' => 'array',
-        'certifications' => 'array',
-    ];
-
-    public function kbji(): BelongsTo
+    public function province()
     {
-        return $this->belongsTo(KbjiClassification::class, 'kbji_id');
+        return $this->belongsTo(Province::class, 'province_id');
     }
 
-    public function regency(): BelongsTo
+    public function regency()
     {
-        return $this->belongsTo(Regency::class, 'regency_id', 'id');
+        return $this->belongsTo(Regency::class, 'regency_id');
     }
 
-    public function educationLevel(): BelongsTo
+    public function educationLevel()
     {
         return $this->belongsTo(EducationLevel::class, 'education_level_id');
-    }
-
-    public function creator(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function skills(): BelongsToMany
     {
         return $this->belongsToMany(
             SkillNode::class,
-            'job_seeker_skills',
-            'job_seeker_id',
+            'pencaker_esco_skills',
+            'pencaker_id',
             'esco_skill_id'
-        );
+        )->withPivot(['is_manual', 'source'])->withTimestamps();
     }
 }
