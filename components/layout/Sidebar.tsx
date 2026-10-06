@@ -401,6 +401,21 @@ export default function Sidebar({
                   />
                   <span className="truncate">Pemetaan KBJI</span>
                 </Link>
+                <Link
+                  href="/pemetaan-esco"
+                  className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+                    isItemActive('/pemetaan-esco')
+                      ? 'bg-[#1F5A88] text-white shadow-xs font-semibold'
+                      : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+                  }`}
+                >
+                  <Bone
+                    className={`h-4 w-4 shrink-0 transition-colors ${
+                      isItemActive('/pemetaan-esco') ? 'text-amber-300' : 'text-blue-200 group-hover:text-white'
+                    }`}
+                  />
+                  <span className="truncate">Pemetaan ESCO Skill</span>
+                </Link>
               </div>
             </div>
           )}
