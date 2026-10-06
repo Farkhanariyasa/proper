@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\EscoSkillController;
 use App\Http\Controllers\Api\JobSeekerController;
 use App\Http\Controllers\Api\LowonganController;
 use App\Http\Controllers\Api\MatchingController;
+use App\Http\Controllers\Api\PublicDashboardController;
 use App\Http\Controllers\Api\WilayahController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\KbjiController;
@@ -20,6 +21,15 @@ Route::apiResource('tasks', TaskController::class);
 // Master Wilayah (Sumber Kepmendagri cahyadsn/wilayah)
 Route::get('provinces', [WilayahController::class, 'provinces']);
 Route::get('regencies', [WilayahController::class, 'regencies']);
+
+// Dashboard Publik (Landing Page) — agregat data req_pk_pencaker & req_pk_loker
+Route::prefix('public/dashboard')->group(function () {
+    Route::get('years', [PublicDashboardController::class, 'years']);
+    Route::get('regions', [PublicDashboardController::class, 'regions']);
+    Route::get('ringkasan', [PublicDashboardController::class, 'ringkasan']);
+    Route::get('profil-pencaker', [PublicDashboardController::class, 'profilPencaker']);
+    Route::get('kebutuhan-industri', [PublicDashboardController::class, 'kebutuhanIndustri']);
+});
 
 // Master Pendukung (Pendidikan & Keahlian ESCO)
 Route::get('education-levels', [EducationLevelController::class, 'index']);

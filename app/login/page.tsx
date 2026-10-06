@@ -47,7 +47,7 @@ export default function LoginPage() {
       if (user.roles.includes('superadmin') || user.roles.includes('operator')) {
         router.push('/profil-skill');
       } else if (user.roles.includes('pimpinan')) {
-        router.push('/dashboard/pimpinan');
+        router.push('/dashboard');
       } else {
         router.push('/profil-skill');
       }

@@ -38,8 +38,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (path.startsWith('/laporan')) return 'Laporan & Statistik'; 
     if (path.startsWith('/users')) return 'Manajemen Pengguna';
     if (path.startsWith('/roles')) return 'Peran & Hak Akses (RBAC)';
-    if (path.startsWith('/dashboard/pimpinan')) return 'Dashboard Pimpinan';
-    if (path.startsWith('/dashboard/operator')) return 'Dashboard Operator';
     if (path.startsWith('/dashboard')) return 'Dashboard';
     return 'Platform Penempatan Kerja';
   };

@@ -12,8 +12,6 @@ import {
   Sparkles,
   LayoutDashboard,
   ChevronDown,
-  BarChart3,
-  ShieldCheck,
   Shield,
   User,
   Home,
@@ -49,16 +47,12 @@ export default function Sidebar({
     activeRole,
     setActiveRole,
   } = useAuth();
-  const [dashboardOpen, setDashboardOpen] = useState(false);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileContainerRef = useRef<HTMLDivElement>(null);
 
-  // Otomatis buka accordion dashboard jika rute saat ini berada di /dashboard/*
+  // Otomatis buka accordion taxonomy jika rute saat ini berada di /taxonomy/*
   useEffect(() => {
-    if (pathname.startsWith('/dashboard')) {
-      setDashboardOpen(true);
-    }
     if (pathname.startsWith('/taxonomy')) {
       setTaxonomyOpen(true);
     }
@@ -133,28 +127,6 @@ export default function Sidebar({
     },
   ];
 
-  const dashboardSubItems = [
-    {
-      label: 'Dashboard Operator',
-      href: '/dashboard/operator',
-      icon: ShieldCheck,
-      permission: 'dashboard.operator.view',
-      role: 'operator',
-    },
-    {
-      label: 'Dashboard Pimpinan',
-      href: '/dashboard/pimpinan',
-      icon: BarChart3,
-      permission: 'dashboard.pimpinan.view',
-      role: 'pimpinan',
-    },
-  ];
-
-  // Filter item dashboard berdasarkan hak akses permission
-  const visibleDashboardItems = dashboardSubItems.filter((sub) => {
-    return hasPermission(sub.permission);
-  });
-
   const visibleNavBeforeTaxonomy = navItemsBeforeTaxonomy.filter((item) => {
     if (!item.permission) return true;
     return hasPermission(item.permission);
@@ -188,14 +160,14 @@ export default function Sidebar({
       label: 'Operator Pengantar Kerja',
       roleTitle: 'Operator Pengantar Kerja',
       unit: 'Pusat Pasar Kerja',
-      href: '/dashboard/operator',
+      href: '/dashboard',
     },
     pimpinan: {
       id: 'pimpinan',
       label: 'Pimpinan Eksekutif',
       roleTitle: 'Pimpinan',
       unit: 'Ditjen Binapenta Kemnaker',
-      href: '/dashboard/pimpinan',
+      href: '/dashboard',
     },
   };
 
@@ -282,64 +254,22 @@ export default function Sidebar({
             Menu Utama
           </div>
 
-          {/* 1. Dashboard Paling Atas (Tampil jika ada dashboard yang berhak diakses) */}
-          {visibleDashboardItems.length > 0 && (
-            <div className="pb-1">
-              <button
-                type="button"
-                onClick={() => setDashboardOpen(!dashboardOpen)}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-[13px] font-medium transition-colors cursor-pointer ${
-                  isDashboardActive
-                    ? 'text-white font-semibold'
-                    : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
-                }`}
-                aria-expanded={dashboardOpen}
-              >
-                <div className="flex items-center gap-3">
-                  <LayoutDashboard
-                    className={`h-4 w-4 shrink-0 ${
-                      isDashboardActive ? 'text-amber-300' : 'text-blue-200'
-                    }`}
-                  />
-                  <span>Dashboard</span>
-                </div>
-                <ChevronDown
-                  className={`h-4 w-4 text-blue-300 transition-transform duration-200 ${
-                    dashboardOpen ? 'rotate-180 text-white' : ''
-                  }`}
-                />
-              </button>
-
-              {/* Submenu Dropdown / Accordion */}
-              {dashboardOpen && (
-                <div className="mt-1 space-y-1 pl-7 pr-1">
-                  {visibleDashboardItems.map((sub) => {
-                    const subActive = pathname === sub.href;
-                    const SubIcon = sub.icon;
-
-                    return (
-                      <Link
-                        key={sub.href}
-                        href={sub.href}
-                        className={`group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
-                          subActive
-                            ? 'bg-[#1F5A88] text-white font-semibold shadow-xs'
-                            : 'text-blue-200 hover:bg-[#1F5A88]/40 hover:text-white'
-                        }`}
-                      >
-                        <SubIcon
-                          className={`h-3.5 w-3.5 shrink-0 ${
-                            subActive ? 'text-amber-300' : 'text-blue-300 group-hover:text-white'
-                          }`}
-                        />
-                        <span className="truncate">{sub.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+          {/* 1. Dashboard Paling Atas (satu halaman untuk semua peran, isi sama dengan landing page) */}
+          <Link
+            href="/dashboard"
+            className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+              isDashboardActive
+                ? 'bg-[#1F5A88] text-white shadow-xs font-semibold'
+                : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+            }`}
+          >
+            <LayoutDashboard
+              className={`h-4 w-4 shrink-0 transition-colors ${
+                isDashboardActive ? 'text-amber-300' : 'text-blue-200 group-hover:text-white'
+              }`}
+            />
+            <span className="truncate">Dashboard</span>
+          </Link>
 
           {/* 2. Menu Navigasi Sebelum Taxonomy (Profil Skill) */}
           {visibleNavBeforeTaxonomy.map((item) => {
