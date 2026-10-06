@@ -23,6 +23,26 @@ class LowonganController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = ReqPkLoker::query()
+            ->select([
+                'id',
+                'job_id',
+                'vac_id',
+                'judul_pekerjaan',
+                'nama_perusahaan',
+                'deskripsi_pekerjaan',
+                'tipe_pekerjaan',
+                'status_loker',
+                'kuota',
+                'rentang_gaji',
+                'reg',
+                'provinsi_id',
+                'regency_id',
+                'kbji_2026_id',
+                'tanggal_tayang',
+                'tanggal_expired_lowongan',
+                'tanggal_dibuat',
+                'tanggal_update',
+            ])
             ->with([
                 'kbji:id,code,title,level',
                 'province:id,name',
