@@ -90,7 +90,9 @@ class LowonganKerja extends Model
     {
         return $this->belongsToMany(
             SkillNode::class,
-            'lowongan_skills',
+            // Tabel lowongan_skills kini berisi pemetaan req_pk_loker -> ESCO;
+            // data skill modul lowongan aplikasi dipindah ke lowongan_skills_old
+            'lowongan_skills_old',
             'lowongan_id',
             'esco_skill_id'
         )->withPivot(['tipe_keahlian', 'level_kemahiran']);
