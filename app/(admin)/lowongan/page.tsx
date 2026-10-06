@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import AuthGuard from '@/components/auth/AuthGuard';
 import { useAuth } from '@/hooks/useAuth';
-import { LowonganItem } from '@/types/lowongan';
+import { LowonganItem, LowonganStatus } from '@/types/lowongan';
 import {
   deleteLowonganApi,
   getLowonganListApi,
@@ -31,6 +31,32 @@ import { getProvinces } from '@/services/wilayah';
 import { Province } from '@/types/job-seeker';
 import LowonganFormModal from '@/components/lowongan/LowonganFormModal';
 import LowonganDetailModal from '@/components/lowongan/LowonganDetailModal';
+
+const TIPE_PEKERJAAN_OPTIONS = [
+  { value: 'Full time', label: 'Full time' },
+  { value: 'Part time', label: 'Part time' },
+  { value: 'Contract', label: 'Kontrak' },
+  { value: 'Internship', label: 'Magang' },
+];
+
+const STATUS_OPTIONS: LowonganStatus[] = [
+  'Published',
+  'Draft',
+  'Closed',
+  'Expired',
+  'Suspended',
+  'Blocked',
+  'Archived',
+];
+
+const statusBadgeClass = (status: string) => {
+  if (status === 'Published') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (status === 'Closed' || status === 'Blocked' || status === 'Suspended')
+    return 'bg-red-50 text-red-700 border-red-200';
+  if (status === 'Expired' || status === 'Archived')
+    return 'bg-slate-100 text-slate-600 border-slate-200';
+  return 'bg-amber-50 text-amber-700 border-amber-200';
+};
 
 export default function LowonganPage() {
   const { hasPermission } = useAuth();
@@ -152,7 +178,7 @@ export default function LowonganPage() {
 
   const handleStatusChange = async (
     id: string,
-    newStatus: 'Draft' | 'Published' | 'Closed' | 'Archived'
+    newStatus: LowonganStatus
   ) => {
     try {
       await toggleLowonganStatusApi(id, newStatus);
@@ -253,11 +279,11 @@ export default function LowonganPage() {
               className="text-xs sm:text-sm py-2 px-3 rounded-md border border-slate-300 bg-white text-slate-700 focus:outline-hidden"
             >
               <option value="">Semua Tipe</option>
-              <option value="Full-Time">Full-Time</option>
-              <option value="Part-Time">Part-Time</option>
-              <option value="Kontrak">Kontrak</option>
-              <option value="Magang">Magang</option>
-              <option value="Freelance">Freelance</option>
+              {TIPE_PEKERJAAN_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
 
             <select
@@ -269,10 +295,11 @@ export default function LowonganPage() {
               className="text-xs sm:text-sm py-2 px-3 rounded-md border border-slate-300 bg-white text-slate-700 focus:outline-hidden"
             >
               <option value="">Semua Status</option>
-              <option value="Published">Published</option>
-              <option value="Draft">Draft</option>
-              <option value="Closed">Closed</option>
-              <option value="Archived">Archived</option>
+              {STATUS_OPTIONS.map((st) => (
+                <option key={st} value={st}>
+                  {st}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -467,33 +494,23 @@ export default function LowonganPage() {
                             <select
                               value={job.status_lowongan}
                               onChange={(e) =>
-                                handleStatusChange(
-                                  job.id,
-                                  e.target.value as 'Draft' | 'Published' | 'Closed' | 'Archived'
-                                )
+                                handleStatusChange(job.id, e.target.value as LowonganStatus)
                               }
-                              className={`text-[11px] font-bold px-2 py-1 rounded-md border cursor-pointer focus:outline-hidden ${
-                                job.status_lowongan === 'Published'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  : job.status_lowongan === 'Closed'
-                                  ? 'bg-red-50 text-red-700 border-red-200'
-                                  : 'bg-amber-50 text-amber-700 border-amber-200'
-                              }`}
+                              className={`text-[11px] font-bold px-2 py-1 rounded-md border cursor-pointer focus:outline-hidden ${statusBadgeClass(
+                                job.status_lowongan
+                              )}`}
                             >
-                              <option value="Published">Published</option>
-                              <option value="Draft">Draft</option>
-                              <option value="Closed">Closed</option>
-                              <option value="Archived">Archived</option>
+                              {STATUS_OPTIONS.map((st) => (
+                                <option key={st} value={st}>
+                                  {st}
+                                </option>
+                              ))}
                             </select>
                           ) : (
                             <span
-                              className={`text-[11px] font-bold px-2.5 py-1 rounded-md border inline-block ${
-                                job.status_lowongan === 'Published'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  : job.status_lowongan === 'Closed'
-                                  ? 'bg-red-50 text-red-700 border-red-200'
-                                  : 'bg-amber-50 text-amber-700 border-amber-200'
-                              }`}
+                              className={`text-[11px] font-bold px-2.5 py-1 rounded-md border inline-block ${statusBadgeClass(
+                                job.status_lowongan
+                              )}`}
                             >
                               {job.status_lowongan}
                             </span>

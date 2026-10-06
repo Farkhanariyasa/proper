@@ -272,7 +272,7 @@ class LowonganController extends Controller
         }
 
         $lowongan->status_loker = strtolower($request->status_lowongan);
-        if ($request->status_lowongan === 'Published' && !$lowongan->tanggal_tayang) {
+        if ($lowongan->status_loker === 'published' && !$lowongan->tanggal_tayang) {
             $lowongan->tanggal_tayang = now();
         }
         $lowongan->save();
@@ -296,10 +296,11 @@ class LowonganController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'tipe_pekerjaan' => ['Full-Time', 'Part-Time', 'Kontrak', 'Magang', 'Freelance'],
+                // Nilai mengikuti data yang tersimpan di req_pk_loker
+                'tipe_pekerjaan' => ['Full time', 'Part time', 'Contract', 'Internship'],
                 'sistem_kerja' => ['WFO', 'WFH', 'Hybrid'],
                 'jenis_kelamin' => ['Semua', 'Laki-laki', 'Perempuan'],
-                'status_lowongan' => ['Draft', 'Published', 'Closed', 'Archived'],
+                'status_lowongan' => ['Draft', 'Published', 'Closed', 'Expired', 'Suspended', 'Blocked', 'Archived'],
                 'tipe_keahlian' => ['wajib', 'tambahan'],
                 'level_kemahiran' => ['pemula', 'menengah', 'ahli'],
             ],

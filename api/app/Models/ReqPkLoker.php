@@ -100,16 +100,26 @@ class ReqPkLoker extends Model
         }
 
         if (!empty($filters['status_lowongan'])) {
-            // Mapping status dari frontend ke status_loker
-            // Frontend: 'Published', 'Closed', 'Archived', 'Draft'
-            // DB: 'tayang', 'expired', 'closed', dll
+            // Frontend mengirim label (Published/Closed/Expired/...), DB menyimpan lowercase.
+            // 'tayang' adalah nilai lama yang setara dengan 'published'.
             $status = strtolower($filters['status_lowongan']);
-            if ($status === 'published') $status = 'tayang';
-            $query->where('status_loker', $status);
+            if ($status === 'published') {
+                $query->whereIn('status_loker', ['published', 'tayang']);
+            } else {
+                $query->where('status_loker', $status);
+            }
         }
 
         if (!empty($filters['kbji_id'])) {
             $query->where('kbji_2026_id', $filters['kbji_id']);
+        }
+
+        if (!empty($filters['provinsi_id'])) {
+            $query->where('provinsi_id', $filters['provinsi_id']);
+        }
+
+        if (!empty($filters['regency_id'])) {
+            $query->where('regency_id', $filters['regency_id']);
         }
 
         return $query;

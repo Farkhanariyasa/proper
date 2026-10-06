@@ -25,25 +25,37 @@ class JobSeekerController extends Controller
             ->with(['province', 'regency', 'educationLevel'])
             ->withCount('skills');
 
-        // Filter pencarian nama
+        // Pencarian nama atau ID profil
         if ($request->filled('q')) {
             $keyword = trim((string) $request->query('q'));
-            $query->where('name', 'ILIKE', "%{$keyword}%");
+            $query->where(function ($q) use ($keyword) {
+                $q->where('name', 'ILIKE', "%{$keyword}%")
+                  ->orWhere('profile_id', 'ILIKE', "%{$keyword}%");
+            });
         }
 
-        // Filter provinsi (string text bebas dari DB)
+        // Filter provinsi_id dan regency_id (relasi)
+        if ($request->filled('province_id')) {
+            $query->where('province_id', $request->query('province_id'));
+        }
+
+        if ($request->filled('regency_id')) {
+            $query->where('regency_id', $request->query('regency_id'));
+        }
+
+        // Filter provinsi (string text bebas dari DB) - fallback
         if ($request->filled('provinsi')) {
             $query->where('provinsi', 'ILIKE', '%' . $request->query('provinsi') . '%');
         }
 
-        // Filter kabupaten/kota (string text bebas dari DB)
+        // Filter kabupaten/kota (string text bebas dari DB) - fallback
         if ($request->filled('kab_kota')) {
             $query->where('kab_kota', 'ILIKE', '%' . $request->query('kab_kota') . '%');
         }
 
-        // Filter tingkat pendidikan (string dari DB)
+        // Filter jenjang pendidikan (nilai persis seperti di kolom pendidikan)
         if ($request->filled('pendidikan')) {
-            $query->where('pendidikan', 'ILIKE', '%' . $request->query('pendidikan') . '%');
+            $query->where('pendidikan', $request->query('pendidikan'));
         }
 
         // Filter rentang pengalaman
@@ -155,6 +167,7 @@ class JobSeekerController extends Controller
             'data' => [
                 'study_field_groups' => JobSeeker::STUDY_FIELD_GROUPS,
                 'experience_ranges' => JobSeeker::EXPERIENCE_RANGES,
+                'pendidikan' => JobSeeker::PENDIDIKAN_OPTIONS,
             ],
         ]);
     }

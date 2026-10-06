@@ -13,7 +13,9 @@ import {
   Award,
   Loader2,
   CheckCircle2,
+  Target,
 } from 'lucide-react';
+import Link from 'next/link';
 import { JobSeeker } from '@/types/job-seeker';
 import { getJobSeekerDetail } from '@/services/job-seeker';
 
@@ -66,10 +68,10 @@ export default function JobSeekerDetailModal({
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold">
-                {data ? data.full_name : 'Memuat Profil...'}
+                {data ? data.name || data.full_name || 'Tanpa Nama' : 'Memuat Profil...'}
               </h3>
               <p className="text-xs text-sky-200 font-mono">
-                {data ? `NIK: ${data.nik}` : ''}
+                {data ? `ID: ${data.profile_id || data.nik || data.id}` : ''}
               </p>
             </div>
           </div>
@@ -255,14 +257,22 @@ export default function JobSeekerDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-md bg-[#0E385E] text-white text-xs sm:text-sm font-semibold hover:bg-[#163A5F]"
+            className="px-4 py-2 rounded-md border border-slate-300 bg-white text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100"
           >
             Tutup
           </button>
+          <Link
+            href={`/rekomendasi?pencaker_id=${jobSeekerId}`}
+            id="btn-match-lowongan"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#0E385E] text-white text-xs sm:text-sm font-semibold hover:bg-[#163A5F]"
+          >
+            <Target className="w-4 h-4" />
+            Match Lowongan
+          </Link>
         </div>
       </div>
     </div>

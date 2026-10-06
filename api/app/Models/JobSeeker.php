@@ -36,6 +36,23 @@ class JobSeeker extends Model
         '>5',
     ];
 
+    // Nilai persis kolom `pendidikan` di req_pk_pencaker, urut jenjang
+    public const PENDIDIKAN_OPTIONS = [
+        'Tidak Tamat SD/Tidak Sekolah',
+        'SD atau Sederajat',
+        'SMP atau Sederajat',
+        'SMA atau Sederajat',
+        'SMK',
+        'D1',
+        'D2',
+        'D3',
+        'D4',
+        'S1',
+        'Profesi',
+        'S2',
+        'S3',
+    ];
+
     protected $fillable = [
         'profile_id',
         'name',

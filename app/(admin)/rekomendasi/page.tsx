@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { 
   Users, CheckCircle2, ChevronRight, Search, Briefcase, MapPin, Target,
   Loader2, ArrowRight, Save, Plus, X, Building2, AlertTriangle, AlertCircle
@@ -12,6 +13,17 @@ import { recommendLowonganApi } from '@/services/matching';
 import SearchableSelect, { SearchableOption } from '@/components/ui/SearchableSelect';
 
 export default function MatchingWizardPage() {
+  return (
+    <Suspense fallback={null}>
+      <MatchingWizard />
+    </Suspense>
+  );
+}
+
+function MatchingWizard() {
+  const searchParams = useSearchParams();
+  const initialPencakerId = searchParams.get('pencaker_id') || '';
+
   const [step, setStep] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -21,7 +33,7 @@ export default function MatchingWizardPage() {
   const [regencies, setRegencies] = useState<SearchableOption[]>([]);
   
   // States
-  const [selectedPencakerId, setSelectedPencakerId] = useState<string>('');
+  const [selectedPencakerId, setSelectedPencakerId] = useState<string>(initialPencakerId);
   const [selectedSeeker, setSelectedSeeker] = useState<any>(null);
   const [pencakerSkills, setPencakerSkills] = useState<any[]>([]);
   
@@ -107,6 +119,25 @@ export default function MatchingWizardPage() {
       setSelectedSeeker(null);
     }
   }, [selectedPencakerId]);
+
+  // Pencaker yang dipilih (mis. dari ?pencaker_id=) bisa saja tidak termasuk
+  // 50 data awal; sisipkan ke opsi agar namanya tampil di dropdown.
+  useEffect(() => {
+    if (!selectedSeeker) return;
+    const id = String(selectedSeeker.id);
+    setPencakerList(prev =>
+      prev.some(o => o.value === id)
+        ? prev
+        : [
+            {
+              value: id,
+              label: selectedSeeker.name || selectedSeeker.full_name || 'Tanpa Nama',
+              code: selectedSeeker.nik || selectedSeeker.profile_id,
+            },
+            ...prev,
+          ]
+    );
+  }, [selectedSeeker, pencakerList]);
 
   const handleSearchSkill = async () => {
     if (skillQuery.length < 3) return;

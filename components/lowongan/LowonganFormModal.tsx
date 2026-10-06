@@ -19,6 +19,7 @@ import {
   CreateLowonganPayload,
   KbjiOption,
   LowonganItem,
+  LowonganStatus,
 } from '@/types/lowongan';
 import { Province, Regency, EducationLevel } from '@/types/job-seeker';
 import { getProvinces, getRegencies } from '@/services/wilayah';
@@ -55,11 +56,10 @@ export default function LowonganFormModal({
   const [regencies, setRegencies] = useState<Regency[]>([]);
   const [educationLevels, setEducationLevels] = useState<EducationLevel[]>([]);
   const [tipePekerjaanOptions, setTipePekerjaanOptions] = useState<string[]>([
-    'Full-Time',
-    'Part-Time',
-    'Kontrak',
-    'Magang',
-    'Freelance',
+    'Full time',
+    'Part time',
+    'Contract',
+    'Internship',
   ]);
   const [sistemKerjaOptions, setSistemKerjaOptions] = useState<string[]>([
     'WFO',
@@ -85,7 +85,7 @@ export default function LowonganFormModal({
   const [kbjiId, setKbjiId] = useState<number | null>(null);
   const [kbjiLabel, setKbjiLabel] = useState('');
   const [deskripsiPekerjaan, setDeskripsiPekerjaan] = useState('');
-  const [tipePekerjaan, setTipePekerjaan] = useState('Full-Time');
+  const [tipePekerjaan, setTipePekerjaan] = useState('Full time');
   const [sistemKerja, setSistemKerja] = useState('WFO');
   const [jumlahKebutuhan, setJumlahKebutuhan] = useState(1);
 
@@ -107,7 +107,7 @@ export default function LowonganFormModal({
   const [gajiTampilkan, setGajiTampilkan] = useState(true);
   const [gajiMinimal, setGajiMinimal] = useState<number | ''>('');
   const [gajiMaksimal, setGajiMaksimal] = useState<number | ''>('');
-  const [statusLowongan, setStatusLowongan] = useState<'Draft' | 'Published' | 'Closed' | 'Archived'>('Draft');
+  const [statusLowongan, setStatusLowongan] = useState<LowonganStatus>('Draft');
   const [tanggalBuka, setTanggalBuka] = useState('');
   const [tanggalTutup, setTanggalTutup] = useState('');
 
@@ -202,7 +202,7 @@ export default function LowonganFormModal({
       setKbjiId(initialData.kbji?.id || null);
       setKbjiLabel(initialData.kbji ? `${initialData.kbji.code} - ${initialData.kbji.title}` : '');
       setDeskripsiPekerjaan(initialData.deskripsi_pekerjaan || '');
-      setTipePekerjaan(initialData.tipe_pekerjaan || 'Full-Time');
+      setTipePekerjaan(initialData.tipe_pekerjaan || 'Full time');
       setSistemKerja(initialData.sistem_kerja || 'WFO');
       setJumlahKebutuhan(initialData.jumlah_kebutuhan || 1);
 
@@ -246,7 +246,7 @@ export default function LowonganFormModal({
       setKbjiId(null);
       setKbjiLabel('');
       setDeskripsiPekerjaan('');
-      setTipePekerjaan('Full-Time');
+      setTipePekerjaan('Full time');
       setSistemKerja('WFO');
       setJumlahKebutuhan(1);
       setEducationLevelId('');
@@ -944,7 +944,7 @@ export default function LowonganFormModal({
                   </label>
                   <select
                     value={statusLowongan}
-                    onChange={(e) => setStatusLowongan(e.target.value as 'Draft' | 'Published' | 'Closed' | 'Archived')}
+                    onChange={(e) => setStatusLowongan(e.target.value as LowonganStatus)}
                     className="w-full px-3 py-2 text-xs sm:text-sm rounded-md border border-slate-300 bg-white text-slate-800 focus:outline-hidden focus:border-blue-600"
                   >
                     {statusOptions.map((st) => (

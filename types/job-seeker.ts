@@ -38,6 +38,8 @@ export interface EscoSkillItem {
 
 export interface JobSeeker {
   id: number;
+  name?: string;
+  profile_id?: string;
   nik: string;
   full_name: string;
   phone: string;
@@ -88,4 +90,5 @@ export interface CreateJobSeekerPayload {
 export interface JobSeekerOptionsResponse {
   study_field_groups: string[];
   experience_ranges: string[];
+  pendidikan: string[];
 }

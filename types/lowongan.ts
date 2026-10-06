@@ -6,6 +6,15 @@ export interface LowonganSkillItem {
   level_kemahiran: 'pemula' | 'menengah' | 'ahli';
 }
 
+export type LowonganStatus =
+  | 'Draft'
+  | 'Published'
+  | 'Closed'
+  | 'Expired'
+  | 'Suspended'
+  | 'Blocked'
+  | 'Archived';
+
 export interface LowonganItem {
   id: string;
   slug: string;
@@ -26,7 +35,7 @@ export interface LowonganItem {
   gaji_tampilkan: boolean;
   gaji_minimal: number | null;
   gaji_maksimal: number | null;
-  status_lowongan: 'Draft' | 'Published' | 'Closed' | 'Archived';
+  status_lowongan: LowonganStatus;
   tanggal_buka: string | null;
   tanggal_tutup: string;
   created_at: string;
@@ -79,7 +88,7 @@ export interface CreateLowonganPayload {
   gaji_tampilkan?: boolean;
   gaji_minimal?: number;
   gaji_maksimal?: number;
-  status_lowongan?: 'Draft' | 'Published' | 'Closed' | 'Archived';
+  status_lowongan?: LowonganStatus;
   tanggal_buka?: string;
   tanggal_tutup: string;
   skills: Array<{

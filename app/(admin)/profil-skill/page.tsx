@@ -26,7 +26,7 @@ export default function ProfilSkillPage() {
   const { hasPermission } = useAuth();
   const [jobSeekers, setJobSeekers] = useState<JobSeeker[]>([]);
   const [provinces, setProvinces] = useState<Province[]>([]);
-  const [studyFieldGroups, setStudyFieldGroups] = useState<string[]>([]);
+  const [pendidikanOptions, setPendidikanOptions] = useState<string[]>([]);
   const [meta, setMeta] = useState({
     current_page: 1,
     last_page: 1,
@@ -36,8 +36,14 @@ export default function ProfilSkillPage() {
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedProvince, setSelectedProvince] = useState('');
-  const [selectedFieldGroup, setSelectedFieldGroup] = useState('');
+  const [selectedPendidikan, setSelectedPendidikan] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // UI States
   const [isLoading, setIsLoading] = useState(true);
@@ -63,7 +69,7 @@ export default function ProfilSkillPage() {
     Promise.all([getProvinces(), getJobSeekerOptions()])
       .then(([provData, optData]) => {
         setProvinces(provData);
-        setStudyFieldGroups(optData.study_field_groups);
+        setPendidikanOptions(optData.pendidikan || []);
       })
       .catch((err) => {
         console.error('Gagal memuat filter options:', err);
@@ -78,9 +84,9 @@ export default function ProfilSkillPage() {
       try {
         const response = await getJobSeekers({
           page,
-          q: searchQuery.trim() || undefined,
+          q: debouncedSearch || undefined,
           province_id: selectedProvince || undefined,
-          study_field_group: selectedFieldGroup || undefined,
+          pendidikan: selectedPendidikan || undefined,
           per_page: 10,
         });
         setJobSeekers(response.data);
@@ -91,7 +97,7 @@ export default function ProfilSkillPage() {
         setIsLoading(false);
       }
     },
-    [searchQuery, selectedProvince, selectedFieldGroup]
+    [debouncedSearch, selectedProvince, selectedPendidikan]
   );
 
   useEffect(() => {
@@ -141,9 +147,9 @@ export default function ProfilSkillPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') loadJobSeekers(1);
+              if (e.key === 'Enter') setDebouncedSearch(searchQuery.trim());
             }}
-            placeholder="Cari NIK atau Nama kandidat..."
+            placeholder="Cari nama atau ID profil..."
             className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-md border border-slate-300 focus:outline-hidden focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
           />
         </div>
@@ -160,27 +166,34 @@ export default function ProfilSkillPage() {
             />
           </div>
 
-          {/* Filter Rumpun Pendidikan */}
+          {/* Filter Jenjang Pendidikan */}
           <select
-            value={selectedFieldGroup}
-            onChange={(e) => setSelectedFieldGroup(e.target.value)}
+            value={selectedPendidikan}
+            onChange={(e) => setSelectedPendidikan(e.target.value)}
             className="text-xs sm:text-sm py-2 px-3 rounded-md border border-slate-300 bg-white text-slate-700 focus:outline-hidden max-w-[220px]"
           >
-            <option value="">Semua Rumpun Bidang</option>
-            {studyFieldGroups.map((group) => (
-              <option key={group} value={group}>
-                {group}
+            <option value="">Semua Pendidikan</option>
+            {pendidikanOptions.map((p) => (
+              <option key={p} value={p}>
+                {p}
               </option>
             ))}
           </select>
 
-          <button
-            type="button"
-            onClick={() => loadJobSeekers(1)}
-            className="px-4 py-2 rounded-md bg-[#0E385E] text-white text-xs font-semibold hover:bg-[#163A5F] transition-colors"
-          >
-            Filter
-          </button>
+          {(searchQuery || selectedProvince || selectedPendidikan) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setDebouncedSearch('');
+                setSelectedProvince('');
+                setSelectedPendidikan('');
+              }}
+              className="px-3 py-2 rounded-md border border-slate-300 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-colors"
+            >
+              Reset
+            </button>
+          )}
         </div>
       </div>
 

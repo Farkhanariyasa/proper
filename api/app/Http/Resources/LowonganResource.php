@@ -32,7 +32,7 @@ class LowonganResource extends JsonResource
             'gaji_tampilkan' => !empty($this->rentang_gaji),
             'gaji_minimal' => $this->rentang_gaji ? (explode('-', $this->rentang_gaji)[0] ?? null) : null,
             'gaji_maksimal' => $this->rentang_gaji ? (explode('-', $this->rentang_gaji)[1] ?? null) : null,
-            'status_lowongan' => $this->status_loker,
+            'status_lowongan' => self::normalizeStatus($this->status_loker),
             'tanggal_buka' => $this->tanggal_tayang?->toISOString(),
             'tanggal_tutup' => $this->tanggal_expired_lowongan?->toISOString(),
             'created_at' => $this->tanggal_dibuat?->toISOString(),
@@ -84,5 +84,19 @@ class LowonganResource extends JsonResource
                 ];
             }),
         ];
+    }
+
+    public static function normalizeStatus(?string $status): ?string
+    {
+        if ($status === null || $status === '') {
+            return null;
+        }
+
+        $s = strtolower($status);
+        if ($s === 'tayang') {
+            $s = 'published';
+        }
+
+        return ucfirst($s);
     }
 }

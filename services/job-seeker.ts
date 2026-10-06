@@ -78,6 +78,7 @@ export async function getJobSeekers(params?: {
   province_id?: string;
   regency_id?: string;
   study_field_group?: string;
+  pendidikan?: string;
   experience_range?: string;
   page?: number;
   per_page?: number;
@@ -97,6 +98,7 @@ export async function getJobSeekers(params?: {
   if (params?.province_id) query.set('province_id', params.province_id);
   if (params?.regency_id) query.set('regency_id', params.regency_id);
   if (params?.study_field_group) query.set('study_field_group', params.study_field_group);
+  if (params?.pendidikan) query.set('pendidikan', params.pendidikan);
   if (params?.experience_range) query.set('experience_range', params.experience_range);
   if (params?.page) query.set('page', String(params.page));
   if (params?.per_page) query.set('per_page', String(params.per_page));
