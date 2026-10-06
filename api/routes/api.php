@@ -109,5 +109,10 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
     // KBJI Alias Curation (Superadmin/Admin)
     Route::get('kbji-aliases', [\App\Http\Controllers\Api\Admin\KbjiAliasController::class, 'index'])->middleware('permission:mapping.kbji');
     Route::put('kbji-aliases/{id}', [\App\Http\Controllers\Api\Admin\KbjiAliasController::class, 'update'])->middleware('permission:mapping.kbji');
+
+    // Kurasi Pemetaan Lowongan (req_pk_loker) -> Skill ESCO (lowongan_skills)
+    Route::get('lowongan-skills', [\App\Http\Controllers\Api\Admin\LowonganSkillController::class, 'index'])->middleware('permission:mapping.kbji');
+    Route::get('lowongan-skills/{vacId}', [\App\Http\Controllers\Api\Admin\LowonganSkillController::class, 'show'])->middleware('permission:mapping.kbji');
+    Route::put('lowongan-skills/{vacId}', [\App\Http\Controllers\Api\Admin\LowonganSkillController::class, 'update'])->middleware('permission:mapping.kbji');
 });
 
