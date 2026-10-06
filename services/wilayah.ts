@@ -22,7 +22,7 @@ export async function getProvinces(): Promise<Province[]> {
   }
 
   const json = await res.json();
-  return json.data || [];
+  return Array.isArray(json.data) ? json.data : [];
 }
 
 /**
@@ -44,5 +44,5 @@ export async function getRegencies(provinceId?: string): Promise<Regency[]> {
   }
 
   const json = await res.json();
-  return json.data || [];
+  return Array.isArray(json.data) ? json.data : [];
 }

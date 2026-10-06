@@ -18,7 +18,8 @@ use Illuminate\Support\Facades\DB;
  */
 class PublicDashboardController extends Controller
 {
-    private const CACHE_TTL = 21600; // 6 jam — data sumber jarang berubah
+    private const CACHE_TTL = 86400; // 24 jam — data sumber jarang berubah
+    private const CACHE_TTL_METADATA = 604800; // 7 hari untuk years & regions
 
     private const LOKER_PROVINCE = "UPPER(TRIM(reverse(split_part(reverse(reg), ',', 1))))";
     private const LOKER_REGENCY = "UPPER(TRIM(reverse(split_part(reverse(reg), ',', 2))))";
@@ -66,27 +67,32 @@ class PublicDashboardController extends Controller
      */
     public function regions(): JsonResponse
     {
-        $data = Cache::remember('public_dashboard:regions', self::CACHE_TTL, function () {
-            $rows = DB::select("
-                SELECT provinsi, kab_kota FROM req_pk_pencaker
-                WHERE provinsi IS NOT NULL AND kab_kota IS NOT NULL
-                GROUP BY provinsi, kab_kota
-                ORDER BY provinsi, kab_kota
-            ");
-
-            $provinces = [];
-            foreach ($rows as $row) {
-                $provinces[$row->provinsi][] = $row->kab_kota;
-            }
-
-            return array_map(
-                fn ($name, $regencies) => ['name' => $name, 'regencies' => $regencies],
-                array_keys($provinces),
-                $provinces
-            );
+        $data = Cache::remember('public_dashboard:regions', self::CACHE_TTL_METADATA, function () {
+            return $this->buildRegions();
         });
 
         return response()->json(['status' => 'success', 'data' => $data]);
+    }
+
+    public function buildRegions(): array
+    {
+        $rows = DB::select("
+            SELECT provinsi, kab_kota FROM req_pk_pencaker
+            WHERE provinsi IS NOT NULL AND kab_kota IS NOT NULL
+            GROUP BY provinsi, kab_kota
+            ORDER BY provinsi, kab_kota
+        ");
+
+        $provinces = [];
+        foreach ($rows as $row) {
+            $provinces[$row->provinsi][] = $row->kab_kota;
+        }
+
+        return array_map(
+            fn ($name, $regencies) => ['name' => $name, 'regencies' => $regencies],
+            array_keys($provinces),
+            $provinces
+        );
     }
 
     /**
@@ -95,18 +101,23 @@ class PublicDashboardController extends Controller
      */
     public function years(): JsonResponse
     {
-        $data = Cache::remember('public_dashboard:years', self::CACHE_TTL, function () {
-            $rows = DB::select('
-                SELECT ' . self::LOKER_YEAR . ' AS tahun FROM req_pk_loker WHERE tanggal_tayang IS NOT NULL
-                UNION
-                SELECT ' . self::PENCAKER_YEAR . " AS tahun FROM req_pk_pencaker WHERE recent_start ~ '[0-9]{4}$'
-                ORDER BY 1 DESC
-            ");
-
-            return array_map(fn ($r) => (int) $r->tahun, $rows);
+        $data = Cache::remember('public_dashboard:years', self::CACHE_TTL_METADATA, function () {
+            return $this->buildYears();
         });
 
         return response()->json(['status' => 'success', 'data' => $data]);
+    }
+
+    public function buildYears(): array
+    {
+        $rows = DB::select('
+            SELECT ' . self::LOKER_YEAR . ' AS tahun FROM req_pk_loker WHERE tanggal_tayang IS NOT NULL
+            UNION
+            SELECT ' . self::PENCAKER_YEAR . " AS tahun FROM req_pk_pencaker WHERE recent_start ~ '[0-9]{4}$'
+            ORDER BY 1 DESC
+        ");
+
+        return array_map(fn ($r) => (int) $r->tahun, $rows);
     }
 
     /**
@@ -114,36 +125,39 @@ class PublicDashboardController extends Controller
      */
     public function ringkasan(Request $request): JsonResponse
     {
-        return $this->cached('ringkasan', $request, function (array $area) {
-            [$pWhere, $pParams] = $this->pencakerWhere($area);
-            [$lWhere, $lParams] = $this->lokerWhere($area);
+        return $this->cached('ringkasan', $request, fn (array $area) => $this->buildRingkasan($area));
+    }
 
-            $pencakerTotal = (int) DB::selectOne("SELECT COUNT(*) AS c FROM req_pk_pencaker WHERE {$pWhere}", $pParams)->c;
-            // KPI Lowongan hanya menghitung loker yang sedang tayang (status_loker = 'published')
-            $loker = DB::selectOne("
-                SELECT COALESCE(SUM(kuota) FILTER (WHERE status_loker = 'published'), 0) AS kuota,
-                       COALESCE(SUM(lamaran_diterima), 0) AS diterima
-                FROM req_pk_loker WHERE {$lWhere}
-            ", $lParams);
+    public function buildRingkasan(array $area): array
+    {
+        [$pWhere, $pParams] = $this->pencakerWhere($area);
+        [$lWhere, $lParams] = $this->lokerWhere($area);
 
-            // Top wilayah: provinsi (nasional) atau kab/kota (saat provinsi dipilih)
-            $regionColumn = $area['provinsi'] ? 'kab_kota' : 'provinsi';
+        $pencakerTotal = (int) DB::selectOne("SELECT COUNT(*) AS c FROM req_pk_pencaker WHERE {$pWhere}", $pParams)->c;
+        // KPI Lowongan hanya menghitung loker yang sedang tayang (status_loker = 'published')
+        $loker = DB::selectOne("
+            SELECT COALESCE(SUM(kuota) FILTER (WHERE status_loker = 'published'), 0) AS kuota,
+                   COALESCE(SUM(lamaran_diterima), 0) AS diterima
+            FROM req_pk_loker WHERE {$lWhere}
+        ", $lParams);
 
-            return [
-                'kpi' => [
-                    'pencaker' => $pencakerTotal,
-                    'lowongan_kuota' => (int) $loker->kuota,
-                    'diterima' => (int) $loker->diterima,
-                ],
-                'status_bekerja' => $this->groupCount('req_pk_pencaker', 'status_bekerja', $pWhere, $pParams),
-                'top_wilayah' => [
-                    'level' => $regionColumn,
-                    'items' => $this->groupCount('req_pk_pencaker', $regionColumn, $pWhere, $pParams, 6),
-                ],
-                'top_bidang' => $this->groupSum('bidang_pekerjaan', $lWhere, $lParams, 6),
-                'top_industri' => $this->groupSum('industri', $lWhere, $lParams, 6),
-            ];
-        });
+        // Top wilayah: provinsi (nasional) atau kab/kota (saat provinsi dipilih)
+        $regionColumn = $area['provinsi'] ? 'kab_kota' : 'provinsi';
+
+        return [
+            'kpi' => [
+                'pencaker' => $pencakerTotal,
+                'lowongan_kuota' => (int) $loker->kuota,
+                'diterima' => (int) $loker->diterima,
+            ],
+            'status_bekerja' => $this->groupCount('req_pk_pencaker', 'status_bekerja', $pWhere, $pParams),
+            'top_wilayah' => [
+                'level' => $regionColumn,
+                'items' => $this->groupCount('req_pk_pencaker', $regionColumn, $pWhere, $pParams, 6),
+            ],
+            'top_bidang' => $this->groupSum('bidang_pekerjaan', $lWhere, $lParams, 6),
+            'top_industri' => $this->groupSum('industri', $lWhere, $lParams, 6),
+        ];
     }
 
     /**
@@ -151,81 +165,96 @@ class PublicDashboardController extends Controller
      */
     public function profilPencaker(Request $request): JsonResponse
     {
-        return $this->cached('profil', $request, function (array $area) {
-            [$where, $params] = $this->pencakerWhere($area);
+        return $this->cached('profil', $request, fn (array $area) => $this->buildProfilPencaker($area));
+    }
 
-            $kpi = DB::selectOne("
-                SELECT
-                    COUNT(*) FILTER (WHERE pendidikan = 'SMK') AS smk,
-                    COUNT(*) FILTER (WHERE pendidikan = 'S1') AS s1,
-                    COUNT(*) FILTER (WHERE rencana_kerja_luar_negeri = 'Ya') AS minat_pmi,
-                    COUNT(*) FILTER (WHERE kondisi_fisik = 'Disabilitas') AS disabilitas
-                FROM req_pk_pencaker WHERE {$where}
-            ", $params);
+    public function buildProfilPencaker(array $area): array
+    {
+        [$where, $params] = $this->pencakerWhere($area);
 
-            // Distribusi pendidikan, diurutkan dari jenjang terendah
-            $education = collect($this->groupCount('req_pk_pencaker', 'pendidikan', $where, $params))
-                ->map(fn ($row) => ['label' => $row['label'] ?? 'Tidak diketahui', 'value' => $row['value']])
-                ->sortBy(fn ($row) => array_search($row['label'], self::EDUCATION_ORDER, true) === false
-                    ? 99
-                    : array_search($row['label'], self::EDUCATION_ORDER, true))
-                ->values()
-                ->all(); // array biasa: objek Collection tidak bisa dibaca ulang dari cache
+        // Distribusi pendidikan, diurutkan dari jenjang terendah
+        $educationRaw = $this->groupCount('req_pk_pencaker', 'pendidikan', $where, $params);
+        $education = collect($educationRaw)
+            ->map(fn ($row) => ['label' => $row['label'] ?? 'Tidak diketahui', 'value' => $row['value']])
+            ->sortBy(fn ($row) => array_search($row['label'], self::EDUCATION_ORDER, true) === false
+                ? 99
+                : array_search($row['label'], self::EDUCATION_ORDER, true))
+            ->values()
+            ->all();
 
-            // Kelompok umur per gender (umur tersimpan sebagai teks; abaikan nilai tidak wajar)
-            $ageCase = implode(' ', array_map(
-                fn ($g) => "WHEN usia BETWEEN {$g[1]} AND {$g[2]} THEN '{$g[0]}'",
-                self::AGE_GROUPS
-            ));
-            $ageRows = DB::select("
-                SELECT kelompok, jenis_kelamin, COUNT(*) AS c
+        // Hitung SMK dan S1 langsung dari agregat pendidikan untuk menghemat komputasi
+        $smkCount = 0;
+        $s1Count = 0;
+        foreach ($educationRaw as $item) {
+            $label = $item['label'] ?? '';
+            if ($label === 'SMK') {
+                $smkCount = (int) $item['value'];
+            } elseif ($label === 'S1') {
+                $s1Count = (int) $item['value'];
+            }
+        }
+
+        // KPI hanya perlu menghitung minat_pmi dan disabilitas
+        $kpi = DB::selectOne("
+            SELECT
+                COUNT(*) FILTER (WHERE rencana_kerja_luar_negeri = 'Ya') AS minat_pmi,
+                COUNT(*) FILTER (WHERE kondisi_fisik = 'Disabilitas') AS disabilitas
+            FROM req_pk_pencaker WHERE {$where}
+        ", $params);
+
+        // Kelompok umur per gender (umur tersimpan sebagai teks; abaikan nilai tidak wajar)
+        $ageCase = implode(' ', array_map(
+            fn ($g) => "WHEN usia BETWEEN {$g[1]} AND {$g[2]} THEN '{$g[0]}'",
+            self::AGE_GROUPS
+        ));
+        $ageRows = DB::select("
+            SELECT kelompok, jenis_kelamin, COUNT(*) AS c
+            FROM (
+                SELECT CASE {$ageCase} END AS kelompok, jenis_kelamin
                 FROM (
-                    SELECT CASE {$ageCase} END AS kelompok, jenis_kelamin
-                    FROM (
-                        SELECT jenis_kelamin,
-                               CASE WHEN umur ~ '^[0-9]{1,2}$' THEN umur::int END AS usia
-                        FROM req_pk_pencaker WHERE {$where}
-                    ) AS umur_valid
-                ) AS dikelompokkan
-                WHERE kelompok IS NOT NULL
-                GROUP BY 1, 2
-            ", $params);
-            $ages = [];
-            foreach (self::AGE_GROUPS as [$label]) {
-                $ages[$label] = ['label' => $label, 'laki_laki' => 0, 'perempuan' => 0];
-            }
-            foreach ($ageRows as $row) {
-                $key = $row->jenis_kelamin === 'Perempuan' ? 'perempuan' : 'laki_laki';
-                $ages[$row->kelompok][$key] += (int) $row->c;
-            }
+                    SELECT jenis_kelamin,
+                           CASE WHEN umur ~ '^[0-9]{1,2}$' THEN umur::int END AS usia
+                    FROM req_pk_pencaker WHERE {$where}
+                ) AS umur_valid
+            ) AS dikelompokkan
+            WHERE kelompok IS NOT NULL
+            GROUP BY 1, 2
+        ", $params);
+        $ages = [];
+        foreach (self::AGE_GROUPS as [$label]) {
+            $ages[$label] = ['label' => $label, 'laki_laki' => 0, 'perempuan' => 0];
+        }
+        foreach ($ageRows as $row) {
+            $key = $row->jenis_kelamin === 'Perempuan' ? 'perempuan' : 'laki_laki';
+            $ages[$row->kelompok][$key] += (int) $row->c;
+        }
 
-            $migrant = DB::select("
-                SELECT country_wish AS label, COUNT(*) AS value
-                FROM req_pk_pencaker
-                WHERE {$where} AND COALESCE(country_wish, '') <> ''
-                GROUP BY 1 ORDER BY 2 DESC LIMIT 8
-            ", $params);
+        $migrant = DB::select("
+            SELECT country_wish AS label, COUNT(*) AS value
+            FROM req_pk_pencaker
+            WHERE {$where} AND COALESCE(country_wish, '') <> ''
+            GROUP BY 1 ORDER BY 2 DESC LIMIT 8
+        ", $params);
 
-            $majors = DB::select("
-                SELECT UPPER(TRIM(jurusan)) AS label, COUNT(*) AS value
-                FROM req_pk_pencaker
-                WHERE {$where} AND COALESCE(TRIM(jurusan), '') <> ''
-                GROUP BY 1 ORDER BY 2 DESC LIMIT 10
-            ", $params);
+        $majors = DB::select("
+            SELECT UPPER(TRIM(jurusan)) AS label, COUNT(*) AS value
+            FROM req_pk_pencaker
+            WHERE {$where} AND COALESCE(TRIM(jurusan), '') <> ''
+            GROUP BY 1 ORDER BY 2 DESC LIMIT 10
+        ", $params);
 
-            return [
-                'kpi' => [
-                    'smk' => (int) $kpi->smk,
-                    's1' => (int) $kpi->s1,
-                    'minat_pmi' => (int) $kpi->minat_pmi,
-                    'disabilitas' => (int) $kpi->disabilitas,
-                ],
-                'pendidikan' => $education,
-                'umur_gender' => array_values($ages),
-                'destinasi_pmi' => $this->formatRows($migrant),
-                'top_jurusan' => $this->formatRows($majors),
-            ];
-        });
+        return [
+            'kpi' => [
+                'smk' => $smkCount,
+                's1' => $s1Count,
+                'minat_pmi' => (int) $kpi->minat_pmi,
+                'disabilitas' => (int) $kpi->disabilitas,
+            ],
+            'pendidikan' => $education,
+            'umur_gender' => array_values($ages),
+            'destinasi_pmi' => $this->formatRows($migrant),
+            'top_jurusan' => $this->formatRows($majors),
+        ];
     }
 
     /**
@@ -233,45 +262,48 @@ class PublicDashboardController extends Controller
      */
     public function kebutuhanIndustri(Request $request): JsonResponse
     {
-        return $this->cached('industri', $request, function (array $area) {
-            [$where, $params] = $this->lokerWhere($area);
+        return $this->cached('industri', $request, fn (array $area) => $this->buildKebutuhanIndustri($area));
+    }
 
-            $kpi = DB::selectOne("
-                SELECT COUNT(*) AS loker,
-                       COUNT(DISTINCT nama_perusahaan) AS perusahaan,
-                       COALESCE(SUM(kuota), 0) AS kuota,
-                       COALESCE(AVG(kuota), 0) AS rata_kuota
-                FROM req_pk_loker WHERE {$where}
-            ", $params);
+    public function buildKebutuhanIndustri(array $area): array
+    {
+        [$where, $params] = $this->lokerWhere($area);
 
-            $skillSelects = [];
-            foreach (array_values(self::SKILL_KEYWORDS) as $i => $pattern) {
-                $skillSelects[] = "COUNT(*) FILTER (WHERE (judul_pekerjaan || ' ' || COALESCE(deskripsi_pekerjaan, '')) ~* " . DB::getPdo()->quote($pattern) . ") AS s{$i}";
-            }
-            $skillRow = (array) DB::selectOne(
-                'SELECT ' . implode(', ', $skillSelects) . " FROM req_pk_loker WHERE {$where}",
-                $params
-            );
-            $skills = collect(array_keys(self::SKILL_KEYWORDS))
-                ->map(fn ($label, $i) => ['label' => $label, 'value' => (int) $skillRow["s{$i}"]])
-                ->filter(fn ($row) => $row['value'] > 0)
-                ->sortByDesc('value')
-                ->values()
-                ->take(10)
-                ->all();
+        $kpi = DB::selectOne("
+            SELECT COUNT(*) AS loker,
+                   COUNT(DISTINCT nama_perusahaan) AS perusahaan,
+                   COALESCE(SUM(kuota), 0) AS kuota,
+                   COALESCE(AVG(kuota), 0) AS rata_kuota
+            FROM req_pk_loker WHERE {$where}
+        ", $params);
 
-            return [
-                'kpi' => [
-                    'loker' => (int) $kpi->loker,
-                    'perusahaan' => (int) $kpi->perusahaan,
-                    'kuota' => (int) $kpi->kuota,
-                    'rata_kuota' => round((float) $kpi->rata_kuota, 1),
-                ],
-                'kuota_per_industri' => $this->groupSum('industri', $where, $params, 10),
-                'pola_waktu_kerja' => $this->groupCount('req_pk_loker', 'tipe_pekerjaan', $where, $params),
-                'keterampilan' => $skills,
-            ];
-        });
+        $skillSelects = [];
+        foreach (array_values(self::SKILL_KEYWORDS) as $i => $pattern) {
+            $skillSelects[] = "COUNT(*) FILTER (WHERE (judul_pekerjaan || ' ' || COALESCE(deskripsi_pekerjaan, '')) ~* " . DB::getPdo()->quote($pattern) . ") AS s{$i}";
+        }
+        $skillRow = (array) DB::selectOne(
+            'SELECT ' . implode(', ', $skillSelects) . " FROM req_pk_loker WHERE {$where}",
+            $params
+        );
+        $skills = collect(array_keys(self::SKILL_KEYWORDS))
+            ->map(fn ($label, $i) => ['label' => $label, 'value' => (int) $skillRow["s{$i}"]])
+            ->filter(fn ($row) => $row['value'] > 0)
+            ->sortByDesc('value')
+            ->values()
+            ->take(10)
+            ->all();
+
+        return [
+            'kpi' => [
+                'loker' => (int) $kpi->loker,
+                'perusahaan' => (int) $kpi->perusahaan,
+                'kuota' => (int) $kpi->kuota,
+                'rata_kuota' => round((float) $kpi->rata_kuota, 1),
+            ],
+            'kuota_per_industri' => $this->groupSum('industri', $where, $params, 10),
+            'pola_waktu_kerja' => $this->groupCount('req_pk_loker', 'tipe_pekerjaan', $where, $params),
+            'keterampilan' => $skills,
+        ];
     }
 
     // ------------------------------------------------------------------

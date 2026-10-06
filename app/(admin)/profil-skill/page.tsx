@@ -55,7 +55,7 @@ export default function ProfilSkillPage() {
   const provinceOptions = useMemo(
     () => [
       { value: '', label: 'Semua Provinsi' },
-      ...provinces.map((p) => ({
+      ...(Array.isArray(provinces) ? provinces : []).map((p) => ({
         value: p.id,
         label: p.name,
         code: p.id,
@@ -68,8 +68,8 @@ export default function ProfilSkillPage() {
   useEffect(() => {
     Promise.all([getProvinces(), getJobSeekerOptions()])
       .then(([provData, optData]) => {
-        setProvinces(provData);
-        setPendidikanOptions(optData.pendidikan || []);
+        setProvinces(Array.isArray(provData) ? provData : []);
+        setPendidikanOptions(optData?.pendidikan || []);
       })
       .catch((err) => {
         console.error('Gagal memuat filter options:', err);
@@ -216,13 +216,12 @@ export default function ProfilSkillPage() {
                 <th className="py-3 px-4">Domisili (Kab/Kota)</th>
                 <th className="py-3 px-4">Pendidikan & Rumpun</th>
                 <th className="py-3 px-4">Keahlian Utama</th>
-                <th className="py-3 px-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <td colSpan={5} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Loader2 className="w-6 h-6 animate-spin text-[#0E385E]" />
                       <span className="text-xs">Memuat data pencari kerja...</span>
@@ -231,7 +230,7 @@ export default function ProfilSkillPage() {
                 </tr>
               ) : jobSeekers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <td colSpan={5} className="py-12 text-center text-slate-400">
                     <p className="text-sm font-medium text-slate-500">
                       Belum ada profil pencari kerja yang cocok.
                     </p>
@@ -242,12 +241,24 @@ export default function ProfilSkillPage() {
                 </tr>
               ) : (
                 jobSeekers.map((item: any) => (
-                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3.5 px-4 font-mono text-xs text-blue-700 font-medium">
+                  <tr
+                    key={item.id}
+                    onClick={() => setDetailSeekerId(item.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setDetailSeekerId(item.id);
+                      }
+                    }}
+                    className="hover:bg-blue-50/40 cursor-pointer transition-colors group"
+                  >
+                    <td className="py-3.5 px-4 font-mono text-xs text-blue-700 font-medium group-hover:underline">
                       {item.profile_id || item.id}
                     </td>
                     <td className="py-3.5 px-4 font-medium text-slate-900">
-                      <div>{item.name}</div>
+                      <div className="group-hover:text-blue-700 transition-colors">{item.name}</div>
                       <div className="text-[11px] text-slate-400">
                         {item.jenis_kelamin || 'Tidak Diketahui'} • Umur {item.umur ? `${item.umur} Thn` : '-'}
                       </div>
@@ -276,15 +287,6 @@ export default function ProfilSkillPage() {
                       <div className="text-[11px] text-slate-400">
                         Pengalaman: {item.experience || '-'}
                       </div>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setDetailSeekerId(item.id)}
-                        className="px-3 py-1 rounded bg-[#0E385E] text-white text-xs font-medium hover:bg-[#163A5F] transition-colors shadow-2xs"
-                      >
-                        Detail
-                      </button>
                     </td>
                   </tr>
                 ))

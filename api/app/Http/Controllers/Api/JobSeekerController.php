@@ -19,10 +19,30 @@ class JobSeekerController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        // Hubungan dengan master data sekarang menggunakan relasi standar dengan foreign key id
-        // Kita meload relasi master dan 'skills' count
+        // Optimasi: Pilih hanya kolom yang dibutuhkan untuk tampilan tabel list
         $query = JobSeeker::query()
-            ->with(['province', 'regency', 'educationLevel'])
+            ->select([
+                'id',
+                'profile_id',
+                'name',
+                'provinsi',
+                'province_id',
+                'kab_kota',
+                'regency_id',
+                'pendidikan',
+                'education_level_id',
+                'nama_sekolah',
+                'jurusan',
+                'keahlian',
+                'experience',
+                'jenis_kelamin',
+                'umur',
+            ])
+            ->with([
+                'province:id,name',
+                'regency:id,name,province_id',
+                'educationLevel:id,name',
+            ])
             ->withCount('skills');
 
         // Pencarian nama atau ID profil
