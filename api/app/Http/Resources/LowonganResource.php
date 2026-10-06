@@ -73,7 +73,7 @@ class LowonganResource extends JsonResource
                         'title' => $s->title,
                         'title_en' => $s->title_en,
                         'tipe_keahlian' => $s->pivot->tipe_keahlian,
-                        'level_kemahiran' => $s->pivot->level_kemahiran,
+                        'level_kemahiran' => $s->pivot->skor ?? 'N/A', // fall back if skor is empty
                     ];
                 });
             }),

@@ -73,6 +73,18 @@ class ReqPkLoker extends Model
         return $this->belongsTo(Regency::class, 'regency_id');
     }
 
+    public function skills()
+    {
+        return $this->belongsToMany(
+            SkillNode::class,
+            'lowongan_skills',
+            'vac_id', 
+            'esco_skill_id',
+            'vac_id', 
+            'id'
+        )->withPivot(['tipe_keahlian', 'skor', 'metode']);
+    }
+
     public function scopeFilter($query, array $filters)
     {
         if (!empty($filters['search'])) {

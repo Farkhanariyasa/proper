@@ -27,6 +27,7 @@ class LowonganController extends Controller
                 'kbji:id,code,title,level',
                 'province:id,name',
                 'regency:id,name',
+                'skills:id,title,title_en',
             ]);
 
         // Filter scope dari model
@@ -115,6 +116,7 @@ class LowonganController extends Controller
                 'kbji:id,code,title,level',
                 'province:id,name',
                 'regency:id,name',
+                'skills:id,title,title_en',
             ]);
 
             return response()->json([
@@ -144,6 +146,7 @@ class LowonganController extends Controller
             'kbji:id,code,title,level',
             'province:id,name',
             'regency:id,name',
+            'skills:id,title,title_en',
         ])
         ->where('id', $idOrSlug)
         ->first();
@@ -208,6 +211,7 @@ class LowonganController extends Controller
                 'kbji:id,code,title,level',
                 'province:id,name',
                 'regency:id,name',
+                'skills:id,title,title_en',
             ]);
 
             return response()->json([

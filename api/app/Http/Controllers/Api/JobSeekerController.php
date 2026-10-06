@@ -19,52 +19,50 @@ class JobSeekerController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        // Hubungan dengan master data sekarang menggunakan relasi standar dengan foreign key id
+        // Kita meload relasi master dan 'skills' count
         $query = JobSeeker::query()
-            ->with(['regency.province', 'educationLevel', 'kbji:id,code,title'])
+            ->with(['province', 'regency', 'educationLevel'])
             ->withCount('skills');
 
-        // Filter pencarian nama / NIK
+        // Filter pencarian nama
         if ($request->filled('q')) {
             $keyword = trim((string) $request->query('q'));
-            $query->where(function ($q) use ($keyword) {
-                $q->where('full_name', 'ILIKE', "%{$keyword}%")
-                  ->orWhere('nik', 'LIKE', "%{$keyword}%");
-            });
+            $query->where('name', 'ILIKE', "%{$keyword}%");
         }
 
-        // Filter provinsi
-        if ($request->filled('province_id')) {
-            $query->whereHas('regency', function ($q) use ($request) {
-                $q->where('province_id', $request->query('province_id'));
-            });
+        // Filter provinsi (string text bebas dari DB)
+        if ($request->filled('provinsi')) {
+            $query->where('provinsi', 'ILIKE', '%' . $request->query('provinsi') . '%');
         }
 
-        // Filter kabupaten/kota
-        if ($request->filled('regency_id')) {
-            $query->where('regency_id', $request->query('regency_id'));
+        // Filter kabupaten/kota (string text bebas dari DB)
+        if ($request->filled('kab_kota')) {
+            $query->where('kab_kota', 'ILIKE', '%' . $request->query('kab_kota') . '%');
         }
 
-        // Filter rumpun bidang pendidikan
-        if ($request->filled('study_field_group')) {
-            $query->where('study_field_group', $request->query('study_field_group'));
+        // Filter tingkat pendidikan (string dari DB)
+        if ($request->filled('pendidikan')) {
+            $query->where('pendidikan', 'ILIKE', '%' . $request->query('pendidikan') . '%');
         }
 
         // Filter rentang pengalaman
-        if ($request->filled('experience_range')) {
-            $query->where('experience_range', $request->query('experience_range'));
+        if ($request->filled('experience')) {
+            $query->where('experience', 'ILIKE', '%' . $request->query('experience') . '%');
         }
 
+        // Assuming there is no created_at, we just order by ID or don't order explicitly
+        // If there is no created_at, ordering by id desc is safer
         $perPage = min(100, max(1, (int) $request->query('per_page', 10)));
-        $jobSeekers = $query->orderBy('created_at', 'desc')->paginate($perPage);
+        $jobSeekers = $query->orderBy('id', 'desc')->simplePaginate($perPage);
 
         return response()->json([
             'status' => 'success',
             'data' => $jobSeekers->items(),
             'meta' => [
                 'current_page' => $jobSeekers->currentPage(),
-                'last_page' => $jobSeekers->lastPage(),
                 'per_page' => $jobSeekers->perPage(),
-                'total' => $jobSeekers->total(),
+                'has_more_pages' => $jobSeekers->hasMorePages(),
             ],
         ]);
     }
@@ -127,11 +125,10 @@ class JobSeekerController extends Controller
     public function show($id): JsonResponse
     {
         $jobSeeker = JobSeeker::with([
-            'regency.province',
+            'province',
+            'regency',
             'educationLevel',
-            'kbji:id,code,title,description',
             'skills:id,code,title,title_en,type',
-            'creator:id,name,email',
         ])->find($id);
 
         if (!$jobSeeker) {
