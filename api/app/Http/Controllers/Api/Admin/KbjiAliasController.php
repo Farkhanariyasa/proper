@@ -55,9 +55,8 @@ class KbjiAliasController extends Controller
             'confidence' => 1.0,
         ]);
 
-        // Setelah diverifikasi, perbarui data lowongan terkait
-        \App\Models\ReqPkLoker::whereNull('kbji_2026_id')
-            ->where('judul_pekerjaan', 'ilike', trim($alias->raw_term))
+        // Setelah diverifikasi, perbarui data lowongan terkait secara luas
+        \App\Models\ReqPkLoker::where('judul_pekerjaan', 'ilike', '%' . trim($alias->raw_term) . '%')
             ->update([
                 'kbji_2026_id' => $request->kbji_id,
                 'is_mapped' => true

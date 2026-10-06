@@ -88,9 +88,9 @@ class JobSeeker extends Model
     {
         return $this->belongsToMany(
             SkillNode::class,
-            'job_seeker_skills',
-            'job_seeker_id',
+            'pencaker_esco_skills',
+            'pencaker_id',
             'esco_skill_id'
-        );
+        )->withPivot('is_manual')->withTimestamps();
     }
 }

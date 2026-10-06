@@ -37,6 +37,8 @@ Route::get('esco-skills', [EscoSkillController::class, 'search']);
 
 // Profil Pencari Kerja & Skill
 Route::get('job-seekers/options', [JobSeekerController::class, 'options']);
+Route::get('job-seekers/{id}/skills', [JobSeekerController::class, 'getSkills']);
+Route::post('job-seekers/{id}/skills', [JobSeekerController::class, 'updateSkills']);
 Route::apiResource('job-seekers', JobSeekerController::class)->only(['index', 'store', 'show']);
 
 // Modul Lowongan Kerja
@@ -53,6 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Mesin Penjodohan & Rekomendasi (Smart Matching Engine)
 Route::prefix('rekomendasi')->group(function () {
+    Route::post('lowongan', [MatchingController::class, 'recommendLowongan']);
     Route::get('pairs', [MatchingController::class, 'unifiedPairs']);
     Route::get('jobs-for-seeker/{jobSeekerId}', [MatchingController::class, 'jobsForSeeker']);
     Route::get('candidates-for-job/{lowonganId}', [MatchingController::class, 'candidatesForJob']);

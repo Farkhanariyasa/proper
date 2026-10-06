@@ -158,4 +158,82 @@ class JobSeekerController extends Controller
             ],
         ]);
     }
+
+    /**
+     * GET /api/job-seekers/{id}/skills
+     * Ambil skill pencari kerja. Jika kosong, ekstrak dari field 'keahlian' (MVP text matching).
+     */
+    public function getSkills($id): JsonResponse
+    {
+        $jobSeeker = JobSeeker::with('skills:id,code,title,title_en,type,description')->find($id);
+
+        if (!$jobSeeker) {
+            return response()->json(['status' => 'error', 'message' => 'Not found'], 404);
+        }
+
+        // Jika skill masih kosong, lakukan auto-extract sederhana dari teks (MVP)
+        if ($jobSeeker->skills->isEmpty() && !empty($jobSeeker->keahlian)) {
+            // Simulasi auto extract skill dari teks keahlian
+            $keywords = array_filter(array_map('trim', explode(',', $jobSeeker->keahlian)));
+            
+            if (count($keywords) > 0) {
+                $matchedSkillIds = \App\Models\SkillNode::where(function ($query) use ($keywords) {
+                    foreach ($keywords as $keyword) {
+                        $query->orWhere('title', 'ILIKE', '%' . $keyword . '%')
+                              ->orWhere('title_en', 'ILIKE', '%' . $keyword . '%');
+                    }
+                })->limit(5)->pluck('id')->toArray();
+
+                if (!empty($matchedSkillIds)) {
+                    // Simpan ke pivot table pencaker_esco_skills
+                    $syncData = [];
+                    foreach ($matchedSkillIds as $skillId) {
+                        $syncData[$skillId] = ['is_manual' => false];
+                    }
+                    $jobSeeker->skills()->sync($syncData);
+                    
+                    // Reload skill setelah di-save
+                    $jobSeeker->load('skills:id,code,title,title_en,type,description');
+                }
+            }
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $jobSeeker->skills,
+        ]);
+    }
+
+    /**
+     * POST /api/job-seekers/{id}/skills
+     * Update/Overwrite skill pencaker oleh operator
+     */
+    public function updateSkills(Request $request, $id): JsonResponse
+    {
+        $request->validate([
+            'skills' => 'required|array',
+            'skills.*' => 'integer|exists:skill_nodes,id'
+        ]);
+
+        $jobSeeker = JobSeeker::find($id);
+
+        if (!$jobSeeker) {
+            return response()->json(['status' => 'error', 'message' => 'Not found'], 404);
+        }
+
+        // Sync dengan status is_manual = true karena ini di-update operator
+        $syncData = [];
+        foreach ($request->skills as $skillId) {
+            $syncData[$skillId] = ['is_manual' => true];
+        }
+        
+        $jobSeeker->skills()->sync($syncData);
+        $jobSeeker->load('skills:id,code,title,title_en,type,description');
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Keahlian pencari kerja berhasil diperbarui',
+            'data' => $jobSeeker->skills
+        ]);
+    }
 }

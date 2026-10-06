@@ -49,7 +49,7 @@ export default function SearchableSelect({
     if (!q) return options;
 
     return options.filter((opt) => {
-      const matchLabel = opt.label.toLowerCase().includes(q);
+      const matchLabel = (opt.label || '').toLowerCase().includes(q);
       const matchCode = opt.code ? opt.code.toLowerCase().includes(q) : false;
       const matchValue = opt.value.toLowerCase().includes(q);
       return matchLabel || matchCode || matchValue;
@@ -152,7 +152,7 @@ export default function SearchableSelect({
 
       {/* Dropdown Menu Popover */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg border border-slate-200 shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute left-0 right-0 bottom-full mb-1 bg-white rounded-lg border border-slate-200 shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           {/* Search Input Box */}
           <div className="p-2 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-10">
             <div className="relative">
