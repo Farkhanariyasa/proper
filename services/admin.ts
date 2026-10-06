@@ -262,3 +262,51 @@ export async function getPermissionsApi(): Promise<PermissionsGroupedResponse['d
   const json = await res.json();
   return json.data;
 }
+
+/* ========================================================
+   KBJI ALIAS CURATION
+======================================================== */
+
+export interface GetKbjiAliasesParams {
+  status?: string;
+  method?: string;
+  search?: string;
+  page?: number;
+}
+
+export async function getKbjiAliasesApi(params: GetKbjiAliasesParams = {}) {
+  const baseUrl = getApiBaseUrl();
+  const query = new URLSearchParams();
+
+  if (params.status) query.append('status', params.status);
+  if (params.method) query.append('method', params.method);
+  if (params.search) query.append('search', params.search);
+  if (params.page) query.append('page', String(params.page));
+
+  const res = await fetch(`${baseUrl}/api/admin/kbji-aliases?${query.toString()}`, {
+    headers: getAuthHeaders(),
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error(`Gagal memuat alias KBJI (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export async function updateKbjiAliasApi(id: number, kbjiId: number) {
+  const baseUrl = getApiBaseUrl();
+  const res = await fetch(`${baseUrl}/api/admin/kbji-aliases/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ kbji_id: kbjiId }),
+  });
+
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.message || 'Gagal memverifikasi alias KBJI.');
+  }
+
+  return json;
+}

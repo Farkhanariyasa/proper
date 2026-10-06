@@ -21,14 +21,14 @@ class MatchingEngineService
      */
     public function matchPair(int $jobSeekerId, string $lowonganId): array
     {
-        $lowongan = LowonganKerja::with(['skills:id,title,title_en,code', 'kbji', 'educationLevel', 'province', 'regency'])
+        $lowongan = LowonganKerja::with(['kbji', 'educationLevel', 'province', 'regency'])
             ->find($lowonganId);
 
         if (!$lowongan) {
             throw new \InvalidArgumentException('Lowongan kerja tidak ditemukan.');
         }
 
-        $jobSeeker = JobSeeker::with(['skills:id,title,title_en,code', 'educationLevel', 'regency.province', 'kbji:id,code,title'])
+        $jobSeeker = JobSeeker::with(['educationLevel', 'regency.province', 'kbji:id,code,title'])
             ->find($jobSeekerId);
 
         if (!$jobSeeker) {
@@ -285,7 +285,7 @@ class MatchingEngineService
      */
     public function recommendJobsForSeeker(int $jobSeekerId, array $filters = []): array
     {
-        $jobSeeker = JobSeeker::with(['skills:id,title,title_en', 'kbji:id,code,title'])->find($jobSeekerId);
+        $jobSeeker = JobSeeker::with(['kbji:id,code,title'])->find($jobSeekerId);
 
         if (!$jobSeeker) {
             throw new \InvalidArgumentException('Profil pencari kerja tidak ditemukan.');
@@ -297,7 +297,7 @@ class MatchingEngineService
         // Ambil lowongan yang aktif tayang
         $query = LowonganKerja::query()
             ->with([
-                'skills:id,title,title_en',
+                // 'skills:id,title,title_en', // Temporarily disabled
                 'kbji:id,code,title',
                 'educationLevel:id,name',
                 'province:id,name',
@@ -410,7 +410,7 @@ class MatchingEngineService
      */
     public function recommendCandidatesForJob(string $lowonganId, array $filters = []): array
     {
-        $lowongan = LowonganKerja::with(['skills:id,title,title_en', 'kbji:id,code,title'])->find($lowonganId);
+        $lowongan = LowonganKerja::with(['kbji:id,code,title'])->find($lowonganId);
 
         if (!$lowongan) {
             throw new \InvalidArgumentException('Lowongan kerja tidak ditemukan.');
@@ -422,7 +422,7 @@ class MatchingEngineService
         // Ambil semua pencari kerja dengan skill & KBJI mereka
         $query = JobSeeker::query()
             ->with([
-                'skills:id,title,title_en',
+                // 'skills:id,title,title_en', // Temporarily disabled
                 'educationLevel:id,name',
                 'regency.province',
                 'kbji:id,code,title',
@@ -526,7 +526,7 @@ class MatchingEngineService
         // 1. Query Pencari Kerja
         $seekerQuery = JobSeeker::query()
             ->with([
-                'skills:id,title,title_en',
+                // 'skills:id,title,title_en', // Temporarily disabled
                 'educationLevel:id,name',
                 'regency.province',
                 'kbji:id,code,title',
@@ -541,7 +541,7 @@ class MatchingEngineService
         // 2. Query Lowongan Kerja
         $jobQuery = LowonganKerja::query()
             ->with([
-                'skills:id,title,title_en',
+                // 'skills:id,title,title_en', // Temporarily disabled
                 'kbji:id,code,title',
                 'educationLevel:id,name',
                 'province:id,name',

@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreLowonganRequest;
 use App\Http\Requests\UpdateLowonganRequest;
 use App\Http\Resources\LowonganResource;
-use App\Models\LowonganKerja;
+use App\Models\ReqPkLoker;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,13 +22,11 @@ class LowonganController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = LowonganKerja::query()
+        $query = ReqPkLoker::query()
             ->with([
                 'kbji:id,code,title,level',
-                'educationLevel:id,name',
                 'province:id,name',
                 'regency:id,name',
-                'skills:id,title,title_en',
             ]);
 
         // Filter scope dari model
@@ -43,14 +41,14 @@ class LowonganController extends Controller
             'kbji_id',
         ]));
 
-        $sortBy = $request->query('sort_by', 'created_at');
+        $sortBy = $request->query('sort_by', 'tanggal_tayang');
         $sortOrder = $request->query('sort_order', 'desc');
-        $allowedSorts = ['created_at', 'tanggal_tutup', 'judul_lowongan', 'gaji_minimal'];
+        $allowedSorts = ['tanggal_tayang', 'tanggal_expired_lowongan', 'judul_pekerjaan'];
 
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortOrder === 'asc' ? 'asc' : 'desc');
         } else {
-            $query->orderBy('created_at', 'desc');
+            $query->orderBy('tanggal_tayang', 'desc');
         }
 
         $perPage = min(100, max(1, (int) $request->query('per_page', 10)));
@@ -88,30 +86,35 @@ class LowonganController extends Controller
         $validated['slug'] = $baseSlug . '-' . Str::lower(Str::random(5));
 
         try {
-            $lowongan = DB::transaction(function () use ($validated, $skillsData) {
-                $item = LowonganKerja::create($validated);
+            $mappedData = [
+                'job_id' => 'JOB-' . Str::random(4) . '-' . Str::random(4),
+                'vac_id' => 'VAC-' . Str::random(4) . '-' . Str::random(4),
+                'judul_pekerjaan' => $validated['judul_lowongan'] ?? null,
+                'nama_perusahaan' => $validated['nama_perusahaan'] ?? null,
+                'deskripsi_pekerjaan' => $validated['deskripsi_pekerjaan'] ?? null,
+                'tipe_pekerjaan' => $validated['tipe_pekerjaan'] ?? null,
+                'status_loker' => isset($validated['status_lowongan']) ? strtolower($validated['status_lowongan']) : 'draft',
+                'kuota' => $validated['jumlah_kebutuhan'] ?? null,
+                'rentang_gaji' => (isset($validated['gaji_minimal']) || isset($validated['gaji_maksimal'])) 
+                    ? (($validated['gaji_minimal'] ?? '0') . '-' . ($validated['gaji_maksimal'] ?? '0')) 
+                    : null,
+                'reg' => $validated['alamat_lengkap_penempatan'] ?? null,
+                'provinsi_id' => $validated['provinsi_id'] ?? null,
+                'regency_id' => $validated['regency_id'] ?? null,
+                'kbji_2026_id' => $validated['kbji_id'] ?? null,
+                'tanggal_dibuat' => now(),
+            ];
 
-                // Format sync array dengan pivot attributes
-                $syncPayload = [];
-                foreach ($skillsData as $sk) {
-                    $syncPayload[$sk['esco_skill_id']] = [
-                        'tipe_keahlian' => $sk['tipe_keahlian'] ?? 'wajib',
-                        'level_kemahiran' => $sk['level_kemahiran'] ?? 'menengah',
-                    ];
-                }
-
-                $item->skills()->sync($syncPayload);
+            $lowongan = DB::transaction(function () use ($mappedData) {
+                $item = ReqPkLoker::create($mappedData);
 
                 return $item;
             });
 
             $lowongan->load([
                 'kbji:id,code,title,level',
-                'educationLevel:id,name',
                 'province:id,name',
                 'regency:id,name',
-                'skills:id,title,title_en',
-                'creator:id,name,email',
             ]);
 
             return response()->json([
@@ -137,18 +140,12 @@ class LowonganController extends Controller
      */
     public function show(string $idOrSlug): JsonResponse
     {
-        $lowongan = LowonganKerja::with([
+        $lowongan = ReqPkLoker::with([
             'kbji:id,code,title,level',
-            'educationLevel:id,name',
             'province:id,name',
             'regency:id,name',
-            'skills:id,title,title_en',
-            'creator:id,name,email',
         ])
-        ->where(function ($q) use ($idOrSlug) {
-            $q->where('id', $idOrSlug)
-              ->orWhere('slug', $idOrSlug);
-        })
+        ->where('id', $idOrSlug)
         ->first();
 
         if (!$lowongan) {
@@ -170,7 +167,7 @@ class LowonganController extends Controller
      */
     public function update(UpdateLowonganRequest $request, string $id): JsonResponse
     {
-        $lowongan = LowonganKerja::find($id);
+        $lowongan = ReqPkLoker::find($id);
 
         if (!$lowongan) {
             return response()->json([
@@ -185,28 +182,32 @@ class LowonganController extends Controller
         unset($validated['skills']);
 
         try {
-            DB::transaction(function () use ($lowongan, $validated, $hasSkills, $skillsData) {
-                $lowongan->update($validated);
+            $mappedData = [];
+            if (array_key_exists('judul_lowongan', $validated)) $mappedData['judul_pekerjaan'] = $validated['judul_lowongan'];
+            if (array_key_exists('nama_perusahaan', $validated)) $mappedData['nama_perusahaan'] = $validated['nama_perusahaan'];
+            if (array_key_exists('deskripsi_pekerjaan', $validated)) $mappedData['deskripsi_pekerjaan'] = $validated['deskripsi_pekerjaan'];
+            if (array_key_exists('tipe_pekerjaan', $validated)) $mappedData['tipe_pekerjaan'] = $validated['tipe_pekerjaan'];
+            if (array_key_exists('status_lowongan', $validated)) $mappedData['status_loker'] = strtolower($validated['status_lowongan']);
+            if (array_key_exists('jumlah_kebutuhan', $validated)) $mappedData['kuota'] = $validated['jumlah_kebutuhan'];
+            if (array_key_exists('alamat_lengkap_penempatan', $validated)) $mappedData['reg'] = $validated['alamat_lengkap_penempatan'];
+            if (array_key_exists('provinsi_id', $validated)) $mappedData['provinsi_id'] = $validated['provinsi_id'];
+            if (array_key_exists('regency_id', $validated)) $mappedData['regency_id'] = $validated['regency_id'];
+            if (array_key_exists('kbji_id', $validated)) $mappedData['kbji_2026_id'] = $validated['kbji_id'];
+            
+            if (array_key_exists('gaji_minimal', $validated) || array_key_exists('gaji_maksimal', $validated)) {
+                $mappedData['rentang_gaji'] = ($validated['gaji_minimal'] ?? '0') . '-' . ($validated['gaji_maksimal'] ?? '0');
+            }
+            
+            $mappedData['tanggal_update'] = now();
 
-                if ($hasSkills && is_array($skillsData)) {
-                    $syncPayload = [];
-                    foreach ($skillsData as $sk) {
-                        $syncPayload[$sk['esco_skill_id']] = [
-                            'tipe_keahlian' => $sk['tipe_keahlian'] ?? 'wajib',
-                            'level_kemahiran' => $sk['level_kemahiran'] ?? 'menengah',
-                        ];
-                    }
-                    $lowongan->skills()->sync($syncPayload);
-                }
+            DB::transaction(function () use ($lowongan, $mappedData) {
+                $lowongan->update($mappedData);
             });
 
             $lowongan->load([
                 'kbji:id,code,title,level',
-                'educationLevel:id,name',
                 'province:id,name',
                 'regency:id,name',
-                'skills:id,title,title_en',
-                'creator:id,name,email',
             ]);
 
             return response()->json([
@@ -230,7 +231,7 @@ class LowonganController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        $lowongan = LowonganKerja::find($id);
+        $lowongan = ReqPkLoker::find($id);
 
         if (!$lowongan) {
             return response()->json([
@@ -254,10 +255,10 @@ class LowonganController extends Controller
     public function toggleStatus(Request $request, string $id): JsonResponse
     {
         $request->validate([
-            'status_lowongan' => ['required', 'string', 'in:Draft,Published,Closed,Archived'],
+            'status_lowongan' => ['required', 'string'],
         ]);
 
-        $lowongan = LowonganKerja::find($id);
+        $lowongan = ReqPkLoker::find($id);
 
         if (!$lowongan) {
             return response()->json([
@@ -266,18 +267,18 @@ class LowonganController extends Controller
             ], 404);
         }
 
-        $lowongan->status_lowongan = $request->status_lowongan;
-        if ($request->status_lowongan === 'Published' && !$lowongan->tanggal_buka) {
-            $lowongan->tanggal_buka = now();
+        $lowongan->status_loker = strtolower($request->status_lowongan);
+        if ($request->status_lowongan === 'Published' && !$lowongan->tanggal_tayang) {
+            $lowongan->tanggal_tayang = now();
         }
         $lowongan->save();
 
         return response()->json([
             'status' => 'success',
-            'message' => "Status lowongan berhasil diubah menjadi {$lowongan->status_lowongan}.",
+            'message' => "Status lowongan berhasil diubah menjadi {$lowongan->status_loker}.",
             'data' => [
                 'id' => $lowongan->id,
-                'status_lowongan' => $lowongan->status_lowongan,
+                'status_lowongan' => $lowongan->status_loker,
             ],
         ]);
     }
