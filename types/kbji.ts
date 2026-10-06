@@ -6,6 +6,7 @@ export type KbjiLevel =
   | 'occupation';
 
 export interface KbjiNode {
+  id: number;
   code: string;
   title: string;
   level: KbjiLevel;
@@ -14,6 +15,7 @@ export interface KbjiNode {
 }
 
 export interface KbjiAncestor {
+  id: number;
   code: string;
   title: string;
   level: KbjiLevel;
@@ -27,6 +29,7 @@ export interface KbjiChildrenResponse {
 }
 
 export interface KbjiDetail {
+  id: number;
   code: string;
   title: string;
   level: KbjiLevel;
