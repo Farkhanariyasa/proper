@@ -89,7 +89,7 @@ export default function LowonganPage() {
   const provinceFilterOptions = useMemo(
     () => [
       { value: '', label: 'Semua Wilayah' },
-      ...provinces
+      ...(Array.isArray(provinces) ? provinces : [])
         .slice()
         .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
         .map((p) => ({

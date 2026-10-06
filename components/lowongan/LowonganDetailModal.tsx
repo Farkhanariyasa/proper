@@ -56,6 +56,11 @@ export default function LowonganDetailModal({
     }
   };
 
+  const isHtml = (str?: string | null) => {
+    if (!str) return false;
+    return /<[a-z][\s\S]*>/i.test(str);
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Published':
@@ -173,9 +178,18 @@ export default function LowonganDetailModal({
             <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
               Deskripsi Pekerjaan
             </h4>
-            <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 whitespace-pre-line leading-relaxed text-xs sm:text-sm">
-              {lowongan.deskripsi_pekerjaan}
-            </div>
+            {isHtml(lowongan.deskripsi_pekerjaan) ? (
+              <div
+                className="p-4 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 leading-relaxed text-xs sm:text-sm space-y-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_li]:pl-1 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_b]:font-semibold [&_a]:text-blue-600 [&_a]:underline"
+                dangerouslySetInnerHTML={{ __html: lowongan.deskripsi_pekerjaan! }}
+              />
+            ) : (
+              <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 whitespace-pre-line leading-relaxed text-xs sm:text-sm">
+                {lowongan.deskripsi_pekerjaan || (
+                  <span className="italic text-slate-400">Deskripsi pekerjaan belum tersedia.</span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Kualifikasi & Persyaratan */}
@@ -220,7 +234,14 @@ export default function LowonganDetailModal({
                 <span className="font-semibold text-slate-700 block mb-1">
                   Persyaratan Tambahan:
                 </span>
-                <p className="text-slate-600">{lowongan.persyaratan_tambahan}</p>
+                {isHtml(lowongan.persyaratan_tambahan) ? (
+                  <div
+                    className="text-slate-600 leading-relaxed space-y-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_li]:pl-1 [&_p]:mb-1 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_b]:font-semibold"
+                    dangerouslySetInnerHTML={{ __html: lowongan.persyaratan_tambahan }}
+                  />
+                ) : (
+                  <p className="text-slate-600 whitespace-pre-line">{lowongan.persyaratan_tambahan}</p>
+                )}
               </div>
             )}
           </div>

@@ -15,7 +15,7 @@ class EducationLevelController extends Controller
     public function index(): JsonResponse
     {
         $levels = Cache::remember('master:education_levels', 604800, function () {
-            return EducationLevel::orderBy('sort_order', 'asc')->get();
+            return EducationLevel::orderBy('sort_order', 'asc')->get()->toArray();
         });
 
         return response()->json([

@@ -20,7 +20,7 @@ class WilayahController extends Controller
     public function provinces(): JsonResponse
     {
         $provinces = Cache::remember('master:provinces', self::CACHE_TTL, function () {
-            return Province::orderBy('id', 'asc')->get();
+            return Province::orderBy('id', 'asc')->get()->toArray();
         });
 
         return response()->json([
@@ -45,7 +45,7 @@ class WilayahController extends Controller
                 $query->where('province_id', $provinceId);
             }
 
-            return $query->orderBy('id', 'asc')->get();
+            return $query->orderBy('id', 'asc')->get()->toArray();
         });
 
         return response()->json([
