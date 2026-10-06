@@ -47,9 +47,8 @@ export default function PublicHeader() {
           </nav>
         </div>
 
-        {/* Belum ada sistem autentikasi: sementara langsung menuju area admin */}
         <Link
-          href="/dashboard/operator"
+          href="/login"
           className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-400 text-[#0E385E] text-sm font-bold hover:bg-amber-300 transition-colors shrink-0"
         >
           <LogIn className="w-4 h-4" />
