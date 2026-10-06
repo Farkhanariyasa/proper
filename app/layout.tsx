@@ -10,9 +10,17 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'Proper',
+  title: {
+    default: 'e-Pengantar Kerja',
+    template: '%s | e-Pengantar Kerja',
+  },
   description:
     'Menghubungkan pencari kerja, perusahaan, dan petugas pengantar kerja melalui data skill yang terstandar didukung Skill Taxonomy Nasional.',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 export default function RootLayout({
