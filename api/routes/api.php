@@ -39,6 +39,7 @@ Route::get('esco-skills', [EscoSkillController::class, 'search']);
 Route::get('job-seekers/options', [JobSeekerController::class, 'options']);
 Route::get('job-seekers/{id}/skills', [JobSeekerController::class, 'getSkills']);
 Route::post('job-seekers/{id}/skills', [JobSeekerController::class, 'updateSkills']);
+Route::post('job-seekers/{id}/extract-skills', [JobSeekerController::class, 'extractSkills']);
 Route::apiResource('job-seekers', JobSeekerController::class)->only(['index', 'store', 'show']);
 
 // Modul Lowongan Kerja

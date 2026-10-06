@@ -108,6 +108,6 @@ class JobSeeker extends Model
             'pencaker_esco_skills',
             'pencaker_id',
             'esco_skill_id'
-        )->withPivot('is_manual')->withTimestamps();
+        )->withPivot(['is_manual', 'source'])->withTimestamps();
     }
 }

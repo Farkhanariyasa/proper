@@ -9,7 +9,6 @@ import {
   GitMerge,
   Briefcase,
   GraduationCap,
-  Sparkles,
   LayoutDashboard,
   ChevronDown,
   Shield,
@@ -395,7 +394,7 @@ export default function Sidebar({
                       : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
                   }`}
                 >
-                  <Sparkles
+                  <IdCard
                     className={`h-4 w-4 shrink-0 transition-colors ${
                       isItemActive('/kbji-aliases') ? 'text-amber-300' : 'text-blue-200 group-hover:text-white'
                     }`}

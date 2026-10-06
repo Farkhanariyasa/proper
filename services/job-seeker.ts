@@ -164,11 +164,15 @@ export async function createJobSeeker(payload: CreateJobSeekerPayload): Promise<
 }
 
 /**
- * Mengambil skill pencari kerja (akan auto extract jika kosong)
+ * Mengambil skill pencari kerja (akan auto extract jika kosong, atau refresh jika diminta)
  */
-export async function getJobSeekerSkills(id: number | string): Promise<EscoSkillItem[]> {
+export async function getJobSeekerSkills(
+  id: number | string,
+  refresh: boolean = false
+): Promise<{ data: EscoSkillItem[]; meta?: any }> {
   const baseUrl = getApiBaseUrl();
-  const res = await fetch(`${baseUrl}/api/job-seekers/${id}/skills`, {
+  const url = `${baseUrl}/api/job-seekers/${id}/skills${refresh ? '?refresh=1' : ''}`;
+  const res = await fetch(url, {
     headers: { Accept: 'application/json' },
     cache: 'no-store',
   });
@@ -178,7 +182,38 @@ export async function getJobSeekerSkills(id: number | string): Promise<EscoSkill
   }
 
   const json = await res.json();
-  return json.data;
+  return {
+    data: json.data || [],
+    meta: json.meta,
+  };
+}
+
+/**
+ * Ekstraksi ulang skill pencari kerja berdasarkan keahlian, pengalaman, dan sertifikasi
+ */
+export async function extractJobSeekerSkills(
+  id: number | string
+): Promise<{ data: EscoSkillItem[]; meta?: any; message?: string }> {
+  const baseUrl = getApiBaseUrl();
+  const res = await fetch(`${baseUrl}/api/job-seekers/${id}/extract-skills`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ force: true }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Gagal mengekstrak skill pencari kerja (${res.status})`);
+  }
+
+  const json = await res.json();
+  return {
+    data: json.data || [],
+    meta: json.meta,
+    message: json.message,
+  };
 }
 
 /**

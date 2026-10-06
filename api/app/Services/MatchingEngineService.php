@@ -28,7 +28,7 @@ class MatchingEngineService
             throw new \InvalidArgumentException('Lowongan kerja tidak ditemukan.');
         }
 
-        $jobSeeker = JobSeeker::with(['educationLevel', 'regency.province', 'kbji:id,code,title'])
+        $jobSeeker = JobSeeker::with(['educationLevel', 'regency.province'])
             ->find($jobSeekerId);
 
         if (!$jobSeeker) {
@@ -44,14 +44,26 @@ class MatchingEngineService
 
         // 3. Muat skill yang dimiliki pelamar (dengan metadata)
         $candidateSkills = $jobSeeker->skills;
+        if ($candidateSkills->isEmpty()) {
+            app(\App\Services\CandidateSkillExtractorService::class)->syncSkillsForJobSeeker($jobSeeker);
+            $jobSeeker->load(['skills' => function ($q) {
+                $q->select('skill_nodes.id', 'skill_nodes.code', 'skill_nodes.title', 'skill_nodes.title_en', 'skill_nodes.type', 'skill_nodes.description');
+            }]);
+            $candidateSkills = $jobSeeker->skills;
+        }
         $candidateSkillIds = $candidateSkills->pluck('id')->toArray();
+        $rawProfile = [
+            'keahlian' => $jobSeeker->keahlian,
+            'experience' => $jobSeeker->experience,
+            'sertifikasi' => $jobSeeker->sertifikasi,
+        ];
 
         // 4. Iterasi setiap skill yang dibutuhkan dan uji multi-layer matching
         $matchedSkills = [];
         $gapSkills = [];
 
         foreach ($requiredSkills as $reqSkill) {
-            $matchResult = $this->evaluateSkillMatch($reqSkill, $candidateSkills, $candidateSkillIds);
+            $matchResult = $this->evaluateSkillMatch($reqSkill, $candidateSkills, $candidateSkillIds, $rawProfile);
 
             if ($matchResult['is_matched']) {
                 $matchedSkills[] = [
@@ -60,8 +72,9 @@ class MatchingEngineService
                     'title_en' => $reqSkill->title_en,
                     'tipe_keahlian' => $reqSkill->pivot->tipe_keahlian ?? 'wajib',
                     'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
-                    'match_type' => $matchResult['match_type'], // exact_id, taxonomy_hierarchy, lexical_token
+                    'match_type' => $matchResult['match_type'], // exact_id, taxonomy_hierarchy, lexical_token, profile_source
                     'matched_with' => $matchResult['matched_with_title'],
+                    'source' => $matchResult['source'] ?? 'keahlian',
                     'status_verifikasi' => 'Terverifikasi (Taksonomi ESCO)',
                 ];
             } else {
@@ -132,11 +145,11 @@ class MatchingEngineService
     {
         if (!$candidateKbji || !$jobKbji) {
             return [
-                'is_compatible' => false,
+                'is_compatible' => true,
                 'match_level' => 'unspecified',
                 'label' => 'KBJI Belum Ditentukan',
                 'code' => null,
-                'compatibility_score' => 0,
+                'compatibility_score' => 70,
             ];
         }
 
@@ -178,19 +191,22 @@ class MatchingEngineService
     }
 
     /**
-     * Evaluasi pencocokan skill dengan 3 layer:
+     * Evaluasi pencocokan skill dengan 4 layer:
      * 1. Exact ID
      * 2. Padanan Taksonomi (Hierarki Parent / Child)
      * 3. Leksikal / Substring / Token
+     * 4. Padanan Profil Komprehensif (Keahlian, Experience, Sertifikasi)
      */
-    protected function evaluateSkillMatch(object $reqSkill, $candidateSkills, array $candidateSkillIds): array
+    protected function evaluateSkillMatch(object $reqSkill, $candidateSkills, array $candidateSkillIds, ?array $rawProfile = null): array
     {
         // Layer 1: Exact ID Match
         if (in_array($reqSkill->id, $candidateSkillIds)) {
+            $cSkill = $candidateSkills->firstWhere('id', $reqSkill->id);
             return [
                 'is_matched' => true,
                 'match_type' => 'Exact Match',
                 'matched_with_title' => $reqSkill->title,
+                'source' => $cSkill->pivot->source ?? $cSkill->source ?? 'keahlian',
             ];
         }
 
@@ -198,15 +214,17 @@ class MatchingEngineService
         if (!empty($candidateSkillIds)) {
             $isRelatedHierarchy = $this->checkTaxonomyHierarchy($reqSkill->id, $candidateSkillIds);
             if ($isRelatedHierarchy) {
+                $cSkill = $candidateSkills->firstWhere('id', $isRelatedHierarchy['matched_id']);
                 return [
                     'is_matched' => true,
                     'match_type' => 'Padanan Taksonomi (Hierarki)',
                     'matched_with_title' => $isRelatedHierarchy['matched_title'],
+                    'source' => $cSkill->pivot->source ?? $cSkill->source ?? 'keahlian',
                 ];
             }
         }
 
-        // Layer 3: Leksikal / Substring / Token Match
+        // Layer 3: Leksikal / Substring / Token Match dengan Skill Kandidat
         $reqTitle = mb_strtolower(trim($reqSkill->title));
         $reqTitleEn = mb_strtolower(trim($reqSkill->title_en ?? ''));
         $reqTokens = array_filter(explode(' ', preg_replace('/[^\p{L}\p{N}\s]/u', '', $reqTitle)));
@@ -214,6 +232,7 @@ class MatchingEngineService
         foreach ($candidateSkills as $cSkill) {
             $candTitle = mb_strtolower(trim($cSkill->title));
             $candTitleEn = mb_strtolower(trim($cSkill->title_en ?? ''));
+            $src = $cSkill->pivot->source ?? $cSkill->source ?? 'keahlian';
 
             // Substring check
             if (
@@ -225,6 +244,7 @@ class MatchingEngineService
                     'is_matched' => true,
                     'match_type' => 'Padanan Leksikal (Substring)',
                     'matched_with_title' => $cSkill->title,
+                    'source' => $src,
                 ];
             }
 
@@ -240,7 +260,74 @@ class MatchingEngineService
                     'is_matched' => true,
                     'match_type' => 'Padanan Token Kata Kunci',
                     'matched_with_title' => $cSkill->title,
+                    'source' => $src,
                 ];
+            }
+        }
+
+        // Layer 4: Padanan Tekstual Profil Kandidat (Keahlian, Experience, Sertifikasi)
+        if ($rawProfile) {
+            $keahlianText = mb_strtolower($rawProfile['keahlian'] ?? '');
+            if ($keahlianText !== '') {
+                if (str_contains($keahlianText, $reqTitle) || ($reqTitleEn && str_contains($keahlianText, $reqTitleEn))) {
+                    return [
+                        'is_matched' => true,
+                        'match_type' => 'Padanan Profil (Keahlian)',
+                        'matched_with_title' => $reqSkill->title,
+                        'source' => 'keahlian',
+                    ];
+                }
+                $kTokens = array_filter(explode(' ', preg_replace('/[^\p{L}\p{N}\s]/u', '', $keahlianText)), fn($t) => mb_strlen($t) >= 4);
+                if (!empty(array_intersect(array_filter($reqTokens, fn($t) => mb_strlen($t) >= 4), $kTokens))) {
+                    return [
+                        'is_matched' => true,
+                        'match_type' => 'Padanan Kata Kunci Keahlian',
+                        'matched_with_title' => $reqSkill->title,
+                        'source' => 'keahlian',
+                    ];
+                }
+            }
+
+            $expText = mb_strtolower($rawProfile['experience'] ?? '');
+            if ($expText !== '') {
+                if (str_contains($expText, $reqTitle) || ($reqTitleEn && str_contains($expText, $reqTitleEn))) {
+                    return [
+                        'is_matched' => true,
+                        'match_type' => 'Padanan Riwayat (Pengalaman)',
+                        'matched_with_title' => $reqSkill->title,
+                        'source' => 'experience',
+                    ];
+                }
+                $eTokens = array_filter(explode(' ', preg_replace('/[^\p{L}\p{N}\s]/u', '', $expText)), fn($t) => mb_strlen($t) >= 4);
+                if (!empty(array_intersect(array_filter($reqTokens, fn($t) => mb_strlen($t) >= 4), $eTokens))) {
+                    return [
+                        'is_matched' => true,
+                        'match_type' => 'Padanan Kata Kunci Pengalaman',
+                        'matched_with_title' => $reqSkill->title,
+                        'source' => 'experience',
+                    ];
+                }
+            }
+
+            $sertText = mb_strtolower($rawProfile['sertifikasi'] ?? '');
+            if ($sertText !== '') {
+                if (str_contains($sertText, $reqTitle) || ($reqTitleEn && str_contains($sertText, $reqTitleEn))) {
+                    return [
+                        'is_matched' => true,
+                        'match_type' => 'Padanan Dokumen (Sertifikasi)',
+                        'matched_with_title' => $reqSkill->title,
+                        'source' => 'sertifikasi',
+                    ];
+                }
+                $sTokens = array_filter(explode(' ', preg_replace('/[^\p{L}\p{N}\s]/u', '', $sertText)), fn($t) => mb_strlen($t) >= 4);
+                if (!empty(array_intersect(array_filter($reqTokens, fn($t) => mb_strlen($t) >= 4), $sTokens))) {
+                    return [
+                        'is_matched' => true,
+                        'match_type' => 'Padanan Kata Kunci Sertifikasi',
+                        'matched_with_title' => $reqSkill->title,
+                        'source' => 'sertifikasi',
+                    ];
+                }
             }
         }
 
@@ -248,6 +335,7 @@ class MatchingEngineService
             'is_matched' => false,
             'match_type' => null,
             'matched_with_title' => null,
+            'source' => null,
         ];
     }
 
@@ -285,14 +373,26 @@ class MatchingEngineService
      */
     public function recommendJobsForSeeker(int $jobSeekerId, array $filters = []): array
     {
-        $jobSeeker = JobSeeker::with(['kbji:id,code,title'])->find($jobSeekerId);
+        $jobSeeker = JobSeeker::find($jobSeekerId);
 
         if (!$jobSeeker) {
             throw new \InvalidArgumentException('Profil pencari kerja tidak ditemukan.');
         }
 
         $candidateSkills = $jobSeeker->skills;
+        if ($candidateSkills->isEmpty()) {
+            app(\App\Services\CandidateSkillExtractorService::class)->syncSkillsForJobSeeker($jobSeeker);
+            $jobSeeker->load(['skills' => function ($q) {
+                $q->select('skill_nodes.id', 'skill_nodes.code', 'skill_nodes.title', 'skill_nodes.title_en', 'skill_nodes.type', 'skill_nodes.description');
+            }]);
+            $candidateSkills = $jobSeeker->skills;
+        }
         $candidateSkillIds = $candidateSkills->pluck('id')->toArray();
+        $rawProfile = [
+            'keahlian' => $jobSeeker->keahlian,
+            'experience' => $jobSeeker->experience,
+            'sertifikasi' => $jobSeeker->sertifikasi,
+        ];
 
         // Ambil lowongan yang aktif tayang
         $query = LowonganKerja::query()
@@ -344,7 +444,7 @@ class MatchingEngineService
             $gapSkills = [];
 
             foreach ($requiredSkills as $reqSkill) {
-                $matchResult = $this->evaluateSkillMatch($reqSkill, $candidateSkills, $candidateSkillIds);
+                $matchResult = $this->evaluateSkillMatch($reqSkill, $candidateSkills, $candidateSkillIds, $rawProfile);
 
                 if ($matchResult['is_matched']) {
                     $matchedSkills[] = [
@@ -354,6 +454,7 @@ class MatchingEngineService
                         'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
                         'match_type' => $matchResult['match_type'],
                         'matched_with' => $matchResult['matched_with_title'],
+                        'source' => $matchResult['source'] ?? 'keahlian',
                     ];
                 } else {
                     $gapSkills[] = [
@@ -419,13 +520,11 @@ class MatchingEngineService
         $requiredSkills = $lowongan->skills;
         $totalRequired = $requiredSkills->count();
 
-        // Ambil semua pencari kerja dengan skill & KBJI mereka
+        // Ambil semua pencari kerja dengan skill & relasi mereka
         $query = JobSeeker::query()
             ->with([
-                // 'skills:id,title,title_en', // Temporarily disabled
                 'educationLevel:id,name',
                 'regency.province',
-                'kbji:id,code,title',
             ]);
 
         if (!empty($filters['regency_id'])) {
@@ -452,13 +551,25 @@ class MatchingEngineService
             }
 
             $candidateSkills = $candidate->skills;
+            if ($candidateSkills->isEmpty()) {
+                app(\App\Services\CandidateSkillExtractorService::class)->syncSkillsForJobSeeker($candidate);
+                $candidate->load(['skills' => function ($q) {
+                    $q->select('skill_nodes.id', 'skill_nodes.code', 'skill_nodes.title', 'skill_nodes.title_en', 'skill_nodes.type', 'skill_nodes.description');
+                }]);
+                $candidateSkills = $candidate->skills;
+            }
             $candidateSkillIds = $candidateSkills->pluck('id')->toArray();
+            $rawProfile = [
+                'keahlian' => $candidate->keahlian,
+                'experience' => $candidate->experience,
+                'sertifikasi' => $candidate->sertifikasi,
+            ];
 
             $matchedSkills = [];
             $gapSkills = [];
 
             foreach ($requiredSkills as $reqSkill) {
-                $matchResult = $this->evaluateSkillMatch($reqSkill, $candidateSkills, $candidateSkillIds);
+                $matchResult = $this->evaluateSkillMatch($reqSkill, $candidateSkills, $candidateSkillIds, $rawProfile);
 
                 if ($matchResult['is_matched']) {
                     $matchedSkills[] = [
@@ -468,6 +579,7 @@ class MatchingEngineService
                         'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
                         'match_type' => $matchResult['match_type'],
                         'matched_with' => $matchResult['matched_with_title'],
+                        'source' => $matchResult['source'] ?? 'keahlian',
                     ];
                 } else {
                     $gapSkills[] = [
@@ -526,10 +638,8 @@ class MatchingEngineService
         // 1. Query Pencari Kerja
         $seekerQuery = JobSeeker::query()
             ->with([
-                // 'skills:id,title,title_en', // Temporarily disabled
                 'educationLevel:id,name',
                 'regency.province',
-                'kbji:id,code,title',
             ]);
 
         if (!empty($filters['job_seeker_id'])) {
@@ -563,7 +673,19 @@ class MatchingEngineService
 
         foreach ($seekers as $candidate) {
             $candidateSkills = $candidate->skills;
+            if ($candidateSkills->isEmpty()) {
+                app(\App\Services\CandidateSkillExtractorService::class)->syncSkillsForJobSeeker($candidate);
+                $candidate->load(['skills' => function ($q) {
+                    $q->select('skill_nodes.id', 'skill_nodes.code', 'skill_nodes.title', 'skill_nodes.title_en', 'skill_nodes.type', 'skill_nodes.description');
+                }]);
+                $candidateSkills = $candidate->skills;
+            }
             $candidateSkillIds = $candidateSkills->pluck('id')->toArray();
+            $rawProfile = [
+                'keahlian' => $candidate->keahlian,
+                'experience' => $candidate->experience,
+                'sertifikasi' => $candidate->sertifikasi,
+            ];
 
             foreach ($vacancies as $job) {
                 // Wajib di 2 level KBJI: Jabatan Identik (exact) atau Sub-Golongan Identik (unit_group 4 digit)
@@ -593,7 +715,7 @@ class MatchingEngineService
                 $gapSkills = [];
 
                 foreach ($requiredSkills as $reqSkill) {
-                    $matchResult = $this->evaluateSkillMatch($reqSkill, $candidateSkills, $candidateSkillIds);
+                    $matchResult = $this->evaluateSkillMatch($reqSkill, $candidateSkills, $candidateSkillIds, $rawProfile);
 
                     if ($matchResult['is_matched']) {
                         $matchedSkills[] = [
@@ -603,6 +725,7 @@ class MatchingEngineService
                             'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
                             'match_type' => $matchResult['match_type'],
                             'matched_with' => $matchResult['matched_with_title'],
+                            'source' => $matchResult['source'] ?? 'keahlian',
                         ];
                     } else {
                         $gapSkills[] = [

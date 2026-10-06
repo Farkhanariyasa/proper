@@ -25,11 +25,16 @@ class MatchingController extends Controller
     {
         $validated = $request->validate([
             'pencaker_id' => 'required|integer',
-            'kbji_code' => 'required|string',
-            'provinsi_id' => 'required|string',
-            'kabkota_id' => 'nullable|string',
+            'kbji_code' => 'required',
+            'provinsi_id' => 'required',
+            'kabkota_id' => 'nullable',
             'skills' => 'required|array',
         ]);
+        $validated['kbji_code'] = (string) $validated['kbji_code'];
+        $validated['provinsi_id'] = (string) $validated['provinsi_id'];
+        if (!empty($validated['kabkota_id'])) {
+            $validated['kabkota_id'] = (string) $validated['kabkota_id'];
+        }
 
         try {
             // Karena logikanya spesifik untuk fitur ini, kita bisa letakkan di service
@@ -138,6 +143,7 @@ class MatchingController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Terjadi kesalahan sistem saat memproses rekomendasi lowongan.',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

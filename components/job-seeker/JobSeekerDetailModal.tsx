@@ -193,15 +193,23 @@ export default function JobSeekerDetailModal({
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {data.skills && data.skills.length > 0 ? (
-                    data.skills.map((skill: any) => (
-                      <span
-                        key={skill.id}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-sky-50 text-[#0E385E] border border-sky-200 shadow-2xs"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>{skill.title}</span>
-                      </span>
-                    ))
+                    data.skills.map((skill: any) => {
+                      const src = skill.source || skill.pivot?.source;
+                      return (
+                        <span
+                          key={skill.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-sky-50 text-[#0E385E] border border-sky-200 shadow-2xs"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>{skill.title}</span>
+                          {src && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-white text-slate-600 border border-slate-200 font-normal">
+                              {src}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })
                   ) : (
                     <span className="text-xs text-slate-400 italic">
                       Tidak ada skill terverifikasi yang terdaftar.

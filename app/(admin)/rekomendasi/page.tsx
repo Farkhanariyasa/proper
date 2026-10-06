@@ -4,9 +4,13 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } fr
 import { useSearchParams } from 'next/navigation';
 import { 
   Users, CheckCircle2, ChevronRight, Search, Briefcase, MapPin, Target,
-  Loader2, ArrowRight, Save, Plus, X, Building2, AlertTriangle, AlertCircle
+  Loader2, ArrowRight, Save, Plus, X, Building2, AlertTriangle, AlertCircle,
+  RefreshCw, Sparkles, Award, FileText, Check
 } from 'lucide-react';
-import { getJobSeekers, getJobSeekerDetail, getJobSeekerSkills, updateJobSeekerSkills, searchEscoSkills } from '@/services/job-seeker';
+import { 
+  getJobSeekers, getJobSeekerDetail, getJobSeekerSkills, 
+  updateJobSeekerSkills, extractJobSeekerSkills, searchEscoSkills 
+} from '@/services/job-seeker';
 import { searchKbji } from '@/services/kbji';
 import { getProvinces, getRegencies } from '@/services/wilayah';
 import { recommendLowonganApi } from '@/services/matching';
@@ -26,6 +30,7 @@ function MatchingWizard() {
 
   const [step, setStep] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isExtracting, setIsExtracting] = useState<boolean>(false);
 
   // Data Masters
   const [pencakerList, setPencakerList] = useState<SearchableOption[]>([]);
@@ -36,6 +41,8 @@ function MatchingWizard() {
   const [selectedPencakerId, setSelectedPencakerId] = useState<string>(initialPencakerId);
   const [selectedSeeker, setSelectedSeeker] = useState<any>(null);
   const [pencakerSkills, setPencakerSkills] = useState<any[]>([]);
+  const [extractionMeta, setExtractionMeta] = useState<any>(null);
+  const [skillFilterTab, setSkillFilterTab] = useState<string>('all');
   
   const [kbjiQuery, setKbjiQuery] = useState('');
   const [kbjiResults, setKbjiResults] = useState<any[]>([]);
@@ -92,18 +99,34 @@ function MatchingWizard() {
     }
   }, [selectedProvinsi]);
 
-  // Load skills when continuing to step 2
+  // Load skills when continuing to step 2 (auto-extracted from keahlian, experience, sertifikasi)
   const handleProceedToStep2 = async () => {
     if (!selectedPencakerId) return;
     setIsLoading(true);
     try {
-      const skills = await getJobSeekerSkills(selectedPencakerId);
-      setPencakerSkills(skills || []);
+      const res = await getJobSeekerSkills(selectedPencakerId);
+      setPencakerSkills(res.data || []);
+      setExtractionMeta(res.meta || null);
       setStep(2);
     } catch (e) {
       alert("Gagal menarik data skill");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Re-extract skills forcefully from 3 data sources
+  const handleReExtractSkills = async () => {
+    if (!selectedPencakerId) return;
+    setIsExtracting(true);
+    try {
+      const res = await extractJobSeekerSkills(selectedPencakerId);
+      setPencakerSkills(res.data || []);
+      setExtractionMeta(res.meta || null);
+    } catch (e) {
+      alert("Gagal melakukan ekstraksi ulang skill");
+    } finally {
+      setIsExtracting(false);
     }
   };
 
@@ -151,7 +174,14 @@ function MatchingWizard() {
 
   const handleAddSkill = (skill: any) => {
     if (!pencakerSkills.find(s => s.id === skill.id)) {
-      setPencakerSkills([...pencakerSkills, skill]);
+      setPencakerSkills([
+        ...pencakerSkills, 
+        { 
+          ...skill, 
+          source: 'manual', 
+          pivot: { ...skill.pivot, source: 'manual', is_manual: true } 
+        }
+      ]);
     }
     setSkillQuery('');
     setSkillResults([]);
@@ -369,37 +399,172 @@ function MatchingWizard() {
         {/* STEP 2 */}
         {step === 2 && (
           <div className="p-8 space-y-6 animate-in slide-in-from-right-8 duration-300">
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold flex items-center gap-2">
-                <Target className="w-5 h-5 text-sky-600" />
-                Validasi Skill Kandidat
-              </h2>
-              <p className="text-sm text-slate-500">Skill berikut adalah hasil ektraksi otomatis. Anda bisa menambah atau menghapus skill jika dirasa kurang pas.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-xl font-bold flex items-center gap-2 text-slate-900">
+                  <Target className="w-5 h-5 text-sky-600" />
+                  Validasi & Penyelarasan Skill Kandidat
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Skill berikut diekstraksi otomatis berbasis 3 pilar: <strong>Keahlian</strong>, <strong>Pengalaman Kerja</strong>, dan <strong>Sertifikasi</strong>.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={isExtracting || isLoading}
+                onClick={handleReExtractSkills}
+                className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 transition-all shadow-xs disabled:opacity-50 shrink-0"
+                title="Ekstrak ulang kata kunci dari keahlian, pengalaman, dan sertifikasi"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isExtracting ? 'animate-spin text-sky-600' : ''}`} />
+                <span>{isExtracting ? 'Mengekstrak Ulang...' : 'Ekstraksi Ulang (3 Sumber)'}</span>
+              </button>
             </div>
+
+            {/* Sumber Profil Data Mentah Pencaker */}
+            {selectedSeeker && (
+              <div className="bg-slate-50/80 rounded-xl p-4 border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-sky-800">
+                    <span className="w-2 h-2 rounded-full bg-sky-500" />
+                    <span>🎯 Keahlian (Skill Set)</span>
+                  </div>
+                  <p className="text-slate-600 line-clamp-2" title={selectedSeeker.keahlian || '-'}>
+                    {selectedSeeker.keahlian || <span className="text-slate-400 italic">Tidak dicantumkan</span>}
+                  </p>
+                </div>
+
+                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span>💼 Pengalaman (Experience)</span>
+                  </div>
+                  <p className="text-slate-600 line-clamp-2" title={selectedSeeker.experience || '-'}>
+                    {selectedSeeker.experience || <span className="text-slate-400 italic">Tidak ada riwayat</span>}
+                  </p>
+                </div>
+
+                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-purple-800">
+                    <span className="w-2 h-2 rounded-full bg-purple-500" />
+                    <span>📜 Sertifikasi (Certifications)</span>
+                  </div>
+                  <p className="text-slate-600 line-clamp-2" title={selectedSeeker.sertifikasi || '-'}>
+                    {selectedSeeker.sertifikasi || <span className="text-slate-400 italic">Tidak ada sertifikasi</span>}
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* List Keahlian Saat ini */}
-              <div className="bg-slate-50 rounded-xl p-5 border border-slate-200">
-                <h3 className="font-semibold text-slate-800 mb-4">Daftar Keahlian ({pencakerSkills.length})</h3>
+              <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 flex flex-col">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-slate-800 text-sm">
+                    Daftar Keahlian ({pencakerSkills.length})
+                  </h3>
+                  <span className="text-xs text-slate-400">Siap untuk matching</span>
+                </div>
+
+                {/* Filter Tabs Berdasarkan Sumber */}
+                <div className="flex flex-wrap gap-1.5 mb-4 pb-3 border-b border-slate-200 text-xs">
+                  {[
+                    { id: 'all', label: `Semua (${pencakerSkills.length})` },
+                    { 
+                      id: 'keahlian', 
+                      label: `Keahlian (${pencakerSkills.filter(s => (s.source || s.pivot?.source || '').includes('keahlian')).length})` 
+                    },
+                    { 
+                      id: 'experience', 
+                      label: `Pengalaman (${pencakerSkills.filter(s => (s.source || s.pivot?.source || '').includes('experience')).length})` 
+                    },
+                    { 
+                      id: 'sertifikasi', 
+                      label: `Sertifikasi (${pencakerSkills.filter(s => (s.source || s.pivot?.source || '').includes('sertifikasi')).length})` 
+                    },
+                    { 
+                      id: 'manual', 
+                      label: `Manual (${pencakerSkills.filter(s => (s.source || s.pivot?.source || '').includes('manual') || s.pivot?.is_manual).length})` 
+                    },
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setSkillFilterTab(tab.id)}
+                      className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                        skillFilterTab === tab.id
+                          ? 'bg-sky-600 text-white shadow-2xs'
+                          : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
                 {pencakerSkills.length === 0 ? (
-                  <p className="text-sm text-slate-400 italic">Belum ada skill yang tersimpan.</p>
+                  <div className="py-8 text-center text-slate-400 italic text-sm">
+                    Belum ada skill yang tersimpan. Gunakan tombol &quot;Ekstraksi Ulang&quot; atau cari manual di sebelah kanan.
+                  </div>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {pencakerSkills.map(skill => (
-                      <div key={skill.id} className="flex items-center gap-1.5 bg-sky-100 text-sky-800 px-3 py-1.5 rounded-full text-sm font-medium border border-sky-200">
-                        {skill.title}
-                        <button onClick={() => handleRemoveSkill(skill.id)} className="p-0.5 hover:bg-sky-200 rounded-full transition-colors">
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                  <div className="flex flex-wrap gap-2 max-h-[340px] overflow-y-auto pr-1">
+                    {pencakerSkills
+                      .filter(skill => {
+                        if (skillFilterTab === 'all') return true;
+                        const src = skill.source || skill.pivot?.source || (skill.pivot?.is_manual ? 'manual' : 'keahlian');
+                        return src.includes(skillFilterTab);
+                      })
+                      .map(skill => {
+                        const src = skill.source || skill.pivot?.source || (skill.pivot?.is_manual ? 'manual' : 'keahlian');
+                        const isFromExp = src.includes('experience');
+                        const isFromSert = src.includes('sertifikasi');
+                        const isFromManual = src.includes('manual') || skill.pivot?.is_manual;
+                        const isFromKeahlian = src.includes('keahlian');
+
+                        let badgeBg = 'bg-sky-100 text-sky-800 border-sky-200';
+                        let label = 'Keahlian';
+
+                        if (isFromExp) {
+                          badgeBg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                          label = 'Pengalaman';
+                        } else if (isFromSert) {
+                          badgeBg = 'bg-purple-100 text-purple-800 border-purple-200';
+                          label = 'Sertifikasi';
+                        } else if (isFromManual) {
+                          badgeBg = 'bg-amber-100 text-amber-800 border-amber-200';
+                          label = 'Manual';
+                        }
+
+                        return (
+                          <div 
+                            key={skill.id} 
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border shadow-2xs transition-all ${badgeBg}`}
+                          >
+                            <span className="font-semibold">{skill.title}</span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/70 font-normal">
+                              {label}
+                            </span>
+                            <button 
+                              onClick={() => handleRemoveSkill(skill.id)} 
+                              className="p-0.5 hover:bg-black/10 rounded-full transition-colors ml-0.5"
+                              title="Hapus skill ini"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
                   </div>
                 )}
               </div>
 
               {/* Tambah Keahlian Manual */}
               <div className="space-y-4">
-                <h3 className="font-semibold text-slate-800">Tambah Skill ESCO</h3>
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-slate-800 text-sm">Tambah Skill ESCO Manual</h3>
+                  <p className="text-xs text-slate-500">Cari dari 13.900+ taksonomi keahlian standar ESCO.</p>
+                </div>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Search className="h-4 w-4 text-slate-400" />
@@ -752,7 +917,15 @@ function MatchingWizard() {
                           </div>
                         ) : (
                           selectedRecommendation.lowongan.skills.map((skill: any) => {
-                            const isMatch = pencakerSkills.some(ps => ps.id === skill.id || ps.esco_skill_id === skill.id);
+                            const matchedItem = pencakerSkills.find(ps => ps.id === skill.id || ps.esco_skill_id === skill.id);
+                            const isMatch = !!matchedItem;
+                            const rawSource = matchedItem?.source || matchedItem?.pivot?.source || (matchedItem?.pivot?.is_manual ? 'manual' : '');
+                            
+                            let sourceBadge = '';
+                            if (rawSource.includes('experience')) sourceBadge = '💼 Pengalaman';
+                            else if (rawSource.includes('sertifikasi')) sourceBadge = '📜 Sertifikasi';
+                            else if (rawSource.includes('keahlian')) sourceBadge = '🎯 Keahlian';
+                            else if (rawSource.includes('manual')) sourceBadge = '✍️ Input Manual';
                             
                             return (
                               <div key={skill.id} className={`p-3 rounded-lg border ${isMatch ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
@@ -764,13 +937,24 @@ function MatchingWizard() {
                                       <AlertCircle className="w-5 h-5 text-rose-500" />
                                     )}
                                   </div>
-                                  <div>
+                                  <div className="flex-1">
                                     <p className={`text-sm font-semibold ${isMatch ? 'text-emerald-800' : 'text-rose-800'}`}>
                                       {skill.title || skill.name}
                                     </p>
-                                    <p className={`text-xs mt-1 ${isMatch ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                      {isMatch ? '✓ Tersedia di profil pelamar' : '✗ Tidak ditemukan di profil pelamar'}
-                                    </p>
+                                    <div className={`text-xs mt-1 flex flex-wrap items-center gap-1.5 ${isMatch ? 'text-emerald-700 font-medium' : 'text-rose-600'}`}>
+                                      {isMatch ? (
+                                        <>
+                                          <span>✓ Cocok dengan kandidat</span>
+                                          {sourceBadge && (
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white text-emerald-800 border border-emerald-200 shadow-2xs font-normal">
+                                              Asal: {sourceBadge}
+                                            </span>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <span>✗ Belum ada di profil (Skill Gap)</span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>

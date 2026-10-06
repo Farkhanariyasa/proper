@@ -91,9 +91,11 @@ class LowonganKerja extends Model
         return $this->belongsToMany(
             SkillNode::class,
             'lowongan_skills',
-            'lowongan_id',
-            'esco_skill_id'
-        )->withPivot(['tipe_keahlian', 'level_kemahiran']);
+            'vac_id',
+            'esco_skill_id',
+            'id',
+            'id'
+        )->withPivot(['tipe_keahlian', 'skor', 'metode']);
     }
 
     public function scopePublished($query)
