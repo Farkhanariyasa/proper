@@ -39,6 +39,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (path.startsWith('/users')) return 'Manajemen Pengguna';
     if (path.startsWith('/roles')) return 'Peran & Hak Akses (RBAC)';
     if (path.startsWith('/dashboard')) return 'Dashboard';
+    if (path.startsWith('/kbji-aliases')) return 'Pemetaan KBJI';
+    if (path.startsWith('/pemetaan-esco')) return 'Pemetaan ESCO Skill';
     return 'Platform Penempatan Kerja';
   };
 
