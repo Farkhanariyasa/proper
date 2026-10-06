@@ -105,5 +105,9 @@ Route::prefix('admin')->middleware('auth:sanctum')->group(function () {
 
     // Permissions List
     Route::get('permissions', [\App\Http\Controllers\Api\Admin\PermissionController::class, 'index'])->middleware('permission:roles.view');
+
+    // KBJI Alias Curation (Superadmin/Admin)
+    Route::get('kbji-aliases', [\App\Http\Controllers\Api\Admin\KbjiAliasController::class, 'index'])->middleware('permission:mapping.kbji');
+    Route::put('kbji-aliases/{id}', [\App\Http\Controllers\Api\Admin\KbjiAliasController::class, 'update'])->middleware('permission:mapping.kbji');
 });
 

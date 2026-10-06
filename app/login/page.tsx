@@ -181,7 +181,7 @@ export default function LoginPage() {
             </div>
           </form>
 
-          {/* Quick Demo Accounts Helper */}
+          {/* Quick Demo Accounts Helper
           <div className="mt-8 pt-6 border-t border-slate-200">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 mb-3">
               <span>Pilih Akun :</span>
@@ -214,7 +214,7 @@ export default function LoginPage() {
                 <div className="text-[10px] text-purple-700 truncate">pimpinan1</div>
               </button>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

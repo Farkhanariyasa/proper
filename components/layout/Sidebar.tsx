@@ -380,6 +380,32 @@ export default function Sidebar({
             );
           })}
 
+          {/* 5. Data Matching (Hanya Tampil Jika Memiliki Izin) */}
+          {(hasRole('superadmin') || hasPermission('mapping.kbji')) && (
+            <div className="pt-3">
+              <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-blue-300/70">
+                Data Matching
+              </div>
+              <div className="space-y-1">
+                <Link
+                  href="/kbji-aliases"
+                  className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+                    isItemActive('/kbji-aliases')
+                      ? 'bg-[#1F5A88] text-white shadow-xs font-semibold'
+                      : 'text-blue-100 hover:bg-[#1F5A88]/50 hover:text-white'
+                  }`}
+                >
+                  <Sparkles
+                    className={`h-4 w-4 shrink-0 transition-colors ${
+                      isItemActive('/kbji-aliases') ? 'text-amber-300' : 'text-blue-200 group-hover:text-white'
+                    }`}
+                  />
+                  <span className="truncate">Pemetaan KBJI</span>
+                </Link>
+              </div>
+            </div>
+          )}
+
           {/* 5. Menu Manajemen Akses & Pengguna (Hanya Tampil Jika Memiliki Izin) */}
           {(hasPermission('users.view') || hasPermission('roles.view')) && (
             <div className="pt-3">
