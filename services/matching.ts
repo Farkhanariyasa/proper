@@ -137,8 +137,10 @@ export async function getPairAnalysisApi(
  */
 export async function recommendLowonganApi(payload: {
   pencaker_id: number;
-  kbji_code: string;
-  provinsi_id: string;
+  pekerjaan?: string;
+  judul_pekerjaan?: string;
+  kbji_code?: string;
+  provinsi_id?: string;
   kabkota_id?: string;
   skills: number[];
 }): Promise<any[]> {

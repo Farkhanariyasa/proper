@@ -19,50 +19,70 @@ class MatchingController extends Controller
 
     /**
      * POST /api/rekomendasi/lowongan
-     * Endpoint untuk proses matching pencaker dengan lowongan berdasarkan filter spesifik (Fase 2 & 3)
+     * Endpoint untuk proses matching pencaker dengan lowongan berdasarkan judul pekerjaan dan skill (Top 10)
      */
     public function recommendLowongan(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'pencaker_id' => 'required|integer',
-            'kbji_code' => 'required',
-            'provinsi_id' => 'required',
+            'pekerjaan' => 'nullable|string',
+            'judul_pekerjaan' => 'nullable|string',
+            'kbji_code' => 'nullable',
+            'provinsi_id' => 'nullable',
             'kabkota_id' => 'nullable',
-            'skills' => 'required|array',
+            'skills' => 'nullable|array',
         ]);
-        $validated['kbji_code'] = (string) $validated['kbji_code'];
-        $validated['provinsi_id'] = (string) $validated['provinsi_id'];
-        if (!empty($validated['kabkota_id'])) {
-            $validated['kabkota_id'] = (string) $validated['kabkota_id'];
-        }
+
+        $keyword = trim($validated['pekerjaan'] ?? $validated['judul_pekerjaan'] ?? '');
 
         try {
-            // Karena logikanya spesifik untuk fitur ini, kita bisa letakkan di service
-            // atau langsung memfilter di controller untuk diteruskan ke proses skoring
-            
             // 1. Filter Lowongan Awal
             $query = \App\Models\ReqPkLoker::with(['skills', 'province', 'regency', 'kbji'])
-                        ->where('status_loker', 'tayang'); // atau sesuaikan dengan status buka
-            
-            // Filter by broader KBJI (4-digit group) to avoid being too strict
-            $baseKbji = substr($validated['kbji_code'], 0, 4);
-            $query->whereHas('kbji', function($q) use ($baseKbji) {
-                $q->where('code', 'LIKE', $baseKbji . '%');
-            });
+                        ->whereIn('status_loker', ['tayang', 'published']);
+
+            // Pencarian berdasarkan kata kunci judul pekerjaan
+            if (!empty($keyword)) {
+                $words = array_filter(explode(' ', $keyword), function($w) {
+                    return mb_strlen(trim($w)) >= 2;
+                });
+
+                $query->where(function($q) use ($keyword, $words) {
+                    $q->where('judul_pekerjaan', 'ILIKE', '%' . $keyword . '%');
+                    foreach ($words as $word) {
+                        $q->orWhere('judul_pekerjaan', 'ILIKE', '%' . trim($word) . '%');
+                    }
+                });
+            } elseif (!empty($validated['kbji_code'])) {
+                // Fallback untuk backward-compatibility jika kbji_code dikirim
+                $baseKbji = substr((string)$validated['kbji_code'], 0, 4);
+                $query->whereHas('kbji', function($q) use ($baseKbji) {
+                    $q->where('code', 'LIKE', $baseKbji . '%');
+                });
+            }
 
             if (!empty($validated['provinsi_id'])) {
-                $query->where('provinsi_id', $validated['provinsi_id']);
+                $query->where('provinsi_id', (string) $validated['provinsi_id']);
             }
                         
             if (!empty($validated['kabkota_id'])) {
-                $query->where('regency_id', $validated['kabkota_id']);
+                $query->where('regency_id', (string) $validated['kabkota_id']);
             }
 
             $lowonganList = $query->get();
-            $pencakerSkills = $validated['skills']; // Array ESCO Skill ID dari Pencaker
+
+            // Ambil skill pencaker (dari payload atau relasi pencaker)
+            $pencakerSkills = $validated['skills'] ?? [];
+            if (empty($pencakerSkills)) {
+                $seeker = \App\Models\JobSeeker::with('skills')->find($validated['pencaker_id']);
+                if ($seeker) {
+                    $pencakerSkills = $seeker->skills->pluck('id')->toArray();
+                }
+            }
 
             // 2. Skoring / Matching
             $recommendations = [];
+            $keywordLower = strtolower($keyword);
+
             foreach ($lowonganList as $lowongan) {
                 $lowonganSkills = $lowongan->skills->pluck('id')->toArray();
                 
@@ -73,40 +93,43 @@ class MatchingController extends Controller
                 if ($totalLowonganSkills > 0) {
                     $score = round(($matchCount / $totalLowonganSkills) * 100);
                 } else {
-                    // Jika lowongan tidak mensyaratkan skill spesifik
                     $score = 0; 
                 }
+
+                $titleLower = strtolower($lowongan->judul_pekerjaan ?? '');
+                $isExactPhrase = (!empty($keywordLower) && str_contains($titleLower, $keywordLower)) ? 1 : 0;
 
                 $recommendations[] = [
                     'lowongan' => $lowongan,
                     'match_score' => $score,
                     'matched_skills_count' => $matchCount,
+                    'is_exact_phrase' => $isExactPhrase,
                 ];
             }
 
-            // 3. Sorting (Descending berdasar match_score) & Limit (Top 10)
-            usort($recommendations, function ($a, $b) use ($validated) {
+            // 3. Sorting (Descending berdasar match_score, matched_skills_count, kesesuaian judul) & Limit (Top 10)
+            usort($recommendations, function ($a, $b) {
                 // Primary: skill match score (descending)
                 if ($a['match_score'] !== $b['match_score']) {
                     return $b['match_score'] <=> $a['match_score'];
                 }
                 
-                // Secondary: KBJI closeness
-                $codeA = $a['lowongan']->kbji->code ?? '';
-                $codeB = $b['lowongan']->kbji->code ?? '';
-                $reqCode = $validated['kbji_code'];
-                
-                $scoreA = ($codeA === $reqCode) ? 2 : (str_starts_with($codeA, $reqCode) ? 1 : 0);
-                $scoreB = ($codeB === $reqCode) ? 2 : (str_starts_with($codeB, $reqCode) ? 1 : 0);
-                
-                return $scoreB <=> $scoreA;
+                // Secondary: jumlah skill yang cocok (descending)
+                if ($a['matched_skills_count'] !== $b['matched_skills_count']) {
+                    return $b['matched_skills_count'] <=> $a['matched_skills_count'];
+                }
+
+                // Tertiary: kesesuaian frase judul pekerjaan
+                return $b['is_exact_phrase'] <=> $a['is_exact_phrase'];
             });
             
             $topRecommendations = array_slice($recommendations, 0, 10);
 
             return response()->json([
                 'status' => 'success',
-                'data' => $topRecommendations
+                'data' => $topRecommendations,
+                'total_found' => count($lowonganList),
+                'keyword' => $keyword
             ]);
             
         } catch (Exception $e) {
