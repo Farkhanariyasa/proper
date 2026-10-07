@@ -65,11 +65,11 @@ echo PHP_EOL . "=== TESTING MATCHING CONTROLLER API ===" . PHP_EOL;
 
 $matchingController = app(MatchingController::class);
 
-// Test USDAR matching
+// Test USDAR matching dengan kata kunci pekerjaan
 $reqUsdar = Request::create('/api/rekomendasi/lowongan', 'POST', [
     'pencaker_id' => 981339,
-    'kbji_code' => '1219',
-    'provinsi_id' => '31',
+    'pekerjaan' => 'Account Manager',
+    'provinsi_id' => null,
     'kabkota_id' => null,
     'skills' => [8228, 5029, 7371],
 ]);
@@ -77,7 +77,7 @@ $reqUsdar = Request::create('/api/rekomendasi/lowongan', 'POST', [
 $responseUsdar = $matchingController->recommendLowongan($reqUsdar);
 $dataUsdar = json_decode($responseUsdar->getContent(), true);
 
-echo "Result for USDAR (Job 2254 Huawei):" . PHP_EOL;
+echo "Result for USDAR (Keyword: 'Account Manager'):" . PHP_EOL;
 echo "Status: " . ($dataUsdar['status'] ?? 'err') . PHP_EOL;
 if (!empty($dataUsdar['data'])) {
     foreach ($dataUsdar['data'] as $rec) {
@@ -93,11 +93,11 @@ if (!empty($dataUsdar['data'])) {
     echo " No recommendations found.\n";
 }
 
-// Test Komang matching
+// Test Komang matching dengan kata kunci pekerjaan
 $reqKomang = Request::create('/api/rekomendasi/lowongan', 'POST', [
     'pencaker_id' => 981338,
-    'kbji_code' => '1219',
-    'provinsi_id' => '31',
+    'pekerjaan' => 'Front Office',
+    'provinsi_id' => null,
     'kabkota_id' => null,
     'skills' => [1382, 1804],
 ]);
@@ -105,7 +105,7 @@ $reqKomang = Request::create('/api/rekomendasi/lowongan', 'POST', [
 $responseKomang = $matchingController->recommendLowongan($reqKomang);
 $dataKomang = json_decode($responseKomang->getContent(), true);
 
-echo PHP_EOL . "Result for Komang (Job 915 Hotel):" . PHP_EOL;
+echo PHP_EOL . "Result for Komang (Keyword: 'Front Office'):" . PHP_EOL;
 echo "Status: " . ($dataKomang['status'] ?? 'err') . PHP_EOL;
 if (!empty($dataKomang['data'])) {
     foreach ($dataKomang['data'] as $rec) {
