@@ -55,6 +55,19 @@ type TabKey = (typeof TABS)[number]['key'];
 
 const asIs = (label: string | null) => label ?? 'Tidak diketahui';
 
+// Nilai status_loker di sumber data (bahasa Inggris, huruf kecil) -> label tampilan
+const LOKER_STATUS_LABEL: Record<string, string> = {
+  published: 'Tayang',
+  tayang: 'Tayang',
+  expired: 'Kedaluwarsa',
+  closed: 'Ditutup',
+  suspended: 'Ditangguhkan',
+  blocked: 'Diblokir',
+  draft: 'Draf',
+};
+const lokerStatusLabel = (label: string | null) =>
+  label ? LOKER_STATUS_LABEL[label.toLowerCase()] ?? toTitleCase(label) : 'Tidak diketahui';
+
 const EDUCATION_SHORT: Record<string, string> = {
   'Tidak Tamat SD/Tidak Sekolah': '< SD',
   'SD atau Sederajat': 'SD',
@@ -346,7 +359,11 @@ function RingkasanTab({ area, areaLabel }: { area: DashboardArea; areaLabel: str
               label="Lowongan"
               value={fmt(d.kpi.lowongan_kuota)}
               unit="formasi"
-              note="Kuota tenaga kerja pada lowongan yang sedang tayang"
+              note={
+                d.kpi.lowongan_tayang !== undefined
+                  ? `Kuota tenaga kerja pada ${fmt(d.kpi.lowongan_tayang)} lowongan yang sedang tayang`
+                  : 'Kuota tenaga kerja pada lowongan yang sedang tayang'
+              }
             />
             <StatCard
               icon={UserCheck}
@@ -359,16 +376,31 @@ function RingkasanTab({ area, areaLabel }: { area: DashboardArea; areaLabel: str
             />
           </section>
 
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <Card className="lg:col-span-5" title="Komposisi Status Bekerja" subtitle="Status pencari kerja saat mendaftar">
+          <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <Card title="Komposisi Status Bekerja" subtitle="Status pencari kerja saat mendaftar">
               <DonutChart items={d.status_bekerja} formatLabel={asIs} />
             </Card>
             <Card
-              className="lg:col-span-7"
               title={d.top_wilayah.level === 'provinsi' ? 'Top 6 Provinsi Pencari Kerja' : 'Top 6 Kabupaten/Kota Pencari Kerja'}
               subtitle="Wilayah dengan jumlah pencari kerja terbanyak"
             >
               <HBarList items={d.top_wilayah.items} unit="orang" />
+            </Card>
+            <Card
+              className="md:col-span-2 xl:col-span-1"
+              title="Lowongan per Status"
+              subtitle="Jumlah lowongan (dan kuota formasinya) menurut status penayangan"
+            >
+              <HBarList
+                items={d.status_loker ?? []}
+                color="bg-violet-500"
+                unit="lowongan"
+                formatLabel={lokerStatusLabel}
+                detail={(item) => {
+                  const kuota = (item as { kuota?: number }).kuota;
+                  return kuota !== undefined ? `· ${fmt(kuota)} formasi` : null;
+                }}
+              />
             </Card>
           </section>
 
