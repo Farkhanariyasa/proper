@@ -82,13 +82,15 @@ export async function getJobSeekers(params?: {
   experience_range?: string;
   page?: number;
   per_page?: number;
-}): Promise<{
+  lite?: boolean;
+}, signal?: AbortSignal): Promise<{
   data: JobSeeker[];
   meta: {
     current_page: number;
-    last_page: number;
+    last_page?: number;
     per_page: number;
-    total: number;
+    total?: number;
+    has_more_pages?: boolean;
   };
 }> {
   const baseUrl = getApiBaseUrl();
@@ -102,11 +104,13 @@ export async function getJobSeekers(params?: {
   if (params?.experience_range) query.set('experience_range', params.experience_range);
   if (params?.page) query.set('page', String(params.page));
   if (params?.per_page) query.set('per_page', String(params.per_page));
+  if (params?.lite) query.set('lite', '1');
 
   const url = `${baseUrl}/api/job-seekers?${query.toString()}`;
   const res = await fetch(url, {
     headers: { Accept: 'application/json' },
     cache: 'no-store',
+    signal,
   });
 
   if (!res.ok) {
