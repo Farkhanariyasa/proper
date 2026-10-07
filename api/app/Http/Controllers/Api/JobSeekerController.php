@@ -19,39 +19,48 @@ class JobSeekerController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        // Optimasi: Pilih hanya kolom yang dibutuhkan untuk tampilan tabel list
-        $query = JobSeeker::query()
-            ->select([
-                'id',
-                'profile_id',
-                'name',
-                'provinsi',
-                'province_id',
-                'kab_kota',
-                'regency_id',
-                'pendidikan',
-                'education_level_id',
-                'nama_sekolah',
-                'jurusan',
-                'keahlian',
-                'experience',
-                'jenis_kelamin',
-                'umur',
-            ])
-            ->with([
-                'province:id,name',
-                'regency:id,name,province_id',
-                'educationLevel:id,name',
-            ])
-            ->withCount('skills');
+        $isLite = $request->boolean('lite');
 
-        // Pencarian nama atau ID profil
+        if ($isLite) {
+            // Mode ringan untuk dropdown/autocomplete: hanya ambil kolom esensial tanpa eager-load & withCount
+            $query = JobSeeker::query()->select(['id', 'profile_id', 'name']);
+        } else {
+            // Mode lengkap untuk tampilan tabel manajemen data pencaker
+            $query = JobSeeker::query()
+                ->select([
+                    'id',
+                    'profile_id',
+                    'name',
+                    'provinsi',
+                    'province_id',
+                    'kab_kota',
+                    'regency_id',
+                    'pendidikan',
+                    'education_level_id',
+                    'nama_sekolah',
+                    'jurusan',
+                    'keahlian',
+                    'experience',
+                    'jenis_kelamin',
+                    'umur',
+                ])
+                ->with([
+                    'province:id,name',
+                    'regency:id,name,province_id',
+                    'educationLevel:id,name',
+                ])
+                ->withCount('skills');
+        }
+
+        // Pencarian nama atau ID profil dengan pemanfaatan GIN Trigram index
         if ($request->filled('q')) {
             $keyword = trim((string) $request->query('q'));
-            $query->where(function ($q) use ($keyword) {
-                $q->where('name', 'ILIKE', "%{$keyword}%")
-                  ->orWhere('profile_id', 'ILIKE', "%{$keyword}%");
-            });
+            if (str_starts_with(strtoupper($keyword), 'PROFILE-')) {
+                $query->where('profile_id', 'ILIKE', "{$keyword}%");
+            } else {
+                // Memanfaatkan GIN index 'idx_pencaker_name_trgm' untuk pencarian nama instan
+                $query->where('name', 'ILIKE', "%{$keyword}%");
+            }
         }
 
         // Filter provinsi_id dan regency_id (relasi)

@@ -62,6 +62,63 @@ function MatchingWizard() {
   const [selectedRecommendation, setSelectedRecommendation] = useState<any>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
 
+  // Cache & Abort Controller untuk optimasi pencarian pencaker
+  const searchCacheRef = useRef<Map<string, SearchableOption[]>>(new Map());
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleSearchSeeker = useCallback(async (query: string) => {
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return;
+
+    // 1. Cek in-memory cache (0 ms response jika kata kunci sudah pernah dicari)
+    if (searchCacheRef.current.has(q)) {
+      const cached = searchCacheRef.current.get(q)!;
+      setPencakerList(prev => {
+        const map = new Map<string, SearchableOption>();
+        cached.forEach(item => map.set(item.value, item));
+        prev.forEach(item => {
+          if (!map.has(item.value)) map.set(item.value, item);
+        });
+        return Array.from(map.values());
+      });
+      return;
+    }
+
+    // 2. Batalkan request sebelumnya yang masih berjalan (anti race-condition & hemat resource)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      // 3. Request super-ringan (mode lite: hanya id, nama, profile_id tanpa eager join & withCount)
+      const res = await getJobSeekers({ q, per_page: 25, lite: true }, controller.signal);
+      if (res?.data) {
+        const newOptions: SearchableOption[] = res.data.map((s: any) => ({
+          value: String(s.id),
+          label: s.name || s.full_name || 'Tanpa Nama',
+          code: s.nik || s.profile_id,
+        }));
+
+        searchCacheRef.current.set(q, newOptions);
+
+        setPencakerList(prev => {
+          const map = new Map<string, SearchableOption>();
+          newOptions.forEach(item => map.set(item.value, item));
+          prev.forEach(item => {
+            if (!map.has(item.value)) map.set(item.value, item);
+          });
+          return Array.from(map.values());
+        });
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error("Gagal mencari pencaker", err);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     // Load initial data
     async function loadData() {
@@ -311,6 +368,7 @@ function MatchingWizard() {
                 options={pencakerList} 
                 value={selectedPencakerId} 
                 onChange={setSelectedPencakerId} 
+                onSearch={handleSearchSeeker}
                 placeholder="Cari NIK atau Nama..."
               />
               

@@ -13,6 +13,7 @@ interface SearchableSelectProps {
   options: SearchableOption[];
   value: string;
   onChange: (value: string) => void;
+  onSearch?: (query: string) => void;
   placeholder?: string;
   searchPlaceholder?: string;
   disabled?: boolean;
@@ -25,6 +26,7 @@ export default function SearchableSelect({
   options,
   value,
   onChange,
+  onSearch,
   placeholder = '-- Pilih --',
   searchPlaceholder = 'Ketik nama atau kode untuk mencari...',
   disabled = false,
@@ -42,6 +44,15 @@ export default function SearchableSelect({
     () => options.find((opt) => opt.value === value),
     [options, value]
   );
+
+  // Trigger onSearch jika disediakan (debounce 300ms)
+  useEffect(() => {
+    if (!onSearch) return;
+    const timer = setTimeout(() => {
+      onSearch(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search, onSearch]);
 
   // Filter opsi berdasarkan input pencarian (nama atau kode)
   const filteredOptions = useMemo(() => {
@@ -181,7 +192,7 @@ export default function SearchableSelect({
           <div className="max-h-56 overflow-y-auto divide-y divide-slate-50">
             {filteredOptions.length === 0 ? (
               <div className="py-6 text-center text-xs text-slate-400 italic">
-                Tidak ada data wilayah yang cocok dengan &quot;{search}&quot;
+                Tidak ada data yang cocok dengan &quot;{search}&quot;
               </div>
             ) : (
               filteredOptions.map((opt) => {
