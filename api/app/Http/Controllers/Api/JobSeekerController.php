@@ -97,13 +97,19 @@ class JobSeekerController extends Controller
         $perPage = min(100, max(1, (int) $request->query('per_page', 10)));
         $jobSeekers = $query->orderBy('id', 'desc')->simplePaginate($perPage);
 
+        $currentPage = $jobSeekers->currentPage();
+        $hasMore = $jobSeekers->hasMorePages();
+        $lastPage = $hasMore ? $currentPage + 1 : $currentPage;
+
         return response()->json([
             'status' => 'success',
             'data' => $jobSeekers->items(),
             'meta' => [
-                'current_page' => $jobSeekers->currentPage(),
+                'current_page' => $currentPage,
+                'last_page' => $lastPage,
                 'per_page' => $jobSeekers->perPage(),
-                'has_more_pages' => $jobSeekers->hasMorePages(),
+                'total' => $lastPage * $jobSeekers->perPage(),
+                'has_more_pages' => $hasMore,
             ],
         ]);
     }

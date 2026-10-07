@@ -87,9 +87,9 @@ export async function getJobSeekers(params?: {
   data: JobSeeker[];
   meta: {
     current_page: number;
-    last_page?: number;
+    last_page: number;
     per_page: number;
-    total?: number;
+    total: number;
     has_more_pages?: boolean;
   };
 }> {
