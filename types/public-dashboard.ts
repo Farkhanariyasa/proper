@@ -18,9 +18,11 @@ export interface RingkasanData {
   kpi: {
     pencaker: number;
     lowongan_kuota: number;
+    lowongan_tayang?: number;
     diterima: number;
   };
   status_bekerja: LabelValue[];
+  status_loker: (LabelValue & { kuota?: number })[];
   top_wilayah: { level: 'provinsi' | 'kab_kota'; items: LabelValue[] };
   top_bidang: LabelValue[];
   top_industri: LabelValue[];

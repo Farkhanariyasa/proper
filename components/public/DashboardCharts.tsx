@@ -105,7 +105,9 @@ export function DonutChart({
   let offset = 0;
 
   return (
-    <div className="flex flex-col sm:flex-row items-center gap-6">
+    // Menyesuaikan lebar kartu (container query): kartu sempit -> legenda di bawah donut
+    <div className="@container">
+    <div className="flex flex-col @md:flex-row items-center gap-6">
       <svg viewBox="0 0 120 120" className="h-36 w-36 shrink-0 -rotate-90" role="img" aria-label="Diagram donut">
         <circle cx="60" cy="60" r={radius} fill="none" stroke="#F1F5F9" strokeWidth="16" />
         {items.map((item, i) => {
@@ -147,6 +149,7 @@ export function DonutChart({
         ))}
       </ul>
     </div>
+    </div>
   );
 }
 
@@ -156,11 +159,14 @@ export function HBarList({
   color = 'bg-blue-600',
   unit,
   formatLabel = toTitleCase,
+  detail,
 }: {
   items: LabelValue[];
   color?: string;
   unit?: string;
   formatLabel?: (label: string | null) => string;
+  /** Keterangan tambahan kecil di samping label, mis. "2.931 formasi" */
+  detail?: (item: LabelValue) => string | null;
 }) {
   if (!items.length) return <EmptyChart />;
   const max = Math.max(...items.map((i) => i.value), 1);
@@ -170,7 +176,10 @@ export function HBarList({
       {items.map((item, i) => (
         <li key={`${item.label}-${i}`}>
           <div className="flex items-baseline justify-between gap-3 text-sm">
-            <span className="text-slate-700 truncate">{formatLabel(item.label)}</span>
+            <span className="text-slate-700 truncate">
+              {formatLabel(item.label)}
+              {detail?.(item) && <span className="ml-1.5 text-xs text-slate-400">{detail(item)}</span>}
+            </span>
             <span className="shrink-0 font-bold text-slate-900 tabular-nums">
               {fmt(item.value)}
               {unit && <span className="ml-1 text-xs font-normal text-slate-500">{unit}</span>}

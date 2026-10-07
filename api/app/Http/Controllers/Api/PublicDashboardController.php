@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -125,7 +126,47 @@ class PublicDashboardController extends Controller
      */
     public function ringkasan(Request $request): JsonResponse
     {
-        return $this->cached('ringkasan', $request, fn (array $area) => $this->buildRingkasan($area));
+        $payload = $this->cached('ringkasan', $request, fn (array $area) => $this->buildRingkasan($area))->getData(true);
+
+        // Data lowongan per status dihitung & di-cache terpisah (hanya req_pk_loker, ringan),
+        // agar cache ringkasan yang sudah ada tidak perlu dihitung ulang (memindai tabel pencaker).
+        // KPI "Lowongan" diambil dari data yang sama supaya selalu konsisten dengan kartu status.
+        $area = $payload['filter'];
+        $statuses = Cache::remember(
+            'public_dashboard:status_loker_v2:' . md5(json_encode($area)),
+            self::CACHE_TTL,
+            fn () => $this->buildStatusLoker($area)
+        );
+
+        $tayang = collect($statuses)->firstWhere('label', 'published');
+        $payload['data']['kpi']['lowongan_kuota'] = $tayang['kuota'] ?? 0;
+        $payload['data']['kpi']['lowongan_tayang'] = $tayang['value'] ?? 0;
+        $payload['data']['status_loker'] = $statuses;
+
+        return response()->json($payload);
+    }
+
+    /**
+     * Jumlah lowongan (value) dan total kuota per status_loker
+     */
+    public function buildStatusLoker(array $area): array
+    {
+        [$where, $params] = $this->lokerWhere($area);
+        // Data impor memakai 'published', lowongan dari aplikasi memakai 'tayang' -> disatukan
+        $rows = DB::select("
+            SELECT CASE WHEN LOWER(status_loker) IN ('published', 'tayang') THEN 'published'
+                        ELSE LOWER(status_loker) END AS label,
+                   COUNT(*) AS value,
+                   COALESCE(SUM(kuota), 0) AS kuota
+            FROM req_pk_loker WHERE {$where}
+            GROUP BY 1 ORDER BY 2 DESC
+        ", $params);
+
+        return array_map(fn ($r) => [
+            'label' => $r->label,
+            'value' => (int) $r->value,
+            'kuota' => (int) $r->kuota,
+        ], $rows);
     }
 
     public function buildRingkasan(array $area): array
@@ -133,16 +174,38 @@ class PublicDashboardController extends Controller
         [$pWhere, $pParams] = $this->pencakerWhere($area);
         [$lWhere, $lParams] = $this->lokerWhere($area);
 
-        $pencakerTotal = (int) DB::selectOne("SELECT COUNT(*) AS c FROM req_pk_pencaker WHERE {$pWhere}", $pParams)->c;
+        // Top wilayah: provinsi (nasional) atau kab/kota (saat provinsi dipilih)
+        $regionColumn = $area['provinsi'] ? 'kab_kota' : 'provinsi';
+
+        // Total, status bekerja, dan top wilayah pencaker dalam SATU pemindaian (GROUPING SETS)
+        $rows = DB::select("
+            SELECT GROUPING(status_bekerja) AS g_status, GROUPING({$regionColumn}) AS g_wilayah,
+                   status_bekerja, {$regionColumn} AS wilayah, COUNT(*) AS c
+            FROM req_pk_pencaker WHERE {$pWhere}
+            GROUP BY GROUPING SETS ((), (status_bekerja), ({$regionColumn}))
+        ", $pParams);
+
+        $pencakerTotal = 0;
+        $statusBekerja = [];
+        $wilayah = [];
+        foreach ($rows as $row) {
+            if ($row->g_status && $row->g_wilayah) {
+                $pencakerTotal = (int) $row->c;
+            } elseif (!$row->g_status) {
+                $statusBekerja[] = ['label' => $row->status_bekerja, 'value' => (int) $row->c];
+            } else {
+                $wilayah[] = ['label' => $row->wilayah, 'value' => (int) $row->c];
+            }
+        }
+        usort($statusBekerja, fn ($a, $b) => $b['value'] <=> $a['value']);
+        usort($wilayah, fn ($a, $b) => $b['value'] <=> $a['value']);
+
         // KPI Lowongan hanya menghitung loker yang sedang tayang (status_loker = 'published')
         $loker = DB::selectOne("
-            SELECT COALESCE(SUM(kuota) FILTER (WHERE status_loker = 'published'), 0) AS kuota,
+            SELECT COALESCE(SUM(kuota) FILTER (WHERE LOWER(status_loker) IN ('published', 'tayang')), 0) AS kuota,
                    COALESCE(SUM(lamaran_diterima), 0) AS diterima
             FROM req_pk_loker WHERE {$lWhere}
         ", $lParams);
-
-        // Top wilayah: provinsi (nasional) atau kab/kota (saat provinsi dipilih)
-        $regionColumn = $area['provinsi'] ? 'kab_kota' : 'provinsi';
 
         return [
             'kpi' => [
@@ -150,10 +213,10 @@ class PublicDashboardController extends Controller
                 'lowongan_kuota' => (int) $loker->kuota,
                 'diterima' => (int) $loker->diterima,
             ],
-            'status_bekerja' => $this->groupCount('req_pk_pencaker', 'status_bekerja', $pWhere, $pParams),
+            'status_bekerja' => $statusBekerja,
             'top_wilayah' => [
                 'level' => $regionColumn,
-                'items' => $this->groupCount('req_pk_pencaker', $regionColumn, $pWhere, $pParams, 6),
+                'items' => array_slice($wilayah, 0, 6),
             ],
             'top_bidang' => $this->groupSum('bidang_pekerjaan', $lWhere, $lParams, 6),
             'top_industri' => $this->groupSum('industri', $lWhere, $lParams, 6),
@@ -172,8 +235,73 @@ class PublicDashboardController extends Controller
     {
         [$where, $params] = $this->pencakerWhere($area);
 
+        // Semua agregat profil dalam SATU pemindaian tabel pencaker (GROUPING SETS):
+        // total + KPI, pendidikan, umur x gender, negara tujuan, jurusan.
+        // Negara & jurusan dibatasi 12 teratas di SQL agar hasil yang dikirim tetap kecil.
+        $ageCase = implode(' ', array_map(
+            fn ($g) => "WHEN usia BETWEEN {$g[1]} AND {$g[2]} THEN '{$g[0]}'",
+            self::AGE_GROUPS
+        ));
+        $rows = DB::select("
+            WITH base AS (
+                SELECT pendidikan, jenis_kelamin,
+                       CASE {$ageCase} END AS kelompok,
+                       NULLIF(country_wish, '') AS negara,
+                       NULLIF(UPPER(TRIM(jurusan)), '') AS jurusan,
+                       rencana_kerja_luar_negeri, kondisi_fisik
+                FROM (
+                    SELECT pendidikan, jenis_kelamin, country_wish, jurusan,
+                           rencana_kerja_luar_negeri, kondisi_fisik,
+                           CASE WHEN umur ~ '^[0-9]{1,2}$' THEN umur::int END AS usia
+                    FROM req_pk_pencaker WHERE {$where}
+                ) AS p
+            ),
+            agg AS (
+                SELECT GROUPING(pendidikan) AS g_pend, GROUPING(kelompok) AS g_umur,
+                       GROUPING(negara) AS g_negara, GROUPING(jurusan) AS g_jurusan,
+                       pendidikan, kelompok, jenis_kelamin, negara, jurusan,
+                       COUNT(*) AS c,
+                       COUNT(*) FILTER (WHERE rencana_kerja_luar_negeri = 'Ya') AS minat_pmi,
+                       COUNT(*) FILTER (WHERE kondisi_fisik = 'Disabilitas') AS disabilitas
+                FROM base
+                GROUP BY GROUPING SETS ((), (pendidikan), (kelompok, jenis_kelamin), (negara), (jurusan))
+            )
+            SELECT * FROM (
+                SELECT agg.*, ROW_NUMBER() OVER (
+                    PARTITION BY g_pend, g_umur, g_negara, g_jurusan ORDER BY c DESC
+                ) AS rn
+                FROM agg
+            ) AS ranked
+            WHERE NOT ((g_negara = 0 OR g_jurusan = 0) AND rn > 12)
+        ", $params);
+
+        $kpi = (object) ['minat_pmi' => 0, 'disabilitas' => 0];
+        $educationRaw = $ageRows = $migrantRows = $majorRows = [];
+        foreach ($rows as $row) {
+            if ($row->g_pend && $row->g_umur && $row->g_negara && $row->g_jurusan) {
+                $kpi = $row; // baris total
+            } elseif (!$row->g_pend) {
+                $educationRaw[] = ['label' => $row->pendidikan, 'value' => (int) $row->c];
+            } elseif (!$row->g_umur) {
+                if ($row->kelompok !== null) {
+                    $ageRows[] = $row;
+                }
+            } elseif (!$row->g_negara) {
+                if ($row->negara !== null) {
+                    $migrantRows[] = (object) ['label' => $row->negara, 'value' => (int) $row->c];
+                }
+            } elseif ($row->jurusan !== null) {
+                $majorRows[] = (object) ['label' => $row->jurusan, 'value' => (int) $row->c];
+            }
+        }
+        $byValue = fn ($a, $b) => (is_array($b) ? $b['value'] : $b->value) <=> (is_array($a) ? $a['value'] : $a->value);
+        usort($educationRaw, $byValue);
+        usort($migrantRows, $byValue);
+        usort($majorRows, $byValue);
+        $migrant = array_slice($migrantRows, 0, 8);
+        $majors = array_slice($majorRows, 0, 10);
+
         // Distribusi pendidikan, diurutkan dari jenjang terendah
-        $educationRaw = $this->groupCount('req_pk_pencaker', 'pendidikan', $where, $params);
         $education = collect($educationRaw)
             ->map(fn ($row) => ['label' => $row['label'] ?? 'Tidak diketahui', 'value' => $row['value']])
             ->sortBy(fn ($row) => array_search($row['label'], self::EDUCATION_ORDER, true) === false
@@ -194,32 +322,7 @@ class PublicDashboardController extends Controller
             }
         }
 
-        // KPI hanya perlu menghitung minat_pmi dan disabilitas
-        $kpi = DB::selectOne("
-            SELECT
-                COUNT(*) FILTER (WHERE rencana_kerja_luar_negeri = 'Ya') AS minat_pmi,
-                COUNT(*) FILTER (WHERE kondisi_fisik = 'Disabilitas') AS disabilitas
-            FROM req_pk_pencaker WHERE {$where}
-        ", $params);
-
-        // Kelompok umur per gender (umur tersimpan sebagai teks; abaikan nilai tidak wajar)
-        $ageCase = implode(' ', array_map(
-            fn ($g) => "WHEN usia BETWEEN {$g[1]} AND {$g[2]} THEN '{$g[0]}'",
-            self::AGE_GROUPS
-        ));
-        $ageRows = DB::select("
-            SELECT kelompok, jenis_kelamin, COUNT(*) AS c
-            FROM (
-                SELECT CASE {$ageCase} END AS kelompok, jenis_kelamin
-                FROM (
-                    SELECT jenis_kelamin,
-                           CASE WHEN umur ~ '^[0-9]{1,2}$' THEN umur::int END AS usia
-                    FROM req_pk_pencaker WHERE {$where}
-                ) AS umur_valid
-            ) AS dikelompokkan
-            WHERE kelompok IS NOT NULL
-            GROUP BY 1, 2
-        ", $params);
+        // Kelompok umur per gender (umur tersimpan sebagai teks; nilai tidak wajar diabaikan)
         $ages = [];
         foreach (self::AGE_GROUPS as [$label]) {
             $ages[$label] = ['label' => $label, 'laki_laki' => 0, 'perempuan' => 0];
@@ -228,20 +331,6 @@ class PublicDashboardController extends Controller
             $key = $row->jenis_kelamin === 'Perempuan' ? 'perempuan' : 'laki_laki';
             $ages[$row->kelompok][$key] += (int) $row->c;
         }
-
-        $migrant = DB::select("
-            SELECT country_wish AS label, COUNT(*) AS value
-            FROM req_pk_pencaker
-            WHERE {$where} AND COALESCE(country_wish, '') <> ''
-            GROUP BY 1 ORDER BY 2 DESC LIMIT 8
-        ", $params);
-
-        $majors = DB::select("
-            SELECT UPPER(TRIM(jurusan)) AS label, COUNT(*) AS value
-            FROM req_pk_pencaker
-            WHERE {$where} AND COALESCE(TRIM(jurusan), '') <> ''
-            GROUP BY 1 ORDER BY 2 DESC LIMIT 10
-        ", $params);
 
         return [
             'kpi' => [
@@ -318,7 +407,22 @@ class PublicDashboardController extends Controller
         $area = ['tahun' => $tahun ?: null, 'provinsi' => $provinsi, 'kab_kota' => $kabKota];
 
         $key = 'public_dashboard:' . $section . ':' . md5(json_encode($area));
-        $data = Cache::remember($key, self::CACHE_TTL, fn () => $build($area));
+        $data = Cache::get($key);
+
+        if ($data === null) {
+            // Kunci per kombinasi filter: bila beberapa pengunjung membuka filter yang sama
+            // saat cache kosong, hanya satu yang menghitung; yang lain menunggu hasilnya.
+            try {
+                $data = Cache::lock($key . ':lock', 120)->block(90, function () use ($key, $build, $area) {
+                    return Cache::get($key) ?? tap($build($area), fn ($fresh) => Cache::put($key, $fresh, self::CACHE_TTL));
+                });
+            } catch (LockTimeoutException) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Data sedang disiapkan, silakan coba beberapa saat lagi.',
+                ], 503);
+            }
+        }
 
         return response()->json(['status' => 'success', 'filter' => $area, 'data' => $data]);
     }
