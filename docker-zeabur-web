@@ -40,13 +40,16 @@ ENV API_URL=$API_URL
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+# Batasi V8 heap memory agar Node.js tidak boros RAM di server 2GB
 ENV NODE_OPTIONS="--max-old-space-size=256"
 
-# Copy standalone output and static assets only (saves hundreds of MBs of RAM and disk)
+# Hanya salin bundle standalone dan static assets (tanpa node_modules penuh)
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
 EXPOSE 3000
 
+# Jalankan langsung server.js tanpa overhead npx
 CMD ["node", "server.js"]
+

@@ -1,32 +1,33 @@
-# ---- Production Laravel Backend ----
-FROM php:8.4-cli
+# ---- Production Laravel Backend (FrankenPHP) ----
+FROM dunglas/frankenphp:1-php8.4-bookworm
 
-# Install system dependencies and PHP extensions (including opcache)
-RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    libzip-dev \
-    unzip \
-    git \
-    && docker-php-ext-install pdo pdo_pgsql pgsql opcache \
-    && rm -rf /var/lib/apt/lists/*
+# Install required PHP extensions for Laravel (PostgreSQL, MySQL, Zip, etc.)
+RUN install-php-extensions \
+    pdo_pgsql \
+    pgsql \
+    pdo_mysql \
+    zip \
+    pcntl \
+    opcache \
+    bcmath
 
-# Copy Composer binary
+# Copy Composer from official image
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 
-# Copy composer files from api/ and install only production dependencies
+# Copy dependency definitions and install (production only with optimized autoloader)
 COPY api/composer.json api/composer.lock* ./
 RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --optimize-autoloader --classmap-authoritative
 
-# Copy backend source code
+# Copy application source code
 COPY api/ .
 
-# Prepare directories and permissions
+# Prepare storage directories and grant permissions
 RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-# Configure PHP production memory limit & OPcache to reduce RAM usage and boost performance
+# Production Memory & OPcache Optimization for 2GB VPS
 RUN echo "memory_limit = 128M" > /usr/local/etc/php/conf.d/memory-limit.ini \
     && { \
         echo "opcache.enable = 1"; \
@@ -37,11 +38,18 @@ RUN echo "memory_limit = 128M" > /usr/local/etc/php/conf.d/memory-limit.ini \
         echo "opcache.validate_timestamps = 0"; \
     } > /usr/local/etc/php/conf.d/opcache-recommended.ini
 
+# Default Environment Variables (PostgreSQL & Cookie Session seperti di local .env)
+ENV DB_CONNECTION=pgsql
+ENV SESSION_DRIVER=cookie
+ENV CACHE_STORE=file
+ENV QUEUE_CONNECTION=sync
+
+# Set HTTP port to 8000
+ENV SERVER_NAME=":8000"
 EXPOSE 8000
 
-# Cache Laravel configurations, routes, and views before serving to eliminate on-the-fly parsing overhead
+# Cache Laravel configs/routes and run FrankenPHP server
 CMD php artisan config:cache \
     && php artisan route:cache \
     && php artisan view:cache \
-    && php artisan serve --host=0.0.0.0 --port=8000
-
+    && frankenphp run --config /etc/caddy/Caddyfile
