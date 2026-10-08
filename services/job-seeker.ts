@@ -241,3 +241,55 @@ export async function updateJobSeekerSkills(id: number | string, skills: number[
   const json = await res.json();
   return json.data;
 }
+
+/**
+ * Memperbarui data profil pencari kerja
+ */
+export async function updateJobSeeker(
+  id: number | string,
+  payload: Record<string, any>
+): Promise<JobSeeker> {
+  const baseUrl = getApiBaseUrl();
+  const res = await fetch(`${baseUrl}/api/job-seekers/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json();
+
+  if (!res.ok) {
+    const firstError = json.errors
+      ? ((Object.values(json.errors) as unknown as string[][])?.[0]?.[0])
+      : undefined;
+    const errorMsg = json.message || firstError || 'Gagal memperbarui profil pencari kerja';
+    const err = new Error(errorMsg) as Error & { errors?: Record<string, string[]> };
+    err.errors = json.errors;
+    throw err;
+  }
+
+  return json.data;
+}
+
+/**
+ * Menghapus profil pencari kerja
+ */
+export async function deleteJobSeeker(id: number | string): Promise<void> {
+  const baseUrl = getApiBaseUrl();
+  const res = await fetch(`${baseUrl}/api/job-seekers/${id}`, {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  const json = await res.json();
+
+  if (!res.ok) {
+    throw new Error(json.message || 'Gagal menghapus profil pencari kerja');
+  }
+}
+

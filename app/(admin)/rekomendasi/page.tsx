@@ -49,6 +49,7 @@ function MatchingWizard() {
   
   const [selectedProvinsi, setSelectedProvinsi] = useState<string>('');
   const [selectedKabkota, setSelectedKabkota] = useState<string>('');
+  const [filterPendidikan, setFilterPendidikan] = useState<boolean>(false);
 
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [matchMeta, setMatchMeta] = useState<{
@@ -283,7 +284,8 @@ function MatchingWizard() {
         pekerjaan: jobTitleQuery.trim(),
         provinsi_id: selectedProvinsi || undefined,
         kabkota_id: selectedKabkota || undefined,
-        skills: pencakerSkills.map(s => s.id)
+        skills: pencakerSkills.map(s => s.id),
+        filter_pendidikan: true,
       });
       const list = Array.isArray(result) ? result : (result?.data || []);
       setRecommendations(list);
@@ -318,7 +320,8 @@ function MatchingWizard() {
       const result: any = await recommendLowonganApi({
         pencaker_id: Number(selectedPencakerId),
         pekerjaan: jobTitleQuery.trim(),
-        skills: pencakerSkills.map(s => s.id)
+        skills: pencakerSkills.map(s => s.id),
+        filter_pendidikan: filterPendidikan ? true : undefined,
       });
       const list = Array.isArray(result) ? result : (result?.data || []);
       setRecommendations(list);
@@ -840,16 +843,23 @@ function MatchingWizard() {
                 </div>
               </div>
 
-              {/* Status Validasi Skill Kandidat Ringkas */}
-              <div className="flex items-center gap-3 p-4 bg-sky-50/70 border border-sky-200 rounded-xl text-xs text-sky-900">
-                <CheckCircle2 className="w-5 h-5 text-sky-600 shrink-0" />
-                <div>
-                  <p className="font-semibold">
-                    Kandidat: {selectedSeeker?.name || selectedSeeker?.full_name || 'Kandidat'}
-                  </p>
-                  <p className="text-sky-700 mt-0.5">
-                    {pencakerSkills.length} keahlian telah divalidasi dan siap dicocokkan dengan formasi lowongan kerja.
-                  </p>
+              {/* Status Validasi Skill & Pendidikan Kandidat Ringkas */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-sky-50/70 border border-sky-200 rounded-xl text-xs text-sky-900">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-sky-600 shrink-0" />
+                  <div>
+                    <p className="font-semibold">
+                      Kandidat: {selectedSeeker?.name || selectedSeeker?.full_name || 'Kandidat'} • Pendidikan: <span className="font-bold text-sky-800">{selectedSeeker?.pendidikan || '-'}</span>
+                    </p>
+                    <p className="text-sky-700 mt-0.5">
+                      {pencakerSkills.length} keahlian siap dicocokkan dengan formasi lowongan kerja.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="inline-flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-800 font-semibold shrink-0 shadow-2xs">
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Kualifikasi Pendidikan: Wajib Memenuhi</span>
                 </div>
               </div>
             </div>
@@ -900,7 +910,7 @@ function MatchingWizard() {
                 <p className="text-xs text-slate-500">
                   {recommendations.length > 0 
                     ? 'Daftar 10 lowongan pekerjaan paling cocok berdasarkan kesesuaian skill kandidat dan kata kunci jabatan.'
-                    : 'Tidak ada formasi lowongan berstatus tayang/published yang cocok dengan kriteria pencarian saat ini.'}
+                    : 'Belum ada lowongan aktif yang cocok dengan kriteria pencarian saat ini.'}
                 </p>
               </div>
 
@@ -930,90 +940,83 @@ function MatchingWizard() {
 
             {/* Empty State: Informasi Jelas Lowongan Published Tidak Ditemukan */}
             {recommendations.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 shadow-sm max-w-3xl mx-auto space-y-6">
-                <div className="flex flex-col items-center text-center space-y-3">
-                  <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shadow-2xs">
-                    <AlertCircle className="w-7 h-7" />
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm max-w-2xl mx-auto space-y-5">
+                <div className="flex flex-col items-center text-center space-y-2.5">
+                  <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shadow-2xs">
+                    <AlertCircle className="w-6 h-6" />
                   </div>
                   
                   <div className="space-y-1">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 mb-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                      Scope Filter: Hanya Memeriksa Lowongan Berstatus Tayang (Published)
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-medium text-emerald-700 mb-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      Hanya lowongan aktif (tayang)
                     </div>
-                    <h3 className="text-xl font-bold text-slate-900">
-                      Tidak Ditemukan Lowongan Kerja Aktif / Published yang Cocok
+                    <h3 className="text-lg font-bold text-slate-900">
+                      Tidak Ada Lowongan yang Cocok
                     </h3>
-                    <p className="text-sm text-slate-500 max-w-xl mx-auto leading-relaxed">
-                      Sistem telah menyaring database formasi lowongan kerja yang berstatus <strong className="text-slate-700">Tayang (Published)</strong>, 
-                      namun tidak menemukan posisi yang judul pekerjaannya memuat kata kunci <strong className="text-sky-700">&quot;{jobTitleQuery}&quot;</strong>
+                    <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+                      Tidak ditemukan lowongan aktif untuk kata kunci <strong className="text-slate-800">&quot;{jobTitleQuery}&quot;</strong>
                       {matchMeta.provinsiName ? (
-                        <> pada wilayah <strong className="text-slate-700">{matchMeta.provinsiName}{matchMeta.kabkotaName ? `, ${matchMeta.kabkotaName}` : ''}</strong>.</>
+                        <> di wilayah <strong className="text-slate-800">{matchMeta.provinsiName}{matchMeta.kabkotaName ? `, ${matchMeta.kabkotaName}` : ''}</strong>.</>
                       ) : '.'}
                     </p>
                   </div>
                 </div>
 
                 {/* Ringkasan Parameter Pencarian yang Digunakan */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
-                    <Search className="w-3.5 h-3.5 text-slate-400" /> Parameter Pencarian yang Digunakan
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:p-4">
+                  <h4 className="text-xs font-semibold text-slate-500 mb-2.5 flex items-center gap-1.5">
+                    <Search className="w-3.5 h-3.5 text-slate-400" /> Filter yang Digunakan
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                    <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-2xs">
-                      <p className="text-slate-400 text-[11px]">Kata Kunci Judul</p>
-                      <p className="font-bold text-slate-800 truncate mt-0.5">&quot;{jobTitleQuery}&quot;</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                    <div className="bg-white p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
+                      <p className="text-slate-400 text-[11px]">Kata Kunci</p>
+                      <p className="font-semibold text-slate-800 truncate mt-0.5">&quot;{jobTitleQuery}&quot;</p>
                     </div>
-                    <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-2xs">
-                      <p className="text-slate-400 text-[11px]">Status Lowongan</p>
-                      <p className="font-bold text-emerald-700 mt-0.5 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Tayang (Published)
+                    <div className="bg-white p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
+                      <p className="text-slate-400 text-[11px]">Status</p>
+                      <p className="font-semibold text-emerald-700 mt-0.5 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Tayang
                       </p>
                     </div>
-                    <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-2xs">
-                      <p className="text-slate-400 text-[11px]">Wilayah Penempatan</p>
-                      <p className="font-bold text-slate-800 truncate mt-0.5">
-                        {matchMeta.provinsiName ? `${matchMeta.provinsiName}${matchMeta.kabkotaName ? ` (${matchMeta.kabkotaName})` : ''}` : 'Semua Wilayah (Nasional)'}
+                    <div className="bg-white p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
+                      <p className="text-slate-400 text-[11px]">Wilayah</p>
+                      <p className="font-semibold text-slate-800 truncate mt-0.5" title={matchMeta.provinsiName || 'Semua Wilayah (Nasional)'}>
+                        {matchMeta.provinsiName ? `${matchMeta.provinsiName}${matchMeta.kabkotaName ? ` (${matchMeta.kabkotaName})` : ''}` : 'Semua Wilayah'}
                       </p>
                     </div>
-                    <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-2xs">
+                    <div className="bg-white p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
                       <p className="text-slate-400 text-[11px]">Skill Kandidat</p>
-                      <p className="font-bold text-sky-700 mt-0.5">
-                        {pencakerSkills.length} Keahlian Siap
+                      <p className="font-semibold text-sky-700 mt-0.5">
+                        {pencakerSkills.length} Keahlian
                       </p>
                     </div>
                   </div>
                 </div>
 
                 {/* Informasi Penyebab & Saran Solusi */}
-                <div className="border border-amber-200/80 bg-amber-50/40 rounded-xl p-4 sm:p-5 text-xs text-slate-700 space-y-2.5">
-                  <p className="font-bold text-amber-900 flex items-center gap-1.5">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    Kemungkinan Penyebab & Saran Tindakan:
+                <div className="border border-amber-200/70 bg-amber-50/40 rounded-xl p-3.5 sm:p-4 text-xs text-slate-700 space-y-1.5">
+                  <p className="font-semibold text-amber-900 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    Saran Pencarian:
                   </p>
-                  <ul className="space-y-1.5 list-disc list-inside text-slate-600 pl-1">
-                    <li>
-                      <strong className="text-slate-800">Formasi belum ditayangkan (published):</strong> Lowongan untuk posisi ini mungkin belum di-publish oleh perusahaan, masih berstatus draf/menunggu verifikasi, atau masa aktifnya telah kedaluwarsa.
-                    </li>
-                    <li>
-                      <strong className="text-slate-800">Variasi judul posisi:</strong> Perusahaan mungkin mendaftarkan posisi menggunakan istilah yang berbeda atau lebih umum (contoh: gunakan istilah umum seperti <em>&quot;Staff&quot;</em>, <em>&quot;Admin&quot;</em>, <em>&quot;Teknisi&quot;</em>, <em>&quot;Operator&quot;</em>, dll).
-                    </li>
+                  <ul className="space-y-1 text-slate-600 pl-5 list-disc">
+                    <li>Gunakan kata kunci posisi yang lebih umum (misal: <em>Staff, Admin, Teknisi, Operator</em>).</li>
+                    <li>Pastikan lowongan sudah dipublikasikan dan masa berlakunya masih aktif.</li>
                     {matchMeta.provinsiName && (
-                      <li>
-                        <strong className="text-slate-800">Filter lokasi aktif:</strong> Formasi posisi ini mungkin tersedia di luar wilayah <span className="font-semibold text-slate-800">{matchMeta.provinsiName}</span>.
-                      </li>
+                      <li>Coba hapus filter wilayah untuk memperluas pencarian ke cakupan nasional.</li>
                     )}
                   </ul>
                 </div>
 
                 {/* Tombol Aksi */}
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-1">
                   <button 
                     type="button"
                     onClick={() => setStep(3)} 
-                    className="w-full sm:w-auto px-6 py-2.5 bg-sky-600 text-white rounded-xl text-xs font-semibold hover:bg-sky-700 transition-all shadow-sm flex items-center justify-center gap-2"
+                    className="w-full sm:w-auto px-5 py-2.5 bg-sky-600 text-white rounded-xl text-xs font-semibold hover:bg-sky-700 transition-all shadow-sm flex items-center justify-center gap-2"
                   >
-                    ← Ubah Kata Kunci / Kriteria
+                    ← Ubah Kriteria Pencarian
                   </button>
                   
                   {Boolean(selectedProvinsi || selectedKabkota) && (
@@ -1021,10 +1024,10 @@ function MatchingWizard() {
                       type="button"
                       onClick={handleRetryWithoutLocationFilter}
                       disabled={isLoading}
-                      className="w-full sm:w-auto px-5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 hover:border-slate-400 transition-all flex items-center justify-center gap-2 shadow-2xs"
+                      className="w-full sm:w-auto px-4 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 hover:border-slate-400 transition-all flex items-center justify-center gap-2 shadow-2xs"
                     >
                       {isLoading ? <Loader2 className="w-4 h-4 animate-spin text-sky-600" /> : <RefreshCw className="w-3.5 h-3.5 text-slate-500" />}
-                      Cari Ulang Tanpa Filter Wilayah
+                      Cari Tanpa Filter Wilayah
                     </button>
                   )}
 
@@ -1039,7 +1042,7 @@ function MatchingWizard() {
                       setCurrentPage(1);
                       setStep(1);
                     }} 
-                    className="w-full sm:w-auto px-5 py-2.5 text-slate-500 hover:text-slate-800 rounded-xl text-xs font-medium hover:bg-slate-100 transition-colors"
+                    className="w-full sm:w-auto px-4 py-2.5 text-slate-500 hover:text-slate-800 rounded-xl text-xs font-medium hover:bg-slate-100 transition-colors"
                   >
                     Pilih Pencaker Lain
                   </button>
@@ -1054,6 +1057,7 @@ function MatchingWizard() {
                       <tr>
                         <th className="py-3.5 px-4 w-14 text-center">Rank</th>
                         <th className="py-3.5 px-4">Posisi Lowongan & Perusahaan</th>
+                        <th className="py-3.5 px-4">Pendidikan</th>
                         <th className="py-3.5 px-4">Lokasi Penempatan</th>
                         <th className="py-3.5 px-4">Kode KBJI</th>
                         <th className="py-3.5 px-4 text-center">Skor Match</th>
@@ -1096,6 +1100,24 @@ function MatchingWizard() {
                                   <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                   <span className="truncate">{rec.lowongan.nama_perusahaan}</span>
                                 </p>
+                              </td>
+                              <td className="py-4 px-4">
+                                <span className="font-semibold text-slate-800 text-xs block">
+                                  {rec.lowongan?.education_level?.name || rec.education_match?.required_level_name || 'Semua Jenjang'}
+                                </span>
+                                {rec.education_match && (
+                                  rec.education_match.is_matched ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 mt-1">
+                                      <Check className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                                      {rec.education_match.status === 'melebihi' ? 'Memenuhi (>)' : 'Sesuai'} ({selectedSeeker?.pendidikan || rec.education_match.candidate_level_name})
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200 mt-1" title={rec.education_match.label}>
+                                      <AlertCircle className="w-2.5 h-2.5 text-rose-500 shrink-0" />
+                                      Di Bawah Syarat ({selectedSeeker?.pendidikan || rec.education_match.candidate_level_name})
+                                    </span>
+                                  )
+                                )}
                               </td>
                               <td className="py-4 px-4 text-slate-600">
                                 <div className="flex items-center gap-1.5">
@@ -1274,6 +1296,44 @@ function MatchingWizard() {
                         {selectedRecommendation.lowongan.kbji?.code} - {selectedRecommendation.lowongan.kbji?.name}
                       </p>
                     </div>
+
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1 font-medium">Syarat Pendidikan Lowongan</p>
+                      <div className="flex items-center gap-2">
+                        <Award className="w-4 h-4 text-slate-400 shrink-0" />
+                        <p className="text-sm font-semibold text-slate-800">
+                          {selectedRecommendation.lowongan.education_level?.name || selectedRecommendation.education_match?.required_level_name || 'Semua Jenjang'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Evaluasi Kesesuaian Pendidikan */}
+                    {selectedRecommendation.education_match && (
+                      <div className={`p-3 rounded-lg border text-xs ${
+                        selectedRecommendation.education_match.is_matched 
+                          ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900' 
+                          : 'bg-rose-50/80 border-rose-200 text-rose-900'
+                      }`}>
+                        <div className="flex items-start gap-2">
+                          {selectedRecommendation.education_match.is_matched ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          )}
+                          <div className="space-y-0.5">
+                            <p className="font-bold">
+                              {selectedRecommendation.education_match.is_matched ? 'Kualifikasi Pendidikan Terpenuhi' : 'Pendidikan Di Bawah Syarat'}
+                            </p>
+                            <p className="text-[11px] opacity-90">
+                              Kandidat: <strong>{selectedSeeker?.pendidikan || selectedRecommendation.education_match.candidate_level_name}</strong> • Lowongan: <strong>{selectedRecommendation.education_match.required_level_name}</strong>
+                            </p>
+                            <p className="text-[11px] font-medium pt-0.5">
+                              {selectedRecommendation.education_match.label}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="bg-sky-50 border border-sky-100 rounded-lg p-4 mt-4 text-center">
                       <p className="text-xs text-sky-700 font-bold uppercase tracking-wider mb-1">Skor Kecocokan Skill</p>

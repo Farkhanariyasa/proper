@@ -28,7 +28,6 @@ class StoreJobSeekerRequest extends FormRequest
                 'required',
                 'numeric',
                 'digits:16',
-                'unique:job_seekers,nik',
             ],
             'full_name' => ['required', 'string', 'max:150'],
             'phone' => ['required', 'string', 'max:20'],

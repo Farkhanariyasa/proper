@@ -339,6 +339,9 @@ export default function ProfilSkillPage() {
       <JobSeekerDetailModal
         jobSeekerId={detailSeekerId}
         onClose={() => setDetailSeekerId(null)}
+        onDeleted={() => {
+          loadJobSeekers(meta.current_page);
+        }}
       />
     </div>
   </AuthGuard>

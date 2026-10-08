@@ -42,6 +42,7 @@ class ReqPkLoker extends Model
         'is_mapped',
         'provinsi_id',
         'regency_id',
+        'education_level_id',
     ];
 
     protected $casts = [
@@ -57,6 +58,11 @@ class ReqPkLoker extends Model
         'lamaran_dibatalkan' => 'integer',
         'is_mapped' => 'boolean',
     ];
+
+    public function educationLevel(): BelongsTo
+    {
+        return $this->belongsTo(EducationLevel::class, 'education_level_id');
+    }
 
     public function kbji(): BelongsTo
     {

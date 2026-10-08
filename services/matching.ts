@@ -143,6 +143,7 @@ export async function recommendLowonganApi(payload: {
   provinsi_id?: string;
   kabkota_id?: string;
   skills: number[];
+  filter_pendidikan?: boolean;
 }): Promise<any[]> {
   const baseUrl = getApiBaseUrl();
   const res = await fetch(`${baseUrl}/api/rekomendasi/lowongan`, {

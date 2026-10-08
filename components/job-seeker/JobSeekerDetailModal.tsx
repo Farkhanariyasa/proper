@@ -14,22 +14,28 @@ import {
   Loader2,
   CheckCircle2,
   Target,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { JobSeeker } from '@/types/job-seeker';
-import { getJobSeekerDetail } from '@/services/job-seeker';
+import { getJobSeekerDetail, deleteJobSeeker } from '@/services/job-seeker';
+import { useAuth } from '@/hooks/useAuth';
 
 interface JobSeekerDetailModalProps {
   jobSeekerId: number | null;
   onClose: () => void;
+  onDeleted?: () => void;
 }
 
 export default function JobSeekerDetailModal({
   jobSeekerId,
   onClose,
+  onDeleted,
 }: JobSeekerDetailModalProps) {
+  const { hasPermission } = useAuth();
   const [data, setData] = useState<JobSeeker | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,7 +61,23 @@ export default function JobSeekerDetailModal({
     };
   }, [jobSeekerId]);
 
-  if (!jobSeekerId) return null;
+  const handleDelete = async () => {
+    if (!jobSeekerId || !data) return;
+    const confirmName = data.name || data.full_name || 'kandidat ini';
+    if (!window.confirm(`Apakah Anda yakin ingin menghapus profil pekerja "${confirmName}"? Data yang dihapus tidak dapat dipulihkan.`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteJobSeeker(jobSeekerId);
+      onDeleted?.();
+      onClose();
+    } catch (err: any) {
+      alert(err.message || 'Gagal menghapus profil pencari kerja');
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -265,22 +287,41 @@ export default function JobSeekerDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-md border border-slate-300 bg-white text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100"
-          >
-            Tutup
-          </button>
-          <Link
-            href={`/rekomendasi?pencaker_id=${jobSeekerId}`}
-            id="btn-match-lowongan"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#0E385E] text-white text-xs sm:text-sm font-semibold hover:bg-[#163A5F]"
-          >
-            <Target className="w-4 h-4" />
-            Match Lowongan
-          </Link>
+        <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
+          <div>
+            {hasPermission('job_seekers.delete') && data && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-red-200 bg-red-50 text-red-700 text-xs sm:text-sm font-semibold hover:bg-red-100 hover:border-red-300 transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-red-600" />
+                ) : (
+                  <Trash2 className="w-4 h-4 text-red-600" />
+                )}
+                <span>Hapus Profil</span>
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-md border border-slate-300 bg-white text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100"
+            >
+              Tutup
+            </button>
+            <Link
+              href={`/rekomendasi?pencaker_id=${jobSeekerId}`}
+              id="btn-match-lowongan"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[#0E385E] text-white text-xs sm:text-sm font-semibold hover:bg-[#163A5F]"
+            >
+              <Target className="w-4 h-4" />
+              Match Lowongan
+            </Link>
+          </div>
         </div>
       </div>
     </div>
