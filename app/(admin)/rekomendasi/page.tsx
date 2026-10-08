@@ -51,6 +51,17 @@ function MatchingWizard() {
   const [selectedKabkota, setSelectedKabkota] = useState<string>('');
 
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [matchMeta, setMatchMeta] = useState<{
+    totalFound: number;
+    totalPublished: number;
+    keyword: string;
+    provinsiName?: string;
+    kabkotaName?: string;
+  }>({
+    totalFound: 0,
+    totalPublished: 0,
+    keyword: '',
+  });
 
   // Search Esco Skill Manual
   const [skillQuery, setSkillQuery] = useState('');
@@ -267,21 +278,63 @@ function MatchingWizard() {
     }
     setIsLoading(true);
     try {
-      const result = await recommendLowonganApi({
+      const result: any = await recommendLowonganApi({
         pencaker_id: Number(selectedPencakerId),
         pekerjaan: jobTitleQuery.trim(),
         provinsi_id: selectedProvinsi || undefined,
         kabkota_id: selectedKabkota || undefined,
         skills: pencakerSkills.map(s => s.id)
       });
-      setRecommendations(result);
+      const list = Array.isArray(result) ? result : (result?.data || []);
+      setRecommendations(list);
+      const provObj = provinces.find(p => String(p.value) === String(selectedProvinsi));
+      const kabObj = regencies.find(r => String(r.value) === String(selectedKabkota));
+      setMatchMeta({
+        totalFound: result?.total_found ?? list.length,
+        totalPublished: result?.total_published_available ?? 0,
+        keyword: jobTitleQuery.trim(),
+        provinsiName: provObj?.label,
+        kabkotaName: kabObj?.label,
+      });
       setCurrentPage(1);
-      if (result && result.length > 0) {
-        setSelectedRecommendation(result[0]);
+      if (list && list.length > 0) {
+        setSelectedRecommendation(list[0]);
       } else {
         setSelectedRecommendation(null);
       }
       setStep(4);
+    } catch (e: any) {
+      alert(e?.message || "Gagal melakukan proses matching lowongan");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRetryWithoutLocationFilter = async () => {
+    setSelectedProvinsi('');
+    setSelectedKabkota('');
+    setIsLoading(true);
+    try {
+      const result: any = await recommendLowonganApi({
+        pencaker_id: Number(selectedPencakerId),
+        pekerjaan: jobTitleQuery.trim(),
+        skills: pencakerSkills.map(s => s.id)
+      });
+      const list = Array.isArray(result) ? result : (result?.data || []);
+      setRecommendations(list);
+      setMatchMeta({
+        totalFound: result?.total_found ?? list.length,
+        totalPublished: result?.total_published_available ?? 0,
+        keyword: jobTitleQuery.trim(),
+        provinsiName: undefined,
+        kabkotaName: undefined,
+      });
+      setCurrentPage(1);
+      if (list && list.length > 0) {
+        setSelectedRecommendation(list[0]);
+      } else {
+        setSelectedRecommendation(null);
+      }
     } catch (e: any) {
       alert(e?.message || "Gagal melakukan proses matching lowongan");
     } finally {
@@ -761,25 +814,6 @@ function MatchingWizard() {
                       </button>
                     )}
                   </div>
-
-                  {/* Saran Cepat */}
-                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                    <span className="text-xs text-slate-400">Saran Cepat:</span>
-                    {['Staff Administrasi', 'Front Office', 'Customer Service', 'Teknisi', 'Sales / Marketing', 'Kasir', 'Driver', 'Operator Produksi'].map(sug => (
-                      <button
-                        key={sug}
-                        type="button"
-                        onClick={() => setJobTitleQuery(sug)}
-                        className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
-                          jobTitleQuery.toLowerCase() === sug.toLowerCase()
-                            ? 'bg-sky-100 text-sky-800 border-sky-300 font-semibold shadow-2xs'
-                            : 'bg-white text-slate-600 hover:bg-slate-100 border-slate-200'
-                        }`}
-                      >
-                        {sug}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 {/* Filter Wilayah (Opsional) */}
@@ -848,8 +882,10 @@ function MatchingWizard() {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-200">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#0E385E] text-white shadow-2xs">
-                    Top {recommendations.length} Rekomendasi Ter-match
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold shadow-2xs ${
+                    recommendations.length > 0 ? 'bg-[#0E385E] text-white' : 'bg-amber-100 text-amber-800 border border-amber-300'
+                  }`}>
+                    {recommendations.length > 0 ? `Top ${recommendations.length} Rekomendasi Ter-match` : '0 Lowongan Ter-match'}
                   </span>
                   <span className="text-xs text-slate-400">•</span>
                   <span className="text-xs text-slate-600 font-medium">
@@ -862,7 +898,9 @@ function MatchingWizard() {
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900">Hasil Rekomendasi Lowongan Kerja</h2>
                 <p className="text-xs text-slate-500">
-                  Daftar 10 lowongan pekerjaan paling cocok berdasarkan kesesuaian skill kandidat dan kata kunci jabatan.
+                  {recommendations.length > 0 
+                    ? 'Daftar 10 lowongan pekerjaan paling cocok berdasarkan kesesuaian skill kandidat dan kata kunci jabatan.'
+                    : 'Tidak ada formasi lowongan berstatus tayang/published yang cocok dengan kriteria pencarian saat ini.'}
                 </p>
               </div>
 
@@ -890,20 +928,122 @@ function MatchingWizard() {
               </div>
             </div>
 
-            {/* Empty State */}
+            {/* Empty State: Informasi Jelas Lowongan Published Tidak Ditemukan */}
             {recommendations.length === 0 ? (
-              <div className="py-16 flex flex-col items-center justify-center text-slate-400 bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center max-w-2xl mx-auto shadow-2xs">
-                <AlertCircle className="w-12 h-12 mb-3 text-slate-300" />
-                <h3 className="font-bold text-slate-800 text-base">Tidak ada lowongan yang cocok dengan kata kunci &quot;{jobTitleQuery}&quot;</h3>
-                <p className="text-xs text-slate-500 mt-1.5 max-w-md">
-                  Coba gunakan kata kunci pekerjaan lain yang lebih umum (misal: Staff, Admin, Teknisi, Front Office, Kasir) atau kosongkan filter wilayah.
-                </p>
-                <button 
-                  onClick={() => setStep(3)} 
-                  className="mt-5 px-5 py-2.5 bg-sky-600 text-white rounded-xl text-xs font-semibold hover:bg-sky-700 transition-colors shadow-sm"
-                >
-                  Ubah Kriteria Pekerjaan
-                </button>
+              <div className="bg-white rounded-2xl border border-slate-200 p-8 sm:p-10 shadow-sm max-w-3xl mx-auto space-y-6">
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shadow-2xs">
+                    <AlertCircle className="w-7 h-7" />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700 mb-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Scope Filter: Hanya Memeriksa Lowongan Berstatus Tayang (Published)
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900">
+                      Tidak Ditemukan Lowongan Kerja Aktif / Published yang Cocok
+                    </h3>
+                    <p className="text-sm text-slate-500 max-w-xl mx-auto leading-relaxed">
+                      Sistem telah menyaring database formasi lowongan kerja yang berstatus <strong className="text-slate-700">Tayang (Published)</strong>, 
+                      namun tidak menemukan posisi yang judul pekerjaannya memuat kata kunci <strong className="text-sky-700">&quot;{jobTitleQuery}&quot;</strong>
+                      {matchMeta.provinsiName ? (
+                        <> pada wilayah <strong className="text-slate-700">{matchMeta.provinsiName}{matchMeta.kabkotaName ? `, ${matchMeta.kabkotaName}` : ''}</strong>.</>
+                      ) : '.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Ringkasan Parameter Pencarian yang Digunakan */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+                    <Search className="w-3.5 h-3.5 text-slate-400" /> Parameter Pencarian yang Digunakan
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-2xs">
+                      <p className="text-slate-400 text-[11px]">Kata Kunci Judul</p>
+                      <p className="font-bold text-slate-800 truncate mt-0.5">&quot;{jobTitleQuery}&quot;</p>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-2xs">
+                      <p className="text-slate-400 text-[11px]">Status Lowongan</p>
+                      <p className="font-bold text-emerald-700 mt-0.5 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Tayang (Published)
+                      </p>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-2xs">
+                      <p className="text-slate-400 text-[11px]">Wilayah Penempatan</p>
+                      <p className="font-bold text-slate-800 truncate mt-0.5">
+                        {matchMeta.provinsiName ? `${matchMeta.provinsiName}${matchMeta.kabkotaName ? ` (${matchMeta.kabkotaName})` : ''}` : 'Semua Wilayah (Nasional)'}
+                      </p>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-2xs">
+                      <p className="text-slate-400 text-[11px]">Skill Kandidat</p>
+                      <p className="font-bold text-sky-700 mt-0.5">
+                        {pencakerSkills.length} Keahlian Siap
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Informasi Penyebab & Saran Solusi */}
+                <div className="border border-amber-200/80 bg-amber-50/40 rounded-xl p-4 sm:p-5 text-xs text-slate-700 space-y-2.5">
+                  <p className="font-bold text-amber-900 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    Kemungkinan Penyebab & Saran Tindakan:
+                  </p>
+                  <ul className="space-y-1.5 list-disc list-inside text-slate-600 pl-1">
+                    <li>
+                      <strong className="text-slate-800">Formasi belum ditayangkan (published):</strong> Lowongan untuk posisi ini mungkin belum di-publish oleh perusahaan, masih berstatus draf/menunggu verifikasi, atau masa aktifnya telah kedaluwarsa.
+                    </li>
+                    <li>
+                      <strong className="text-slate-800">Variasi judul posisi:</strong> Perusahaan mungkin mendaftarkan posisi menggunakan istilah yang berbeda atau lebih umum (contoh: gunakan istilah umum seperti <em>&quot;Staff&quot;</em>, <em>&quot;Admin&quot;</em>, <em>&quot;Teknisi&quot;</em>, <em>&quot;Operator&quot;</em>, dll).
+                    </li>
+                    {matchMeta.provinsiName && (
+                      <li>
+                        <strong className="text-slate-800">Filter lokasi aktif:</strong> Formasi posisi ini mungkin tersedia di luar wilayah <span className="font-semibold text-slate-800">{matchMeta.provinsiName}</span>.
+                      </li>
+                    )}
+                  </ul>
+                </div>
+
+                {/* Tombol Aksi */}
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                  <button 
+                    type="button"
+                    onClick={() => setStep(3)} 
+                    className="w-full sm:w-auto px-6 py-2.5 bg-sky-600 text-white rounded-xl text-xs font-semibold hover:bg-sky-700 transition-all shadow-sm flex items-center justify-center gap-2"
+                  >
+                    ← Ubah Kata Kunci / Kriteria
+                  </button>
+                  
+                  {Boolean(selectedProvinsi || selectedKabkota) && (
+                    <button 
+                      type="button"
+                      onClick={handleRetryWithoutLocationFilter}
+                      disabled={isLoading}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 hover:border-slate-400 transition-all flex items-center justify-center gap-2 shadow-2xs"
+                    >
+                      {isLoading ? <Loader2 className="w-4 h-4 animate-spin text-sky-600" /> : <RefreshCw className="w-3.5 h-3.5 text-slate-500" />}
+                      Cari Ulang Tanpa Filter Wilayah
+                    </button>
+                  )}
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setSelectedPencakerId('');
+                      setSelectedSeeker(null);
+                      setJobTitleQuery('');
+                      setRecommendations([]);
+                      setSelectedRecommendation(null);
+                      setCurrentPage(1);
+                      setStep(1);
+                    }} 
+                    className="w-full sm:w-auto px-5 py-2.5 text-slate-500 hover:text-slate-800 rounded-xl text-xs font-medium hover:bg-slate-100 transition-colors"
+                  >
+                    Pilih Pencaker Lain
+                  </button>
+                </div>
               </div>
             ) : (
               /* TABEL LANGSUNG DENGAN PAGINATION 5 x 2 */

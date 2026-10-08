@@ -124,11 +124,13 @@ class MatchingController extends Controller
             });
             
             $topRecommendations = array_slice($recommendations, 0, 10);
+            $totalPublished = \App\Models\ReqPkLoker::whereIn('status_loker', ['tayang', 'published'])->count();
 
             return response()->json([
                 'status' => 'success',
                 'data' => $topRecommendations,
                 'total_found' => count($lowonganList),
+                'total_published_available' => $totalPublished,
                 'keyword' => $keyword
             ]);
             
