@@ -59,6 +59,11 @@ class ReqPkLoker extends Model
         'is_mapped' => 'boolean',
     ];
 
+    public function educationLevel(): BelongsTo
+    {
+        return $this->belongsTo(EducationLevel::class, 'education_level_id');
+    }
+
     public function kbji(): BelongsTo
     {
         return $this->belongsTo(KbjiClassification2026::class, 'kbji_2026_id');

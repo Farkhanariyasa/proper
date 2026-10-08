@@ -35,8 +35,9 @@ class MatchingEngineService
             throw new \InvalidArgumentException('Profil pencari kerja tidak ditemukan.');
         }
 
-        // 1. Evaluasi kesesuaian jabatan KBJI
+        // 1. Evaluasi kesesuaian jabatan KBJI dan Pendidikan
         $kbjiMatch = $this->evaluateKbjiMatch($jobSeeker->kbji, $lowongan->kbji);
+        $educationMatch = $this->evaluateEducationMatch($jobSeeker->educationLevel, $lowongan->educationLevel);
 
         // 2. Muat skill yang disyaratkan oleh lowongan (S_required)
         $requiredSkills = $lowongan->skills;
@@ -96,6 +97,18 @@ class MatchingEngineService
         // 6. Klasifikasi Skor (Decision Rules)
         $classification = $this->classifyScore($score);
 
+        // Jika jenjang pendidikan kandidat tidak memenuhi kualifikasi lowongan:
+        if (!$educationMatch['is_matched']) {
+            $classification = [
+                'category' => 'disqualified',
+                'label' => 'Pendidikan Tidak Memenuhi',
+                'badge_color' => 'rose',
+                'action_label' => 'Tidak Memenuhi Syarat',
+                'action_key' => 'not_eligible_education',
+                'description' => 'Jenjang pendidikan kandidat (' . ($jobSeeker->educationLevel?->name ?? 'Belum Terdata') . ') di bawah syarat minimal lowongan (' . ($lowongan->educationLevel?->name ?? 'Min. Tertentu') . ').',
+            ];
+        }
+
         return [
             'candidate' => [
                 'id' => $jobSeeker->id,
@@ -130,8 +143,75 @@ class MatchingEngineService
             'total_gap' => count($gapSkills),
             'classification' => $classification,
             'kbji_match' => $kbjiMatch,
+            'education_match' => $educationMatch,
             'matched_skills' => $matchedSkills,
             'gap_skills' => $gapSkills,
+        ];
+    }
+
+    /**
+     * Evaluasi kesesuaian tingkat pendidikan antara kandidat dan lowongan kerja
+     */
+    public function evaluateEducationMatch($candidateEdu, $jobEdu): array
+    {
+        $cLevel = is_object($candidateEdu) ? ($candidateEdu->sort_order ?? $candidateEdu->id ?? null) : (is_numeric($candidateEdu) ? (int)$candidateEdu : null);
+        $jLevel = is_object($jobEdu) ? ($jobEdu->sort_order ?? $jobEdu->id ?? null) : (is_numeric($jobEdu) ? (int)$jobEdu : null);
+
+        $cName = is_object($candidateEdu) ? ($candidateEdu->name ?? '-') : (is_string($candidateEdu) && $candidateEdu !== '' ? $candidateEdu : '-');
+        $jName = is_object($jobEdu) ? ($jobEdu->name ?? 'Semua Jenjang') : (is_string($jobEdu) && $jobEdu !== '' ? $jobEdu : 'Semua Jenjang');
+
+        if (!$jLevel) {
+            return [
+                'is_matched' => true,
+                'status' => 'semua_jenjang',
+                'label' => 'Terbuka Semua Jenjang',
+                'score' => 100,
+                'required_level' => 'Semua Jenjang',
+                'candidate_level' => $cName !== '-' ? $cName : 'Belum Ditentukan',
+            ];
+        }
+
+        if (!$cLevel) {
+            return [
+                'is_matched' => false,
+                'status' => 'belum_diisi',
+                'label' => 'Pendidikan Belum Terdata',
+                'score' => 50,
+                'required_level' => $jName,
+                'candidate_level' => 'Belum Ditentukan',
+            ];
+        }
+
+        if ($cLevel === $jLevel) {
+            return [
+                'is_matched' => true,
+                'status' => 'sesuai',
+                'label' => 'Sesuai Jenjang (' . $jName . ')',
+                'score' => 100,
+                'required_level' => $jName,
+                'candidate_level' => $cName,
+            ];
+        }
+
+        if ($cLevel > $jLevel) {
+            return [
+                'is_matched' => true,
+                'status' => 'melebihi',
+                'label' => 'Memenuhi (Di Atas Syarat Min. ' . $jName . ')',
+                'score' => 100,
+                'required_level' => $jName,
+                'candidate_level' => $cName,
+            ];
+        }
+
+        $gap = $jLevel - $cLevel;
+        return [
+            'is_matched' => false,
+            'status' => 'di_bawah_syarat',
+            'label' => 'Di Bawah Syarat (Butuh Min. ' . $jName . ')',
+            'score' => max(0, 100 - ($gap * 30)),
+            'required_level' => $jName,
+            'candidate_level' => $cName,
         ];
     }
 
@@ -437,6 +517,13 @@ class MatchingEngineService
                 continue;
             }
 
+            $educationMatch = $this->evaluateEducationMatch($jobSeeker->educationLevel, $job->educationLevel);
+
+            // Syarat Pendidikan Mutlak: Jika tidak memenuhi kualifikasi minimal, jangan dimatch!
+            if (!$educationMatch['is_matched']) {
+                continue;
+            }
+
             $requiredSkills = $job->skills;
             $totalRequired = $requiredSkills->count();
 
@@ -495,13 +582,21 @@ class MatchingEngineService
                 'total_gap' => count($gapSkills),
                 'classification' => $classification,
                 'kbji_match' => $kbjiMatch,
+                'education_match' => $educationMatch,
                 'matched_skills' => $matchedSkills,
                 'gap_skills' => $gapSkills,
             ];
         }
 
-        // Urutkan dari skor tertinggi ke terendah
-        usort($recommendations, fn ($a, $b) => $b['score'] <=> $a['score']);
+        // Urutkan dari skor tertinggi ke terendah, lalu yang pendidikannya cocok
+        usort($recommendations, function ($a, $b) {
+            if ($b['score'] !== $a['score']) {
+                return $b['score'] <=> $a['score'];
+            }
+            $aEdu = $a['education_match']['is_matched'] ? 1 : 0;
+            $bEdu = $b['education_match']['is_matched'] ? 1 : 0;
+            return $bEdu <=> $aEdu;
+        });
 
         return $recommendations;
     }
@@ -547,6 +642,13 @@ class MatchingEngineService
         foreach ($seekers as $candidate) {
             $kbjiMatch = $this->evaluateKbjiMatch($candidate->kbji, $lowongan->kbji);
             if (!$kbjiMatch['is_compatible']) {
+                continue;
+            }
+
+            $educationMatch = $this->evaluateEducationMatch($candidate->educationLevel, $lowongan->educationLevel);
+
+            // Syarat Pendidikan Mutlak: Jika kandidat di bawah syarat minimal formasi, jangan dimatch!
+            if (!$educationMatch['is_matched']) {
                 continue;
             }
 
@@ -617,13 +719,21 @@ class MatchingEngineService
                 'total_gap' => count($gapSkills),
                 'classification' => $classification,
                 'kbji_match' => $kbjiMatch,
+                'education_match' => $educationMatch,
                 'matched_skills' => $matchedSkills,
                 'gap_skills' => $gapSkills,
             ];
         }
 
-        // Urutkan dari skor tertinggi ke terendah
-        usort($recommendations, fn ($a, $b) => $b['score'] <=> $a['score']);
+        // Urutkan dari skor tertinggi ke terendah, lalu yang pendidikannya cocok
+        usort($recommendations, function ($a, $b) {
+            if ($b['score'] !== $a['score']) {
+                return $b['score'] <=> $a['score'];
+            }
+            $aEdu = $a['education_match']['is_matched'] ? 1 : 0;
+            $bEdu = $b['education_match']['is_matched'] ? 1 : 0;
+            return $bEdu <=> $aEdu;
+        });
 
         return $recommendations;
     }
@@ -692,6 +802,13 @@ class MatchingEngineService
                 $kbjiMatch = $this->evaluateKbjiMatch($candidate->kbji, $job->kbji);
 
                 if (!$kbjiMatch['is_compatible']) {
+                    continue;
+                }
+
+                $educationMatch = $this->evaluateEducationMatch($candidate->educationLevel, $job->educationLevel);
+
+                // Syarat Pendidikan Mutlak: Jika tidak memenuhi, jangan dimasukkan ke rekomendasi
+                if (!$educationMatch['is_matched']) {
                     continue;
                 }
 
@@ -765,6 +882,7 @@ class MatchingEngineService
                     'total_gap' => count($gapSkills),
                     'classification' => $classification,
                     'kbji_match' => $kbjiMatch,
+                    'education_match' => $educationMatch,
                     'candidate' => [
                         'id' => $candidate->id,
                         'nik' => $candidate->nik,
@@ -803,8 +921,15 @@ class MatchingEngineService
             }
         }
 
-        // Urutkan dari skor tertinggi
-        usort($results, fn ($a, $b) => $b['score'] <=> $a['score']);
+        // Urutkan dari skor tertinggi ke terendah, lalu yang pendidikannya cocok
+        usort($results, function ($a, $b) {
+            if ($b['score'] !== $a['score']) {
+                return $b['score'] <=> $a['score'];
+            }
+            $aEdu = $a['education_match']['is_matched'] ? 1 : 0;
+            $bEdu = $b['education_match']['is_matched'] ? 1 : 0;
+            return $bEdu <=> $aEdu;
+        });
 
         return $results;
     }

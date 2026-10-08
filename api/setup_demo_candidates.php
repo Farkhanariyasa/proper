@@ -101,10 +101,12 @@ $req1 = Request::create('/api/rekomendasi/lowongan', 'POST', [
 ]);
 $res1 = json_decode($matchingController->recommendLowongan($req1)->getContent(), true);
 $top1 = $res1['data'][0] ?? null;
-echo sprintf("1. USDAR -> Lowongan: %s | Skor: %d%% | Cocok: %d skill\n",
+echo sprintf("1. USDAR -> Lowongan: %s | Skor: %d%% | Cocok: %d skill | Pendidikan: %s [%s]\n",
     $top1['lowongan']['judul_pekerjaan'] ?? '-',
     $top1['match_score'] ?? 0,
-    $top1['matched_skills_count'] ?? 0
+    $top1['matched_skills_count'] ?? 0,
+    $top1['education_match']['label'] ?? '-',
+    $top1['education_match']['is_matched'] ? 'COCOK' : 'TIDAK COCOK'
 );
 
 // 2. Validasi YUDA (Target 67%)
@@ -115,10 +117,12 @@ $req2 = Request::create('/api/rekomendasi/lowongan', 'POST', [
 ]);
 $res2 = json_decode($matchingController->recommendLowongan($req2)->getContent(), true);
 $top2 = $res2['data'][0] ?? null;
-echo sprintf("2. Yuda Handi Sumateja -> Lowongan: %s | Skor: %d%% | Cocok: %d skill\n",
+echo sprintf("2. Yuda Handi Sumateja -> Lowongan: %s | Skor: %d%% | Cocok: %d skill | Pendidikan: %s [%s]\n",
     $top2['lowongan']['judul_pekerjaan'] ?? '-',
     $top2['match_score'] ?? 0,
-    $top2['matched_skills_count'] ?? 0
+    $top2['matched_skills_count'] ?? 0,
+    $top2['education_match']['label'] ?? '-',
+    $top2['education_match']['is_matched'] ? 'COCOK' : 'TIDAK COCOK'
 );
 
 // 3. Validasi KOMANG (Target 100%)
@@ -129,10 +133,12 @@ $req3 = Request::create('/api/rekomendasi/lowongan', 'POST', [
 ]);
 $res3 = json_decode($matchingController->recommendLowongan($req3)->getContent(), true);
 $top3 = $res3['data'][0] ?? null;
-echo sprintf("3. I Komang Tri Agustia -> Lowongan: %s | Skor: %d%% | Cocok: %d skill\n",
+echo sprintf("3. I Komang Tri Agustia -> Lowongan: %s | Skor: %d%% | Cocok: %d skill | Pendidikan: %s [%s]\n",
     $top3['lowongan']['judul_pekerjaan'] ?? '-',
     $top3['match_score'] ?? 0,
-    $top3['matched_skills_count'] ?? 0
+    $top3['matched_skills_count'] ?? 0,
+    $top3['education_match']['label'] ?? '-',
+    $top3['education_match']['is_matched'] ? 'COCOK' : 'TIDAK COCOK'
 );
 
 // 4. Validasi ELSYA (Target 50%)
@@ -143,8 +149,10 @@ $req4 = Request::create('/api/rekomendasi/lowongan', 'POST', [
 ]);
 $res4 = json_decode($matchingController->recommendLowongan($req4)->getContent(), true);
 $top4 = $res4['data'][0] ?? null;
-echo sprintf("4. ELSYA MONALISA PANE -> Lowongan: %s | Skor: %d%% | Cocok: %d skill\n",
+echo sprintf("4. ELSYA MONALISA PANE -> Lowongan: %s | Skor: %d%% | Cocok: %d skill | Pendidikan: %s [%s]\n",
     $top4['lowongan']['judul_pekerjaan'] ?? '-',
     $top4['match_score'] ?? 0,
-    $top4['matched_skills_count'] ?? 0
+    $top4['matched_skills_count'] ?? 0,
+    $top4['education_match']['label'] ?? '-',
+    $top4['education_match']['is_matched'] ? 'COCOK' : 'TIDAK COCOK'
 );
