@@ -38,6 +38,7 @@ class LowonganController extends Controller
                 'provinsi_id',
                 'regency_id',
                 'kbji_2026_id',
+                'education_level_id',
                 'tanggal_tayang',
                 'tanggal_expired_lowongan',
                 'tanggal_dibuat',
@@ -47,6 +48,7 @@ class LowonganController extends Controller
                 'kbji:id,code,title,level',
                 'province:id,name',
                 'regency:id,name',
+                'educationLevel:id,name',
                 'skills:id,title,title_en',
             ]);
 
@@ -123,6 +125,7 @@ class LowonganController extends Controller
                 'provinsi_id' => $validated['provinsi_id'] ?? null,
                 'regency_id' => $validated['regency_id'] ?? null,
                 'kbji_2026_id' => $validated['kbji_id'] ?? null,
+                'education_level_id' => $validated['education_level_id'] ?? null,
                 'tanggal_dibuat' => now(),
             ];
 
@@ -136,6 +139,7 @@ class LowonganController extends Controller
                 'kbji:id,code,title,level',
                 'province:id,name',
                 'regency:id,name',
+                'educationLevel:id,name',
                 'skills:id,title,title_en',
             ]);
 
@@ -166,6 +170,7 @@ class LowonganController extends Controller
             'kbji:id,code,title,level',
             'province:id,name',
             'regency:id,name',
+            'educationLevel:id,name',
             'skills:id,title,title_en',
         ])
         ->where('id', $idOrSlug)
@@ -216,7 +221,8 @@ class LowonganController extends Controller
             if (array_key_exists('provinsi_id', $validated)) $mappedData['provinsi_id'] = $validated['provinsi_id'];
             if (array_key_exists('regency_id', $validated)) $mappedData['regency_id'] = $validated['regency_id'];
             if (array_key_exists('kbji_id', $validated)) $mappedData['kbji_2026_id'] = $validated['kbji_id'];
-            
+            if (array_key_exists('education_level_id', $validated)) $mappedData['education_level_id'] = $validated['education_level_id'];
+
             if (array_key_exists('gaji_minimal', $validated) || array_key_exists('gaji_maksimal', $validated)) {
                 $mappedData['rentang_gaji'] = ($validated['gaji_minimal'] ?? '0') . '-' . ($validated['gaji_maksimal'] ?? '0');
             }
@@ -231,6 +237,7 @@ class LowonganController extends Controller
                 'kbji:id,code,title,level',
                 'province:id,name',
                 'regency:id,name',
+                'educationLevel:id,name',
                 'skills:id,title,title_en',
             ]);
 

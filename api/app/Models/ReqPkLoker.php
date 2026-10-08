@@ -42,6 +42,7 @@ class ReqPkLoker extends Model
         'is_mapped',
         'provinsi_id',
         'regency_id',
+        'education_level_id',
     ];
 
     protected $casts = [
@@ -71,6 +72,11 @@ class ReqPkLoker extends Model
     public function regency(): BelongsTo
     {
         return $this->belongsTo(Regency::class, 'regency_id');
+    }
+
+    public function educationLevel(): BelongsTo
+    {
+        return $this->belongsTo(EducationLevel::class, 'education_level_id');
     }
 
     public function skills()
@@ -120,6 +126,10 @@ class ReqPkLoker extends Model
 
         if (!empty($filters['regency_id'])) {
             $query->where('regency_id', $filters['regency_id']);
+        }
+
+        if (!empty($filters['education_level_id'])) {
+            $query->where('education_level_id', $filters['education_level_id']);
         }
 
         return $query;
