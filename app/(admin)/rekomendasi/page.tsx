@@ -26,7 +26,8 @@ export default function MatchingWizardPage() {
 
 function MatchingWizard() {
   const searchParams = useSearchParams();
-  const initialPencakerId = searchParams.get('pencaker_id') || '';
+  const rawParam = searchParams?.get('pencaker_id');
+  const initialPencakerId = rawParam && rawParam !== 'null' && rawParam !== 'undefined' ? rawParam : '';
 
   const [step, setStep] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -39,6 +40,13 @@ function MatchingWizard() {
   
   // States
   const [selectedPencakerId, setSelectedPencakerId] = useState<string>(initialPencakerId);
+
+  useEffect(() => {
+    const qId = searchParams?.get('pencaker_id');
+    if (qId && qId !== 'null' && qId !== 'undefined') {
+      setSelectedPencakerId(qId);
+    }
+  }, [searchParams]);
   const [selectedSeeker, setSelectedSeeker] = useState<any>(null);
   const [pencakerSkills, setPencakerSkills] = useState<any[]>([]);
   const [extractionMeta, setExtractionMeta] = useState<any>(null);
@@ -201,7 +209,7 @@ function MatchingWizard() {
 
   // Fetch full detail when selection changes
   useEffect(() => {
-    if (selectedPencakerId) {
+    if (selectedPencakerId && selectedPencakerId !== 'null' && selectedPencakerId !== 'undefined' && !isNaN(Number(selectedPencakerId))) {
       setIsLoading(true);
       getJobSeekerDetail(selectedPencakerId)
         .then(data => setSelectedSeeker(data))
@@ -273,6 +281,11 @@ function MatchingWizard() {
   };
 
   const handleMatch = async () => {
+    if (!selectedPencakerId || selectedPencakerId === 'null' || isNaN(Number(selectedPencakerId))) {
+      alert("Silakan pilih pencari kerja terlebih dahulu pada Langkah 1.");
+      setStep(1);
+      return;
+    }
     if (!jobTitleQuery.trim()) {
       alert("Silakan ketik pekerjaan yang diinginkan terlebih dahulu.");
       return;
