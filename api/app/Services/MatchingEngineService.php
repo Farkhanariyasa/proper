@@ -58,7 +58,7 @@ class MatchingEngineService
             throw new \InvalidArgumentException('Profil pencari kerja tidak ditemukan.');
         }
 
-        // Ambil lowongan yang aktif tayang
+        // Ambil lowongan dari tabel req_pk_loker
         $query = LowonganKerja::query()
             ->with([
                 'skills:id,title,title_en',
@@ -69,9 +69,9 @@ class MatchingEngineService
             ]);
 
         if (!empty($filters['status_lowongan'])) {
-            $query->where('status_lowongan', $filters['status_lowongan']);
+            $query->where('status_loker', strtolower($filters['status_lowongan']));
         } else {
-            $query->where('status_lowongan', 'Published');
+            $query->published();
         }
 
         if (!empty($filters['provinsi_id'])) {
@@ -79,10 +79,10 @@ class MatchingEngineService
         }
 
         if (!empty($filters['tipe_pekerjaan'])) {
-            $query->where('tipe_pekerjaan', $filters['tipe_pekerjaan']);
+            $query->where('tipe_pekerjaan', 'ILIKE', '%' . $filters['tipe_pekerjaan'] . '%');
         }
 
-        $vacancies = $query->get();
+        $vacancies = $query->latest('id')->take(50)->get();
         $recommendations = [];
 
         foreach ($vacancies as $job) {
@@ -239,15 +239,14 @@ class MatchingEngineService
         $seekers = $seekerQuery->get();
 
         // 2. Query Lowongan Kerja
-        $jobQuery = LowonganKerja::query()
+        $jobQuery = LowonganKerja::published()
             ->with([
                 'skills:id,title,title_en',
                 'kbji:id,code,title',
                 'educationLevel:id,name,sort_order',
                 'province:id,name',
                 'regency:id,name',
-            ])
-            ->where('status_lowongan', 'Published');
+            ]);
 
         if (!empty($filters['lowongan_id'])) {
             $jobQuery->where('id', $filters['lowongan_id']);
@@ -361,7 +360,7 @@ class MatchingEngineService
      * 4. Kesesuaian Pengalaman Kerja (10%)
      * 5. Kesesuaian Lokasi & Sistem Kerja (5%)
      */
-    public function computeCompositeMatch(JobSeeker $candidate, LowonganKerja $job): array
+    public function computeCompositeMatch(JobSeeker $candidate, object $job): array
     {
         // 1. Evaluasi Dimensi Jabatan (Role) - Bobot 35%
         $roleMatch = $this->evaluateRoleMatch($candidate, $job);
@@ -467,7 +466,7 @@ class MatchingEngineService
      * terhadap Target Okupasi, Riwayat Pekerjaan (Experience), dan Keahlian Kandidat.
      * KBJI TIDAK LAGI memengaruhi skor, hanya sebagai metadata informasional untuk UI.
      */
-    protected function evaluateRoleMatch(JobSeeker $candidate, LowonganKerja $job): array
+    protected function evaluateRoleMatch(JobSeeker $candidate, object $job): array
     {
         $jobTitle = $job->judul_lowongan ?? '';
         $jobDesc = $job->deskripsi_pekerjaan ?? '';
@@ -564,7 +563,7 @@ class MatchingEngineService
      * Mengekstrak poin-poin kompetensi profil kandidat (keahlian, sertifikasi, experience)
      * dan mencocokkannya dengan kebutuhan lowongan secara tekstual & semantik.
      */
-    protected function evaluateCompetencyMatch(JobSeeker $candidate, LowonganKerja $job): array
+    protected function evaluateCompetencyMatch(JobSeeker $candidate, object $job): array
     {
         $rawProfileText = trim(
             ($candidate->keahlian ?? '') . ' ' .
@@ -751,7 +750,7 @@ class MatchingEngineService
     /**
      * Dimensi 3: Evaluasi Kesesuaian Pendidikan & Bidang Studi (Bobot 20%)
      */
-    protected function evaluateEducationAndFieldMatch(JobSeeker $candidate, LowonganKerja $job): array
+    protected function evaluateEducationAndFieldMatch(JobSeeker $candidate, object $job): array
     {
         $eduLevelMatch = $this->evaluateEducationMatch($candidate->educationLevel, $job->educationLevel);
         $levelScore = $eduLevelMatch['score'];
@@ -787,7 +786,7 @@ class MatchingEngineService
     /**
      * Dimensi 4: Evaluasi Kesesuaian Pengalaman Kerja (Bobot 10%)
      */
-    protected function evaluateExperienceMatch(JobSeeker $candidate, LowonganKerja $job): array
+    protected function evaluateExperienceMatch(JobSeeker $candidate, object $job): array
     {
         $reqYears = $job->pengalaman_minimal_tahun ?? 0;
 
@@ -831,7 +830,7 @@ class MatchingEngineService
     /**
      * Dimensi 5: Evaluasi Kesesuaian Lokasi & Sistem Kerja (Bobot 5%)
      */
-    protected function evaluateLocationMatch(JobSeeker $candidate, LowonganKerja $job): array
+    protected function evaluateLocationMatch(JobSeeker $candidate, object $job): array
     {
         $workSystem = mb_strtolower($job->sistem_kerja ?? '');
 
@@ -916,7 +915,7 @@ class MatchingEngineService
      * Mengevaluasi kesesuaian KBJI (Klasifikasi Baku Jabatan Indonesia)
      * Sekarang bersifat SOFT COMPATIBILITY (Bukan Hard Gatekeeper)
      */
-    public function evaluateKbjiMatch(?KbjiClassification $candidateKbji, ?KbjiClassification $jobKbji): array
+    public function evaluateKbjiMatch(?object $candidateKbji, ?object $jobKbji): array
     {
         if (!$candidateKbji || !$jobKbji) {
             return [

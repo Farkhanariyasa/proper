@@ -224,7 +224,7 @@ export default function LowonganPage() {
               Daftar Lowongan Pekerjaan
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              Tabel data lowongan industri terintegrasi standar KBJI dan taksonomi keahlian ESCO.
+              Tabel data lowongan pekerjaan industri terintegrasi kualifikasi dan kebutuhan formasi.
             </p>
           </div>
 
@@ -319,9 +319,8 @@ export default function LowonganPage() {
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   <th className="py-3.5 px-4">Posisi & Perusahaan</th>
-                  <th className="py-3.5 px-4">Jabatan KBJI</th>
                   <th className="py-3.5 px-4">Wilayah & Kuota</th>
-                  <th className="py-3.5 px-4">Kualifikasi & Skill</th>
+                  <th className="py-3.5 px-4">Kualifikasi</th>
                   <th className="py-3.5 px-4">Kompensasi Gaji</th>
                   <th className="py-3.5 px-4">Batas Akhir</th>
                   <th className="py-3.5 px-4 text-center">Status</th>
@@ -331,14 +330,14 @@ export default function LowonganPage() {
               <tbody className="divide-y divide-slate-100 text-slate-800">
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="py-16 text-center text-slate-500">
+                    <td colSpan={7} className="py-16 text-center text-slate-500">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
                       <p className="text-xs sm:text-sm">Memuat daftar lowongan pekerjaan...</p>
                     </td>
                   </tr>
                 ) : vacancies.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-16 text-center text-slate-500">
+                    <td colSpan={7} className="py-16 text-center text-slate-500">
                       <Briefcase className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                       <p className="text-sm font-semibold text-slate-700">Tidak ada lowongan ditemukan</p>
                       <p className="text-xs text-slate-400 mt-1">
@@ -395,22 +394,6 @@ export default function LowonganPage() {
                           </div>
                         </td>
 
-                        {/* Jabatan KBJI */}
-                        <td className="py-3.5 px-4">
-                          {job.kbji ? (
-                            <div>
-                              <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 inline-block mb-1">
-                                {job.kbji.code}
-                              </span>
-                              <div className="text-xs text-slate-700 line-clamp-2" title={job.kbji.title}>
-                                {job.kbji.title}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-slate-400 italic">Belum diklasifikasi</span>
-                          )}
-                        </td>
-
                         {/* Wilayah & Kuota */}
                         <td className="py-3.5 px-4 whitespace-nowrap text-xs text-slate-600">
                           <div className="flex items-center gap-1 font-medium text-slate-800">
@@ -426,7 +409,7 @@ export default function LowonganPage() {
                           </div>
                         </td>
 
-                        {/* Kualifikasi & Skill ESCO */}
+                        {/* Kualifikasi & Keahlian */}
                         <td className="py-3.5 px-4 max-w-[220px]">
                           <div className="text-xs font-semibold text-slate-800 mb-1">
                             {job.education_level?.name || '-'}

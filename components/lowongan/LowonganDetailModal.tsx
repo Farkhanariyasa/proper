@@ -131,24 +131,15 @@ export default function LowonganDetailModal({
 
         {/* Modal Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs sm:text-sm">
-          {/* Klasifikasi KBJI & Kompensasi */}
+          {/* Kompensasi & Penempatan */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-3.5 rounded-lg border border-blue-100 bg-blue-50/40 space-y-1">
-              <span className="text-[11px] font-bold text-blue-900 flex items-center gap-1">
-                <Briefcase className="w-3.5 h-3.5 text-blue-700" />
-                Standar Jabatan KBJI 2026:
+            <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/60 space-y-1">
+              <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-slate-600" />
+                Lokasi Penempatan:
               </span>
               <div className="font-semibold text-slate-900">
-                {lowongan.kbji ? (
-                  <>
-                    <span className="font-mono text-blue-700 font-bold mr-1.5">
-                      [{lowongan.kbji.code}]
-                    </span>
-                    {lowongan.kbji.title}
-                  </>
-                ) : (
-                  'Belum diklasifikasikan'
-                )}
+                {lowongan.regency?.name || '-'}, {lowongan.province?.name || '-'}
               </div>
             </div>
 
@@ -246,15 +237,12 @@ export default function LowonganDetailModal({
             )}
           </div>
 
-          {/* Keahlian ESCO yang Disyaratkan */}
+          {/* Keahlian yang Disyaratkan */}
           <div>
             <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-blue-600" />
-                Spesifikasi Keahlian Standar ESCO ({lowongan.skills?.length || 0})
-              </span>
-              <span className="text-[10px] text-slate-500 font-normal lowercase">
-                digunakan untuk matching engine & gap analysis
+                Spesifikasi Keahlian Formasi ({lowongan.skills?.length || 0})
               </span>
             </h4>
 

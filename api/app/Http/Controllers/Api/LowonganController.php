@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreLowonganRequest;
 use App\Http\Requests\UpdateLowonganRequest;
 use App\Http\Resources\LowonganResource;
-use App\Models\ReqPkLoker;
+use App\Models\LowonganKerja;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,7 +22,7 @@ class LowonganController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = ReqPkLoker::query()
+        $query = LowonganKerja::query()
             ->select([
                 'id',
                 'job_id',
@@ -129,8 +129,22 @@ class LowonganController extends Controller
                 'tanggal_dibuat' => now(),
             ];
 
-            $lowongan = DB::transaction(function () use ($mappedData) {
-                $item = ReqPkLoker::create($mappedData);
+            $lowongan = DB::transaction(function () use ($mappedData, $skillsData) {
+                $item = LowonganKerja::create($mappedData);
+
+                if (!empty($skillsData)) {
+                    $insertSkills = [];
+                    foreach ($skillsData as $sk) {
+                        $insertSkills[] = [
+                            'vac_id' => $item->vac_id,
+                            'esco_skill_id' => $sk['esco_skill_id'],
+                            'tipe_keahlian' => $sk['tipe_keahlian'] ?? 'wajib',
+                            'skor' => 1.0,
+                            'metode' => 'input_manual',
+                        ];
+                    }
+                    DB::table('lowongan_skills')->insert($insertSkills);
+                }
 
                 return $item;
             });
@@ -166,7 +180,7 @@ class LowonganController extends Controller
      */
     public function show(string $idOrSlug): JsonResponse
     {
-        $lowongan = ReqPkLoker::with([
+        $lowongan = LowonganKerja::with([
             'kbji:id,code,title,level',
             'province:id,name',
             'regency:id,name',
@@ -195,7 +209,7 @@ class LowonganController extends Controller
      */
     public function update(UpdateLowonganRequest $request, string $id): JsonResponse
     {
-        $lowongan = ReqPkLoker::find($id);
+        $lowongan = LowonganKerja::find($id);
 
         if (!$lowongan) {
             return response()->json([
@@ -262,7 +276,7 @@ class LowonganController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        $lowongan = ReqPkLoker::find($id);
+        $lowongan = LowonganKerja::find($id);
 
         if (!$lowongan) {
             return response()->json([
@@ -271,7 +285,12 @@ class LowonganController extends Controller
             ], 404);
         }
 
-        $lowongan->delete();
+        DB::transaction(function () use ($lowongan) {
+            if (!empty($lowongan->vac_id)) {
+                DB::table('lowongan_skills')->where('vac_id', $lowongan->vac_id)->delete();
+            }
+            $lowongan->delete();
+        });
 
         return response()->json([
             'status' => 'success',
@@ -289,7 +308,7 @@ class LowonganController extends Controller
             'status_lowongan' => ['required', 'string'],
         ]);
 
-        $lowongan = ReqPkLoker::find($id);
+        $lowongan = LowonganKerja::find($id);
 
         if (!$lowongan) {
             return response()->json([
