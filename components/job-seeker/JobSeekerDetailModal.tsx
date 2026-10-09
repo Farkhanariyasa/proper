@@ -204,12 +204,12 @@ export default function JobSeekerDetailModal({
                 </div>
               </div>
 
-              {/* Skills ESCO */}
+              {/* Skills Profil */}
               <div className="p-4 rounded-lg bg-white border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs sm:text-sm">
                     <Briefcase className="w-4 h-4 text-[#0E385E]" />
-                    <span>Keahlian & Kompetensi ESCO</span>
+                    <span>Keahlian & Kompetensi Profil</span>
                   </div>
                   <span className="text-xs text-slate-500">
                     {data.skills?.length || 0} Keahlian Terverifikasi

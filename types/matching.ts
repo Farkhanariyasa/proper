@@ -27,6 +27,24 @@ export interface MatchClassification {
   description: string;
 }
 
+export interface ScoreBreakdown {
+  role_score: number;
+  skill_score: number;
+  education_score: number;
+  experience_score: number;
+  location_score: number;
+}
+
+export interface EducationMatchInfo {
+  is_matched: boolean;
+  score: number;
+  status: string;
+  label: string;
+  candidate_level_name?: string;
+  required_level_name?: string;
+  reason?: string;
+}
+
 export interface KbjiMatchInfo {
   is_compatible: boolean;
   match_level: 'exact' | 'unit_group' | 'sub_major' | 'different_domain' | 'unspecified';
@@ -124,6 +142,8 @@ export interface PairwiseAnalysisResponse {
   total_gap: number;
   classification: MatchClassification;
   kbji_match?: KbjiMatchInfo;
+  education_match?: EducationMatchInfo;
+  score_breakdown?: ScoreBreakdown;
   matched_skills: MatchedSkillItem[];
   gap_skills: GapSkillItem[];
 }

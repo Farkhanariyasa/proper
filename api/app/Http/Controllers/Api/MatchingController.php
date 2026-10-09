@@ -38,43 +38,17 @@ class MatchingController extends Controller
 
         try {
             // Ambil profil pencaker beserta riwayat pendidikan
-            $seeker = \App\Models\JobSeeker::with(['skills', 'educationLevel'])->find($validated['pencaker_id']);
+            $seeker = \App\Models\JobSeeker::with(['skills', 'educationLevel', 'regency.province', 'province'])->find($validated['pencaker_id']);
 
-            // 1. Filter Lowongan Awal
-            $query = \App\Models\ReqPkLoker::with(['skills', 'province', 'regency', 'kbji', 'educationLevel'])
-                        ->whereIn('status_loker', ['tayang', 'published']);
-
-            // Kualifikasi Pendidikan Wajib Memenuhi:
-            // Jangan ambil lowongan yang mensyaratkan jenjang pendidikan di atas jenjang pendidikan pencaker
-            if ($seeker?->educationLevel) {
-                $cLevel = $seeker->educationLevel->sort_order ?? $seeker->educationLevel->id;
-                $query->where(function($q) use ($cLevel) {
-                    $q->whereNull('education_level_id')
-                      ->orWhereHas('educationLevel', function($eq) use ($cLevel) {
-                          $eq->where('sort_order', '<=', $cLevel);
-                      });
-                });
+            if (!$seeker) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Profil pencari kerja tidak ditemukan.'
+                ], 404);
             }
 
-            // Pencarian berdasarkan kata kunci judul pekerjaan
-            if (!empty($keyword)) {
-                $words = array_filter(explode(' ', $keyword), function($w) {
-                    return mb_strlen(trim($w)) >= 2;
-                });
-
-                $query->where(function($q) use ($keyword, $words) {
-                    $q->where('judul_pekerjaan', 'ILIKE', '%' . $keyword . '%');
-                    foreach ($words as $word) {
-                        $q->orWhere('judul_pekerjaan', 'ILIKE', '%' . trim($word) . '%');
-                    }
-                });
-            } elseif (!empty($validated['kbji_code'])) {
-                // Fallback untuk backward-compatibility jika kbji_code dikirim
-                $baseKbji = substr((string)$validated['kbji_code'], 0, 4);
-                $query->whereHas('kbji', function($q) use ($baseKbji) {
-                    $q->where('code', 'LIKE', $baseKbji . '%');
-                });
-            }
+            // 1. Query Lowongan Kerja dari tabel req_pk_loker via model LowonganKerja (Hanya yang berstatus Published)
+            $query = \App\Models\LowonganKerja::published()->with(['skills', 'province', 'regency', 'educationLevel']);
 
             if (!empty($validated['provinsi_id'])) {
                 $query->where('provinsi_id', (string) $validated['provinsi_id']);
@@ -84,90 +58,105 @@ class MatchingController extends Controller
                 $query->where('regency_id', (string) $validated['kabkota_id']);
             }
 
-            $lowonganList = $query->get();
+            // Pencarian berdasarkan kata kunci judul/deskripsi di tabel req_pk_loker
+            if (!empty($keyword)) {
+                $words = array_filter(explode(' ', $keyword), function($w) {
+                    return mb_strlen(trim($w)) >= 2;
+                });
 
-            // Ambil skill pencaker (dari payload atau relasi pencaker)
-            $pencakerSkills = $validated['skills'] ?? [];
-            if (empty($pencakerSkills) && $seeker) {
-                $pencakerSkills = $seeker->skills->pluck('id')->toArray();
+                $query->where(function($q) use ($keyword, $words) {
+                    $q->where('judul_pekerjaan', 'ILIKE', '%' . $keyword . '%')
+                      ->orWhere('deskripsi_pekerjaan', 'ILIKE', '%' . $keyword . '%')
+                      ->orWhere('nama_perusahaan', 'ILIKE', '%' . $keyword . '%');
+                    foreach ($words as $word) {
+                        $w = trim($word);
+                        $q->orWhere('judul_pekerjaan', 'ILIKE', '%' . $w . '%')
+                          ->orWhere('deskripsi_pekerjaan', 'ILIKE', '%' . $w . '%');
+                    }
+                });
             }
 
-            // 2. Skoring / Matching
+            $lowonganList = $query->take(80)->get();
+
+            // Fallback: Jika tidak ada lowongan yang cocok kata kunci spesifik, ambil lowongan representatif berstatus Published
+            if ($lowonganList->isEmpty()) {
+                $fallbackQuery = \App\Models\LowonganKerja::published()->with(['skills', 'province', 'regency', 'educationLevel']);
+                if (!empty($validated['provinsi_id'])) {
+                    $fallbackQuery->where('provinsi_id', (string) $validated['provinsi_id']);
+                }
+                $lowonganList = $fallbackQuery->latest('id')->take(40)->get();
+            }
+
+            // 2. Skoring menggunakan Multi-Criteria Weighted Matching Engine (Bebas ID Taksonomi)
             $recommendations = [];
             $keywordLower = strtolower($keyword);
 
             foreach ($lowonganList as $lowongan) {
-                // Evaluasi kecocokan jenjang pendidikan kandidat vs syarat lowongan
-                $eduMatch = $this->matchingService->evaluateEducationMatch(
-                    $seeker?->educationLevel,
-                    $lowongan->educationLevel
-                );
+                $matchResult = $this->matchingService->computeCompositeMatch($seeker, $lowongan);
 
-                // SYARAT PENDIDIKAN MUTLAK: Jika pendidikan tidak memenuhi syarat minimal, jangan dimatch!
-                if (!$eduMatch['is_matched']) {
-                    continue;
+                // Filter pendidikan mutlak jika diaktifkan (dengan toleransi gap wajar)
+                if (!empty($validated['filter_pendidikan']) && ($matchResult['education_match']['status'] ?? '') === 'di_bawah_syarat' && !$matchResult['education_match']['is_matched']) {
+                    if (($matchResult['education_match']['score'] ?? 0) < 30) {
+                        continue;
+                    }
                 }
 
-                $lowonganSkills = $lowongan->skills->pluck('id')->toArray();
-                
-                // Hitung irisan skill yang cocok
-                $matchedSkills = array_intersect($pencakerSkills, $lowonganSkills);
-                $matchCount = count($matchedSkills);
-                $totalLowonganSkills = count($lowonganSkills);
-                if ($totalLowonganSkills > 0) {
-                    $score = round(($matchCount / $totalLowonganSkills) * 100);
-                } else {
-                    $score = 0; 
-                }
-
-                $titleLower = strtolower($lowongan->judul_pekerjaan ?? '');
+                $titleLower = strtolower($lowongan->judul_lowongan ?? '');
                 $isExactPhrase = (!empty($keywordLower) && str_contains($titleLower, $keywordLower)) ? 1 : 0;
+
+                // Lampirkan hasil skill sintesis ke objek lowongan agar dapat dirender oleh modal analisis gap di frontend
+                $displaySkills = collect($matchResult['matched_skills'] ?? [])->map(function($sk, $idx) {
+                    return (object)[
+                        'id' => is_array($sk) ? ($sk['id'] ?? (1000 + $idx)) : (1000 + $idx),
+                        'title' => is_array($sk) ? ($sk['title'] ?? '') : (string)$sk,
+                        'name' => is_array($sk) ? ($sk['title'] ?? '') : (string)$sk,
+                    ];
+                });
+                if ($lowongan->skills->isEmpty() && $displaySkills->isNotEmpty()) {
+                    $lowongan->setRelation('skills', $displaySkills);
+                }
 
                 $recommendations[] = [
                     'lowongan' => $lowongan,
-                    'match_score' => $score,
-                    'matched_skills_count' => $matchCount,
-                    'education_match' => $eduMatch,
+                    'match_score' => $matchResult['score'],
+                    'matched_skills_count' => $matchResult['total_matched'] ?? count($matchResult['matched_skills'] ?? []),
+                    'education_match' => $matchResult['education_match'],
                     'is_exact_phrase' => $isExactPhrase,
+                    'classification' => $matchResult['classification'],
+                    'matched_skills' => $matchResult['matched_skills'] ?? [],
+                    'gap_skills' => $matchResult['gap_skills'] ?? [],
+                    'score_breakdown' => $matchResult['score_breakdown'] ?? null,
                 ];
             }
 
-            // 3. Sorting (Descending berdasar match_score, kesesuaian pendidikan, matched_skills_count, kesesuaian judul) & Limit (Top 10)
+            // 3. Sorting berdasar kecocokan frase kata kunci & skor komposit matching
             usort($recommendations, function ($a, $b) {
-                // Primary: skill match score (descending)
+                // Utamakan yang mengandung frase kata kunci pencarian
+                if ($a['is_exact_phrase'] !== $b['is_exact_phrase']) {
+                    return $b['is_exact_phrase'] <=> $a['is_exact_phrase'];
+                }
+
+                // Kemudian urutkan skor matching tertinggi
                 if ($a['match_score'] !== $b['match_score']) {
                     return $b['match_score'] <=> $a['match_score'];
                 }
 
-                // Secondary: kesesuaian kualifikasi pendidikan (yang memenuhi didahulukan jika skor skill setara)
-                $aEdu = $a['education_match']['is_matched'] ? 1 : 0;
-                $bEdu = $b['education_match']['is_matched'] ? 1 : 0;
-                if ($aEdu !== $bEdu) {
-                    return $bEdu <=> $aEdu;
-                }
-                
-                // Tertiary: jumlah skill yang cocok (descending)
-                if ($a['matched_skills_count'] !== $b['matched_skills_count']) {
-                    return $b['matched_skills_count'] <=> $a['matched_skills_count'];
-                }
-
-                // Quaternary: kesesuaian frase judul pekerjaan
-                return $b['is_exact_phrase'] <=> $a['is_exact_phrase'];
+                return ($b['matched_skills_count'] ?? 0) <=> ($a['matched_skills_count'] ?? 0);
             });
             
             $topRecommendations = array_slice($recommendations, 0, 10);
-            $totalPublished = \App\Models\ReqPkLoker::whereIn('status_loker', ['tayang', 'published'])->count();
+            $totalPublished = \App\Models\LowonganKerja::published()->count();
 
             return response()->json([
                 'status' => 'success',
                 'data' => $topRecommendations,
                 'pencaker_education' => $seeker?->educationLevel?->name ?? ($seeker?->pendidikan ?? null),
-                'total_found' => count($lowonganList),
+                'total_found' => count($recommendations),
                 'total_published_available' => $totalPublished,
                 'keyword' => $keyword
             ]);
             
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Terjadi kesalahan sistem saat memproses rekomendasi lowongan.',
