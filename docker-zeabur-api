@@ -23,6 +23,9 @@ RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --opti
 # Copy application source code
 COPY api/ .
 
+# Regenerate authoritative classmap to include all new App classes
+RUN composer dump-autoload --optimize --classmap-authoritative --no-dev
+
 # Prepare storage directories and grant permissions
 RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
