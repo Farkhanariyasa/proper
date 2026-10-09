@@ -79,11 +79,6 @@ class ReqPkLoker extends Model
         return $this->belongsTo(Regency::class, 'regency_id');
     }
 
-    public function educationLevel(): BelongsTo
-    {
-        return $this->belongsTo(EducationLevel::class, 'education_level_id');
-    }
-
     public function skills()
     {
         return $this->belongsToMany(
