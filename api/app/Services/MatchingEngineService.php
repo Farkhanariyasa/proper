@@ -468,7 +468,7 @@ class MatchingEngineService
      */
     protected function evaluateRoleMatch(JobSeeker $candidate, object $job): array
     {
-        $jobTitle = $job->judul_lowongan ?? '';
+        $jobTitle = $job->judul_lowongan ?? $job->judul_pekerjaan ?? '';
         $jobDesc = $job->deskripsi_pekerjaan ?? '';
         $jobContext = mb_strtolower(trim($jobTitle . ' ' . $jobDesc));
 
@@ -572,7 +572,7 @@ class MatchingEngineService
         );
 
         $jobReqText = trim(
-            ($job->judul_lowongan ?? '') . ' ' .
+            ($job->judul_lowongan ?? $job->judul_pekerjaan ?? '') . ' ' .
             ($job->deskripsi_pekerjaan ?? '') . ' ' .
             ($job->persyaratan_tambahan ?? '')
         );
@@ -620,38 +620,62 @@ class MatchingEngineService
                         'matched_with' => $reqSkill->title,
                         'status_verifikasi' => 'Terpenuhi di CV/Profil',
                     ];
-                } else {
-                    // Cek kemiripan token kata kunci
-                    $tokens = $this->tokenizeText($skillTitle);
-                    $profileTokens = $this->tokenizeText($rawProfileText);
-                    $common = array_intersect($tokens, $profileTokens);
+                    continue;
+                }
 
-                    if (count($common) >= 1 && (count($common) / max(1, count($tokens))) >= 0.5) {
-                        $matchedSkills[] = [
-                            'id' => $reqSkill->id,
-                            'title' => $reqSkill->title,
-                            'title_en' => $reqSkill->title_en,
-                            'tipe_keahlian' => $reqSkill->pivot->tipe_keahlian ?? 'wajib',
-                            'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
-                            'match_type' => 'Padanan Kata Kunci',
-                            'matched_with' => implode(', ', $common),
-                            'status_verifikasi' => 'Terpenuhi Sebagian',
-                        ];
-                    } else {
-                        $gapSkills[] = [
-                            'id' => $reqSkill->id,
-                            'title' => $reqSkill->title,
-                            'title_en' => $reqSkill->title_en,
-                            'tipe_keahlian' => $reqSkill->pivot->tipe_keahlian ?? 'wajib',
-                            'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
-                            'status' => 'missing_gap',
-                        ];
-                    }
+                // Layer C: Cek kemiripan token kata kunci
+                $tokens = $this->tokenizeText($skillTitle);
+                $profileTokens = $this->tokenizeText($rawProfileText);
+                $common = array_intersect($tokens, $profileTokens);
+
+                if (count($common) >= 1 && (count($common) / max(1, count($tokens))) >= 0.5) {
+                    $matchedSkills[] = [
+                        'id' => $reqSkill->id,
+                        'title' => $reqSkill->title,
+                        'title_en' => $reqSkill->title_en,
+                        'tipe_keahlian' => $reqSkill->pivot->tipe_keahlian ?? 'wajib',
+                        'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
+                        'match_type' => 'Padanan Kata Kunci',
+                        'matched_with' => implode(', ', $common),
+                        'status_verifikasi' => 'Terpenuhi Sebagian',
+                    ];
+                } else {
+                    $gapSkills[] = [
+                        'id' => $reqSkill->id,
+                        'title' => $reqSkill->title,
+                        'title_en' => $reqSkill->title_en,
+                        'tipe_keahlian' => $reqSkill->pivot->tipe_keahlian ?? 'wajib',
+                        'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
+                        'status' => 'missing_gap',
+                    ];
                 }
             }
+
+            // Hitung skor berbasis pemenuhan skill terstruktur lowongan
+            $totalWeight = 0;
+            $matchedWeight = 0;
+            foreach ($matchedSkills as $m) {
+                $w = ($m['tipe_keahlian'] ?? 'wajib') === 'tambahan' ? 0.7 : 1.0;
+                $matchedWeight += $w;
+                $totalWeight += $w;
+            }
+            foreach ($gapSkills as $g) {
+                $w = ($g['tipe_keahlian'] ?? 'wajib') === 'tambahan' ? 0.7 : 1.0;
+                $totalWeight += $w;
+            }
+
+            $skillScore = $totalWeight > 0 
+                ? (int) round(($matchedWeight / $totalWeight) * 100) 
+                : 100;
+
+            return [
+                'score' => min(100, max(0, $skillScore)),
+                'matched_skills' => $matchedSkills,
+                'gap_skills' => $gapSkills,
+            ];
         }
 
-        // 2. Jika lowongan belum memiliki daftar skill terstruktur, ekstrak kata kunci kompetensi dari teks profil kandidat vs lowongan
+        // 2. Fallback: Jika lowongan belum memiliki daftar skill terstruktur, ekstrak kata kunci kompetensi dari teks profil kandidat vs lowongan
         $candidateSkillItems = $this->extractSkillsFromText($candidate->keahlian ?? '');
         if (!empty($candidate->sertifikasi)) {
             $candidateSkillItems = array_merge($candidateSkillItems, $this->extractSkillsFromText($candidate->sertifikasi));
@@ -707,7 +731,9 @@ class MatchingEngineService
         // 3. Ekstraksi potensi gap skills dari kata kunci penting lowongan jika gap_skills masih kosong
         if (empty($gapSkills) && count($matchedSkills) < 6) {
             $importantJobKeywords = array_filter($jobReqTokens, function($t) use ($profileTokens) {
-                return mb_strlen($t) >= 4 && !in_array($t, $profileTokens);
+                return mb_strlen($t) >= 4 
+                    && !in_array($t, $profileTokens) 
+                    && !in_array($t, $this->stopWords);
             });
 
             $gapDummyId = 20000;
