@@ -50,7 +50,7 @@ class MatchingEngineService
         // 2. Customer Service & Pelayanan Pelanggan
         ['customer service', 'layanan pelanggan', 'pelayanan pelanggan', 'client relation', 'customer relationship', 'crm', 'umpan balik pelanggan', 'kepuasan pelanggan', 'keluhan pelanggan', 'call center', 'helpdesk', 'contact center', 'client care', 'layanan purna jual'],
         // 3. Komunikasi Bisnis & Public Relations
-        ['komunikasi efektif', 'effective communication', 'interpersonal skills', 'negosiasi bisnis', 'business negotiation', 'lobi', 'komunikatif', 'diplomasi', 'hubungan masyarakat', 'public relations'],
+        ['komunikasi bisnis', 'business communication', 'komunikasi efektif', 'effective communication', 'client communication', 'customer communication', 'komunikasi pelanggan', 'communicate with customers', 'communicate with clients', 'interpersonal skills', 'negosiasi bisnis', 'business negotiation', 'lobi', 'komunikatif', 'diplomasi', 'hubungan masyarakat', 'public relations'],
         // 4. Administrasi & Tata Kelola Dokumen
         ['administrasi', 'administration', 'admin perkantoran', 'filing dokumen', 'arsip', 'data entry', 'tata kelola dokumen', 'pembukuan kantor', 'surat menyurat', 'clerical', 'kesekretariatan', 'rekapitulasi data', 'notulensi rapat'],
         // 5. Aplikasi Komputer & Microsoft Office Perkantoran
@@ -68,11 +68,11 @@ class MatchingEngineService
         // 11. IT Support & Helpdesk
         ['it support', 'helpdesk it', 'troubleshooting komputer', 'instalasi software', 'hardware pc', 'perawatan komputer', 'teknisi komputer', 'jaringan lan', 'printer sharing'],
         // 12. Software Engineering & Web Development
-        ['software development', 'rekayasa perangkat lunak', 'pemrograman', 'developer', 'coding', 'web development', 'frontend developer', 'backend developer', 'fullstack developer', 'laravel', 'react js', 'vue js', 'next js', 'node js', 'api integration', 'restful api'],
+        ['software development', 'rekayasa perangkat lunak', 'pemrograman', 'developer', 'coding', 'web development', 'frontend developer', 'backend developer', 'fullstack developer', 'laravel', 'react js', 'vue js', 'next js', 'node js', 'api integration', 'restful api', 'rest api', 'restful apis', 'microservices', 'microservices architecture', 'apis'],
         // 13. Mobile App Development
         ['mobile app development', 'aplikasi mobile', 'flutter developer', 'react native', 'android developer', 'ios developer', 'kotlin', 'swift'],
         // 14. Database Management & SQL
-        ['database management', 'manajemen database', 'sql query', 'mysql', 'postgresql', 'sql server', 'database administrator', 'dba', 'relational database'],
+        ['database management', 'manajemen database', 'sql query', 'mysql', 'postgresql', 'sql server', 'database administrator', 'dba', 'relational database', 'database administration', 'sql performance tuning', 'sql tuning', 'sql', 'optimasi database', 'administrasi database'],
         // 15. DevOps & Cloud Infrastructure
         ['devops', 'cloud computing', 'aws cloud', 'google cloud', 'azure cloud', 'docker container', 'kubernetes', 'ci cd pipeline', 'linux server', 'server administration'],
         // 16. Cybersecurity & Keamanan Informasi
@@ -140,7 +140,7 @@ class MatchingEngineService
         // 47. Pendidikan, Guru & Instruktur Pelatihan
         ['tenaga pendidik', 'pengajar', 'guru', 'tutor belajar', 'instruktur pelatihan', 'pedagogi', 'kurikulum pembelajaran', 'metode pengajaran', 'penyusunan silabus', 'kegiatan belajar mengajar'],
         // 48. Legal Corporate & Drafting Kontrak
-        ['legal corporate', 'staf hukum', 'drafting kontrak', 'perjanjian kerja sama', 'kepatuhan hukum', 'legal compliance', 'perizinan usaha', 'oss rba', 'litigasi', 'konsultasi hukum'],
+        ['legal corporate', 'staf hukum', 'drafting kontrak', 'perjanjian kerja sama', 'kepatuhan hukum', 'legal compliance', 'perizinan usaha', 'oss rba', 'litigasi', 'konsultasi hukum', 'legal drafting', 'review kontrak', 'commercial contracts', 'contracts and agreements', 'kontrak bisnis', 'perjanjian bisnis', 'review agreement', 'commercial agreements'],
         // 49. Procurement, Purchasing & Manajemen Vendor
         ['pengadaan barang', 'procurement', 'purchasing officer', 'pembelian material', 'manajemen vendor', 'sourcing supplier', 'purchase order', 'negosiasi harga supplier'],
         // 50. Bahasa Asing & Penerjemahan
@@ -151,6 +151,10 @@ class MatchingEngineService
         ['pengemudi', 'sopir profesional', 'driver logistik', 'sim b1', 'sim b2', 'safety driving', 'pengantaran barang', 'navigasi rute'],
         // 53. Kasir, Teller Toko & Point of Sales (POS)
         ['kasir', 'cashier', 'mesin kasir', 'sistem pos', 'point of sales', 'transaksi kasir', 'pembayaran kasir', 'hitung uang kas', 'closing kasir', 'operasional kasir'],
+        // 54. Teknologi Informasi & Komputer Umum (General IT & Technologies)
+        ['teknologi informasi', 'information technology', 'ti', 'it', 'technologies', 'technology', 'bidang teknologi', 'sistem komputer', 'komputer'],
+        // 55. Pemantauan & Analisis Tren Teknologi (Technology Trends, Cloud, AI, IoT)
+        ['tren teknologi', 'analisis tren teknologi', 'pemantauan tren teknologi', 'memantau tren teknologi', 'mengikuti perkembangan teknologi', 'technical trend', 'technology trend', 'technical trends', 'technology trends', 'tech trends', 'cloud ai iot', 'adopsi teknologi', 'perkembangan teknologi', 'evaluasi teknologi'],
     ];
 
     /**
@@ -1005,6 +1009,73 @@ class MatchingEngineService
         // 2. Cek Padanan Melalui Klaster Sinonim & Konsep Industri
         $targetTokens = $this->tokenizeText($targetLower . ' ' . $targetEnLower);
 
+        // 2a. Evaluasi Konsep Dwibahasa Sistemik (Bilingual Canonical Concepts)
+        $canonTarget = $this->canonicalizeBilingualConcept($targetLower . ' ' . $targetEnLower);
+        if (!empty($canonTarget)) {
+            $targetCanonCount = count($canonTarget);
+
+            foreach ($candidateSkillItems as $cSkill) {
+                $canonCand = $this->canonicalizeBilingualConcept($cSkill);
+                if (!empty($canonCand)) {
+                    $commonCanon = array_values(array_intersect($canonTarget, $canonCand));
+                    $canonMatchCount = count($commonCanon);
+
+                    // Kasus 1: Target tunggal 1 konsep utama (misal: "Technologies" -> ["teknologi"] vs "Teknologi Informasi" -> ["teknologi", "informasi"])
+                    if ($targetCanonCount === 1 && $canonMatchCount === 1) {
+                        return [
+                            'matched' => true,
+                            'type' => 'Padanan Konsep & Sinonim',
+                            'matched_with' => $cSkill,
+                            'status_verifikasi' => 'Sesuai Konsep Dwibahasa',
+                        ];
+                    }
+
+                    // Kasus 2: Multi-konsep (misal: "Business Development" -> ["bisnis", "kembang"] vs "Pengembangan Bisnis" -> ["kembang", "bisnis"])
+                    // Wajib minimal 2 konsep substantif cocok DAN rasio >= 50%
+                    if ($canonMatchCount >= 2) {
+                        $ratio = $canonMatchCount / max(1, $targetCanonCount);
+                        if ($ratio >= 0.50 || ($canonMatchCount / count($canonCand)) >= 0.50) {
+                            return [
+                                'matched' => true,
+                                'type' => 'Padanan Konsep & Sinonim',
+                                'matched_with' => $cSkill,
+                                'status_verifikasi' => 'Sesuai Konsep Dwibahasa',
+                            ];
+                        }
+                    }
+                }
+            }
+
+            // Kasus 3: Cakupan Gabungan Antar-Keahlian Kandidat (Collective Skill Coverage)
+            // Jika requirement mencakup gabungan 2 konsep (misal: "Warehouse & Inventory", "Vendor & Purchasing")
+            // dan kandidat memiliki masing-masing keahlian secara terpisah di profilnya
+            if ($targetCanonCount >= 2) {
+                $allCandidateCanon = [];
+                $matchingSkillNames = [];
+                foreach ($candidateSkillItems as $cSkill) {
+                    $cCanon = $this->canonicalizeBilingualConcept($cSkill);
+                    if (!empty($cCanon)) {
+                        $intersect = array_intersect($canonTarget, $cCanon);
+                        if (!empty($intersect)) {
+                            $allCandidateCanon = array_merge($allCandidateCanon, $intersect);
+                            $matchingSkillNames[] = $cSkill;
+                        }
+                    }
+                }
+                $allCandidateCanon = array_values(array_unique($allCandidateCanon));
+                $collectiveCommon = array_values(array_intersect($canonTarget, $allCandidateCanon));
+
+                if (count($collectiveCommon) >= 2 && (count($collectiveCommon) / $targetCanonCount) >= 0.50) {
+                    return [
+                        'matched' => true,
+                        'type' => 'Padanan Konsep & Sinonim',
+                        'matched_with' => implode(' + ', array_unique($matchingSkillNames)),
+                        'status_verifikasi' => 'Sesuai Kombinasi Keahlian Profil',
+                    ];
+                }
+            }
+        }
+
         foreach ($this->skillSynonymClusters as $cluster) {
             $matchesTargetCluster = false;
             foreach ($cluster as $syn) {
@@ -1019,6 +1090,15 @@ class MatchingEngineService
                     if (preg_match('/\b' . preg_quote($synLower, '/') . '\b/iu', $targetLower) || in_array($synLower, $targetTokens)) {
                         $matchesTargetCluster = true;
                         break;
+                    }
+                    // Dukung kecocokan frasa konsep jika diselingi kata sifat (misal: "communicate with major customers" mencakup "communicate with customers")
+                    $synSubstantives = array_values(array_filter($this->tokenizeText($synLower), fn($t) => mb_strlen($t) >= 4 && !in_array($t, $this->stopWords)));
+                    if (count($synSubstantives) >= 2) {
+                        $commonSyn = array_intersect($synSubstantives, $targetTokens);
+                        if (count($commonSyn) === count($synSubstantives)) {
+                            $matchesTargetCluster = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -1186,16 +1266,30 @@ class MatchingEngineService
         $reqs = [];
         $seen = [];
 
-        // Kata/frasa non-skill yang wajib diabaikan
+        // Kata/frasa non-skill & judul bagian (headings) yang wajib diabaikan
         $ignorePatterns = [
+            // Headings English
+            'responsibilities', 'responsibility', 'key responsibilities', 'job responsibilities',
+            'roles & responsibilities', 'roles and responsibilities', 'duties & responsibilities',
+            'duties and responsibilities', 'main duties', 'requirements', 'job requirements',
+            'qualifications', 'job qualifications', 'minimum qualifications', 'preferred qualifications',
+            'skills & qualifications', 'skills and qualifications', 'what you will do', 'what you\'ll do',
+            'who you are', 'about the role', 'about the job', 'job description', 'job summary',
+            'job overview', 'overview', 'key accountabilities', 'scope of work',
+
+            // Headings Indonesia
+            'tanggung jawab', 'tugas dan tanggung jawab', 'tugas pokok', 'tugas utama', 'uraian tugas',
+            'tugas', 'kualifikasi', 'persyaratan', 'kriteria', 'ringkasan', 'deskripsi pekerjaan',
+            'ruang lingkup', 'tentang pekerjaan', 'gambaran pekerjaan', 'jobdesk', 'job desk',
+
+            // Syarat Administratif & Ketentuan Kerja
             'siap ditempatkan', 'bersedia ditempatkan', 'area proyek', 'perjalanan dinas',
             'bersedia dinas', 'bersedia lembur', 'bersedia shift', 'bekerja shift',
             'pria', 'wanita', 'laki-laki', 'perempuan', 'usia maksimal', 'usia minimal',
             'pendidikan minimal', 'tamatan minimal', 'lulusan minimal', 'gaji', 'upah',
             'kirim berkas', 'kirim cv', 'surat lamaran', 'portofolio', 'benefit', 'tunjangan',
-            'kualifikasi', 'persyaratan', 'deskripsi pekerjaan', 'tugas dan tanggung jawab',
-            'tugas', 'tanggung jawab', 'kriteria', 'ringkasan', 'front office berperan krusial',
-            'perusahaan kami', 'tentang kami', 'lowongan ini'
+            'front office berperan krusial', 'perusahaan kami', 'tentang kami', 'lowongan ini',
+            'apply now', 'send your cv'
         ];
 
         // Kata tunggal umum yang DILARANG menjadi requirement mandiri
@@ -1217,10 +1311,38 @@ class MatchingEngineService
                 continue;
             }
 
+            // 1. Cek apakah baris ini judul bagian / heading (misal: "Responsibilities :", "Job Description:", "Persyaratan:")
+            $strippedColon = trim(rtrim($cleanedLine, ":- \t\n\r"));
+            $strippedLower = mb_strtolower($strippedColon);
+            $colonWordCount = count(preg_split('/\s+/u', $strippedColon));
+
+            // Jika baris berakhiran titik dua (:) dan relatif pendek (<= 6 kata), ini pasti heading sub-judul
+            if (preg_match('/:\s*$/u', $cleanedLine) && $colonWordCount <= 6) {
+                continue;
+            }
+
+            // Jika teksnya murni judul header kualifikasi / deskripsi
+            $knownHeadingTitles = [
+                'responsibilities', 'responsibility', 'key responsibilities', 'job responsibilities',
+                'roles and responsibilities', 'roles & responsibilities', 'duties and responsibilities',
+                'duties & responsibilities', 'main duties', 'requirements', 'job requirements',
+                'minimum requirements', 'qualifications', 'job qualifications', 'minimum qualifications',
+                'preferred qualifications', 'skills & qualifications', 'skills and qualifications',
+                'what you will do', 'what you will be doing', 'what you\'ll do', 'who you are',
+                'about the role', 'about the job', 'about us', 'about the company', 'job description',
+                'job summary', 'overview', 'job overview', 'scope of work', 'key accountabilities',
+                'tanggung jawab', 'tugas dan tanggung jawab', 'tugas utama', 'tugas pokok', 'uraian tugas',
+                'tugas', 'kualifikasi', 'persyaratan', 'kriteria', 'ringkasan', 'deskripsi pekerjaan',
+                'gambaran pekerjaan', 'ruang lingkup pekerjaan', 'jobdesk', 'job desk'
+            ];
+            if (in_array($strippedLower, $knownHeadingTitles)) {
+                continue;
+            }
+
             // Cek apakah baris ini instruksi administratif atau deskripsi umum perusahaan
             $isIgnored = false;
             foreach ($ignorePatterns as $pattern) {
-                if (str_starts_with($lower, $pattern) || str_contains($lower, $pattern . ':') || $lower === $pattern) {
+                if (str_starts_with($lower, $pattern) || str_contains($lower, $pattern . ':') || $lower === $pattern || str_starts_with($strippedLower, $pattern)) {
                     $isIgnored = true;
                     break;
                 }
@@ -1448,28 +1570,45 @@ class MatchingEngineService
             '/^(wajib\s+|harus\s+|bersedia\s+)/ui',
 
             // Pola Bahasa Inggris (English Prefixes)
+            '/^(regularly\s+|actively\s+|routinely\s+|frequently\s+|periodically\s+|consistently\s+|effectively\s+|efficiently\s+|closely\s+|continuously\s+|diligently\s+|promptly\s+|strictly\s+|accurately\s+|professionally\s+|proactively\s+|successfully\s+|independently\s+|directly\s+|seamlessly\s+|properly\s+)/ui',
+            '/^(secara\s+(rutin|berkala|aktif|intensif|efektif|efisien|konsisten|mandiri|profesional|akurat|langsung|tepat)\s+)/ui',
+            '/^(prepare\s+|preparing\s+|handle\s+|handling\s+|manage\s+|managing\s+|coordinate\s+|coordinating\s+|collaborate\s+(with)?\s*|collaborating\s+(with)?\s*|optimize\s+|optimizing\s+|monitor\s+|monitoring\s+|ensure\s+|ensuring\s+|adhere\s+(to)?\s*|maintain\s+|maintaining\s+)/ui',
+            '/^(drive\s+|driving\s+|lead\s+(?!generation)|leading\s+|oversee\s+|overseeing\s+|supervise\s+|supervising\s+|support\s+|supporting\s+|provide\s+|providing\s+|build\s+|building\s+|create\s+|creating\s+|develop\s+|developing\s+|design\s+(and\s+develop)?\s*|designing\s+|draft\s+(and\s+review)?\s*|drafting\s+|review\s+|reviewing\s+|implement\s+|implementing\s+|execute\s+|executing\s+|deliver\s+|delivering\s+|evaluate\s+|evaluating\s+|facilitate\s+|facilitating\s+|conduct\s+|conducting\s+|track\s+|tracking\s+|analyze\s+|analyzing\s+)/ui',
+            '/^(menyiapkan\s+|membuat\s+|mengelola\s+|mengkoordinasikan\s+|mengoptimalkan\s+|memantau\s+|memonitor\s+|mematuhi\s+|menjaga\s+|memimpin\s+|mengawasi\s+|mendukung\s+|membantu\s+|merancang\s+|mengembangkan\s+|membangun\s+|menyusun\s+|meninjau\s+|menerapkan\s+|mengeksekusi\s+|memberikan\s+|memfasilitasi\s+|menganalisis\s+|mengevaluasi\s+)/ui',
             '/^(based\s+on\s+.*?\s+(for|in|to)\s+|based\s+on\s+)/ui',
             '/^(stay\s+informed\s+(about|on)\s+|keep\s+updated\s+(about|on)\s+)/ui',
             '/^(responsible\s+for\s+(managing|handling|overseeing|leading|executing|performing)?\s*)/ui',
             '/^(proven\s+experience\s+(in|as|with)?\s*|hands-on\s+experience\s+(in|with)?\s*|experience\s+(in|as|with)?\s*)/ui',
-            '/^(ability\s+to\s+(perform|execute|handle|manage|work|lead|deliver)?\s*|able\s+to\s+)/ui',
+            '/^(be\s+able\s+to\s+(follow|keep\s+up\s+with|monitor|track|understand|adopt|perform|execute|handle|manage|work|lead|deliver)?\s*|ability\s+to\s+(perform|execute|handle|manage|work|lead|deliver)?\s*|able\s+to\s+)/ui',
+            '/^(follow\s+(the\s+)?|tracking\s+(the\s+)?|monitoring\s+(the\s+)?)/ui',
             '/^(proficient\s+(in|with)\s+|expert\s+in\s+|skilled\s+in\s+)/ui',
             '/^(strong\s+knowledge\s+of\s+|good\s+knowledge\s+of\s+|in-depth\s+knowledge\s+of\s+|deep\s+understanding\s+of\s+|understanding\s+of\s+)/ui',
             '/^(must\s+have\s+(strong|solid|proven)?\s*|should\s+have\s+(strong|solid|proven)?\s*|must\s+possess\s+|possess\s+)/ui',
-            '/^(ensure\s+(compliance|accuracy|delivery|smooth)?\s*(with|of)?\s*)/ui',
             '/^(performing\s+|executing\s+|conducting\s+|overseeing\s+)/ui',
-            '/^(perform\s+|execute\s+|conduct\s+|manage\s+|oversee\s+|handle\s+|assist\s+in\s+)/ui',
+            '/^(perform\s+|execute\s+|conduct\s+|oversee\s+|assist\s+(in|with)?\s*)/ui',
             '/^(familiar\s+with\s+|familiarity\s+with\s+|knowledge\s+of\s+)/ui',
             '/^(demonstrated\s+skills\s+in\s+|skills\s+in\s+)/ui',
+            '/^(the\s+|an?\s+)/ui',
         ];
-        foreach ($prefixPatterns as $p) {
-            $clean = preg_replace($p, '', $clean);
+        for ($pass = 0; $pass < 3; $pass++) {
+            $prevClean = $clean;
+            foreach ($prefixPatterns as $p) {
+                $clean = preg_replace($p, '', $clean);
+            }
+            if ($clean === $prevClean) {
+                break;
+            }
         }
 
         // 2. Tangani tanda kurung terlebih dahulu sebelum suffix pattern memotongnya
         $clean = preg_replace_callback('/\(([^)]+)\)/u', function($m) {
             $inside = trim($m[1]);
             $insideLower = mb_strtolower($inside);
+
+            // Buang catatan lokasi, waktu, media, atau shift kerja
+            if (preg_match('/(on-site|remote|remotely|wfh|wfo|hybrid|online|offline|daring|luring|shift|daily|weekly|monthly|24\/7|call|email|telepon)/ui', $inside)) {
+                return '';
+            }
             if (str_contains($insideLower, 'sistem alur kerja') || str_contains($insideLower, 'workflow system') || str_contains($insideLower, 'aturan internal') || str_contains($insideLower, 'internal company') || mb_strlen($inside) > 40) {
                 if (preg_match('/(pemeriksaan dokumen|inspeksi dokumen|audit dokumen|document inspection|document audit)/ui', $inside, $subMatch)) {
                     return '& ' . ucwords($subMatch[1]);
@@ -1487,6 +1626,15 @@ class MatchingEngineService
 
         // 3. Pangkas keterangan konteks internal/eksternal perusahaan di belakang (ID & EN)
         $suffixPatterns = [
+            // Keterangan standar teknis / regulasi di belakang
+            '/\s*(in\s+accordance\s+with|according\s+to)\s+(ifrs|gaap|psak|iso|sop|standard).*$/ui',
+            '/\s*sesuai\s+(dengan\s+)?(standar|pedoman|aturan|ifrs|psak|iso).*$/ui',
+            // Keterangan tim atau lingkup
+            '/\s*with\s+(global|local|internal|external|cross-functional)\s+teams?.*$/ui',
+            '/\s*(melalui|through)\s+(fifo|lifo|metode|sistem|stock\s+counts?).*$/ui',
+            '/\s*to\s+(prevent|avoid|minimize|eliminate)\s+.*$/ui',
+            '/\s*in\s+(plant|factory|office|warehouse)\s+environment.*$/ui',
+
             // Suffix Indonesia
             '/\s*(menggunakan|melalui)\s+sistem\s+alur\s+kerja\s+internal\s*.*$/ui',
             '/\s*sesuai\s+(dengan\s+)?(aturan|kebijakan|standar|prosedur|sop)\s+internal\s+perusahaan.*$/ui',
@@ -1520,6 +1668,10 @@ class MatchingEngineService
             '/\s*(is\s+a\s+)?(plus|bonus|an\s+advantage|preferred)\s*$/ui',
             '/\s+in\s+a\s+timely\s+(and\s+professional\s+)?manner\s*$/ui',
             '/\s*(with\s+)?high\s+accuracy\s*$/ui',
+            '/\s*for\s+brand\s+awareness.*$/ui',
+            '/\s*with\s+business\s+partners?.*$/ui',
+            '/\s*in\s+(a\s+)?fast-paced\s+market.*$/ui',
+            '/\s*,?\s+etc\.?\s*$/ui',
         ];
         foreach ($suffixPatterns as $s) {
             $clean = preg_replace($s, '', $clean);
@@ -1977,5 +2129,180 @@ class MatchingEngineService
         }
 
         return array_values(array_unique($skills));
+    }
+
+    /**
+     * Lemmatisasi & Normalisasi Semantik Dwibahasa (ID <-> EN)
+     * Menjembatani ribuan padanan istilah teknis/profesional lintas bahasa secara sistemik tanpa false positive
+     */
+    public function canonicalizeBilingualConcept(string $text): array
+    {
+        $tokens = $this->tokenizeText($text);
+        if (empty($tokens)) return [];
+
+        static $dict = [
+            // Tech, IT & Digital
+            'technology' => 'teknologi', 'technologies' => 'teknologi', 'teknologi' => 'teknologi',
+            'technical' => 'teknis', 'technics' => 'teknis', 'teknis' => 'teknis',
+            'trend' => 'tren', 'trends' => 'tren', 'tren' => 'tren',
+            'system' => 'sistem', 'systems' => 'sistem', 'sistem' => 'sistem',
+            'network' => 'jaringan', 'networking' => 'jaringan', 'jaringan' => 'jaringan',
+            'development' => 'kembang', 'developer' => 'developer', 'developing' => 'kembang', 'pengembangan' => 'kembang',
+            'programming' => 'program', 'programmer' => 'program', 'pemrograman' => 'program',
+            'software' => 'software', 'hardware' => 'hardware', 'database' => 'database',
+            'application' => 'aplikasi', 'applications' => 'aplikasi', 'aplikasi' => 'aplikasi',
+            'security' => 'keamanan', 'keamanan' => 'keamanan', 'cyber' => 'siber', 'siber' => 'siber',
+            'solution' => 'solusi', 'solutions' => 'solusi', 'solusi' => 'solusi',
+            'api' => 'api', 'apis' => 'api', 'rest' => 'api', 'restful' => 'api',
+            'microservice' => 'arsitektur', 'microservices' => 'arsitektur',
+            'frontend' => 'frontend', 'backend' => 'backend', 'fullstack' => 'fullstack',
+            'data' => 'data', 'intelligence' => 'intelijen', 'bi' => 'intelijen',
+            'sql' => 'sql', 'cloud' => 'cloud', 'devops' => 'devops',
+            'framework' => 'framework', 'query' => 'query', 'tuning' => 'optimasi',
+
+            // Business & Management
+            'business' => 'bisnis', 'bisnis' => 'bisnis',
+            'management' => 'manajemen', 'managing' => 'manajemen', 'manajemen' => 'manajemen',
+            'managerial' => 'manajerial', 'manajerial' => 'manajerial',
+            'project' => 'proyek', 'projects' => 'proyek', 'proyek' => 'proyek',
+            'operation' => 'operasi', 'operations' => 'operasi', 'operational' => 'operasi', 'operasional' => 'operasi',
+            'administration' => 'administrasi', 'administrative' => 'administrasi', 'administrasi' => 'administrasi',
+            'strategy' => 'strategi', 'strategic' => 'strategi', 'strategis' => 'strategi', 'strategi' => 'strategi',
+            'planning' => 'rencana', 'plan' => 'rencana', 'perencanaan' => 'rencana',
+            'analysis' => 'analisis', 'analytics' => 'analisis', 'analyst' => 'analisis', 'analisis' => 'analisis', 'analis' => 'analisis',
+            'coordination' => 'koordinasi', 'coordinator' => 'koordinasi', 'koordinasi' => 'koordinasi',
+            'supervision' => 'awasi', 'supervisor' => 'supervisor', 'pengawasan' => 'awasi',
+            'leadership' => 'pimpin', 'kepemimpinan' => 'pimpin',
+            'communication' => 'komunikasi', 'communicative' => 'komunikasi', 'communicate' => 'komunikasi', 'communicating' => 'komunikasi', 'komunikasi' => 'komunikasi',
+            'negotiation' => 'negosiasi', 'negotiating' => 'negosiasi', 'negotiate' => 'negosiasi', 'negosiasi' => 'negosiasi',
+            'presentation' => 'presentasi', 'presenting' => 'presentasi', 'present' => 'presentasi', 'presentasi' => 'presentasi',
+            'coordination' => 'koordinasi', 'coordinating' => 'koordinasi', 'coordinate' => 'koordinasi', 'koordinasi' => 'koordinasi',
+            'collaboration' => 'kolaborasi', 'collaborating' => 'kolaborasi', 'collaborate' => 'kolaborasi', 'teamwork' => 'tim', 'kerjasama' => 'tim',
+            'document' => 'dokumen', 'documentation' => 'dokumen', 'documents' => 'dokumen', 'dokumen' => 'dokumen',
+            'filing' => 'arsip', 'archive' => 'arsip', 'pengarsipan' => 'arsip', 'arsip' => 'arsip',
+
+            // Sales, Marketing & Customer Relations
+            'sales' => 'jual', 'selling' => 'jual', 'penjualan' => 'jual',
+            'marketing' => 'pasar', 'pemasaran' => 'pasar',
+            'customer' => 'pelanggan', 'client' => 'pelanggan', 'clients' => 'pelanggan', 'pelanggan' => 'pelanggan', 'konsumen' => 'pelanggan', 'klien' => 'pelanggan',
+            'relationship' => 'relasi', 'relation' => 'relasi', 'relations' => 'relasi', 'hubungan' => 'relasi', 'relasi' => 'relasi',
+            'service' => 'layani', 'services' => 'layani', 'pelayanan' => 'layani', 'layanan' => 'layani',
+            'support' => 'dukung', 'dukungan' => 'dukung',
+            'b2b' => 'bisnis', 'b2c' => 'pelanggan', 'crm' => 'pelanggan',
+            'acquisition' => 'akuisisi', 'akuisisi' => 'akuisisi',
+            'retention' => 'retensi', 'retensi' => 'retensi',
+            'lead' => 'prospek', 'leads' => 'prospek', 'prospek' => 'prospek',
+            'account' => 'akun', 'brand' => 'merek', 'branding' => 'merek', 'merek' => 'merek',
+            'campaign' => 'kampanye', 'campaigns' => 'kampanye', 'kampanye' => 'kampanye',
+            'growth' => 'kembang',
+
+            // Finance, Accounting & Tax
+            'finance' => 'keuangan', 'financial' => 'keuangan', 'keuangan' => 'keuangan',
+            'accounting' => 'akuntansi', 'accountant' => 'akuntansi', 'akuntansi' => 'akuntansi', 'pembukuan' => 'akuntansi',
+            'budget' => 'anggaran', 'budgeting' => 'anggaran', 'anggaran' => 'anggaran',
+            'tax' => 'pajak', 'taxation' => 'pajak', 'pajak' => 'pajak', 'pph' => 'pajak', 'ppn' => 'pajak', 'vat' => 'pajak',
+            'audit' => 'audit', 'auditing' => 'audit',
+            'forecast' => 'rencana', 'forecasting' => 'rencana', 'proyeksi' => 'rencana',
+            'payable' => 'utang', 'receivable' => 'piutang',
+            'reconciliation' => 'rekonsiliasi', 'rekonsiliasi' => 'rekonsiliasi',
+            'payroll' => 'gaji', 'gaji' => 'gaji',
+
+            // Logistics, Warehouse & Procurement
+            'warehouse' => 'gudang', 'warehousing' => 'gudang', 'gudang' => 'gudang', 'pergudangan' => 'gudang',
+            'inventory' => 'inventaris', 'inventaris' => 'inventaris', 'stok' => 'inventaris', 'stock' => 'inventaris',
+            'logistics' => 'logistik', 'logistik' => 'logistik',
+            'distribution' => 'distribusi', 'distribusi' => 'distribusi',
+            'procurement' => 'pengadaan', 'pengadaan' => 'pengadaan',
+            'purchasing' => 'pengadaan', 'pembelian' => 'pengadaan', 'sourcing' => 'pengadaan', 'beli' => 'pengadaan',
+            'supply' => 'rantai_pasok', 'chain' => 'rantai_pasok',
+            'customs' => 'pabean', 'kepabeanan' => 'pabean',
+            'import' => 'impor', 'export' => 'ekspor', 'impor' => 'impor', 'ekspor' => 'ekspor',
+
+            // Engineering, Machine & Quality
+            'engineering' => 'teknik', 'engineer' => 'teknik', 'teknik' => 'teknik',
+            'machine' => 'mesin', 'machinery' => 'mesin', 'mesin' => 'mesin',
+            'maintenance' => 'rawat', 'pemeliharaan' => 'rawat', 'perawatan' => 'rawat',
+            'repair' => 'perbaiki', 'perbaikan' => 'perbaiki',
+            'installation' => 'pasang', 'instalasi' => 'pasang',
+            'quality' => 'mutu', 'kualitas' => 'mutu', 'mutu' => 'mutu',
+            'assurance' => 'jamin', 'penjaminan' => 'jamin',
+            'control' => 'kontrol', 'pengendalian' => 'kontrol', 'kontrol' => 'kontrol',
+            'troubleshooting' => 'solusi', 'troubleshoot' => 'solusi',
+            'preventive' => 'cegah', 'pencegahan' => 'cegah',
+
+            // Office & Administration
+            'office' => 'kantor', 'kantor' => 'kantor',
+            'facility' => 'fasilitas', 'facilities' => 'fasilitas', 'fasilitas' => 'fasilitas',
+
+            // Stakeholders, Vendors, Optimization, Reports, Safety
+            'stakeholder' => 'pemangku', 'stakeholders' => 'pemangku', 'pemangku' => 'pemangku',
+            'vendor' => 'vendor', 'vendors' => 'vendor', 'supplier' => 'vendor', 'suppliers' => 'vendor', 'pemasok' => 'vendor',
+            'process' => 'proses', 'processes' => 'proses', 'proses' => 'proses',
+            'optimize' => 'optimasi', 'optimizing' => 'optimasi', 'optimization' => 'optimasi', 'optimasi' => 'optimasi',
+            'report' => 'laporan', 'reports' => 'laporan', 'reporting' => 'laporan', 'laporan' => 'laporan',
+            'schedule' => 'jadwal', 'schedules' => 'jadwal', 'penjadwalan' => 'jadwal', 'jadwal' => 'jadwal',
+            'protocol' => 'protokol', 'protocols' => 'protokol', 'protokol' => 'protokol',
+            'safety' => 'k3', 'k3' => 'k3', 'hse' => 'k3',
+            'contract' => 'kontrak', 'contracts' => 'kontrak', 'kontrak' => 'kontrak', 'agreement' => 'kontrak', 'perjanjian' => 'kontrak',
+            'drafting' => 'susun',
+            'inquiry' => 'layani', 'inquiries' => 'layani',
+            'complaint' => 'keluhan', 'complaints' => 'keluhan', 'keluhan' => 'keluhan',
+            'recovery' => 'pulih',
+            'reception' => 'resepsionis', 'receptionist' => 'resepsionis', 'resepsionis' => 'resepsionis',
+            'hospitality' => 'ramah',
+
+            // HR, Legal & Medical
+            'human' => 'sdm', 'resources' => 'sdm', 'personalia' => 'sdm', 'hrd' => 'sdm',
+            'recruitment' => 'rekrut', 'rekrutmen' => 'rekrut', 'recruiting' => 'rekrut',
+            'talent' => 'bakat', 'talenta' => 'bakat',
+            'employee' => 'karyawan', 'karyawan' => 'karyawan', 'pegawai' => 'karyawan',
+            'industrial' => 'industrial',
+            'legal' => 'hukum', 'hukum' => 'hukum', 'compliance' => 'patuh', 'kepatuhan' => 'patuh', 'governance' => 'kelola',
+            'medical' => 'medis', 'medis' => 'medis', 'nurse' => 'rawat', 'perawat' => 'rawat', 'keperawatan' => 'rawat',
+        ];
+
+        static $modifiersToIgnore = [
+            'monthly', 'annual', 'daily', 'weekly', 'cross', 'functional', 'global', 'local',
+            'routine', 'accuracy', 'accurate', 'internal', 'external', 'major', 'minor',
+            'critical', 'prompt', 'diligently', 'consistently', 'effectively', 'accurately',
+            'strictly', 'closely', 'regularly', 'actively', 'various', 'diverse',
+            'seamlessly', 'properly', 'continuously', 'frequently', 'periodically',
+            'efficiently', 'professionally', 'proactively', 'successfully', 'independently',
+            'directly', 'secara', 'berkala', 'rutin', 'intensif', 'efektif', 'efisien',
+            'konsisten', 'mandiri', 'profesional', 'akurat', 'langsung'
+        ];
+
+        $canonical = [];
+        foreach ($tokens as $t) {
+            if (in_array($t, $modifiersToIgnore)) {
+                continue;
+            }
+
+            // 1. Cek kamus bentuk asli terlebih dahulu (mencegah kata berakhiran 'ss' seperti 'business' terpangkas keliru)
+            if (isset($dict[$t])) {
+                $canonical[] = $dict[$t];
+                continue;
+            }
+
+            // 2. Normalisasi bentuk jamak / infleksi Bahasa Inggris jika belum ada di kamus
+            $lemma = $t;
+            if (str_ends_with($t, 'ies') && mb_strlen($t) > 4) {
+                $lemma = mb_substr($t, 0, -3) . 'y';
+            } elseif (str_ends_with($t, 'sses') && mb_strlen($t) > 5) {
+                $lemma = mb_substr($t, 0, -2);
+            } elseif (str_ends_with($t, 'es') && mb_strlen($t) > 4 && !in_array($t, ['proses', 'akses'])) {
+                $lemma = mb_substr($t, 0, -2);
+            } elseif (str_ends_with($t, 's') && mb_strlen($t) > 3 && !str_ends_with($t, 'ss') && !in_array($t, ['analisis', 'bisnis', 'kasir', 'pos', 'ops'])) {
+                $lemma = mb_substr($t, 0, -1);
+            }
+
+            if (isset($dict[$lemma])) {
+                $canonical[] = $dict[$lemma];
+            } elseif (mb_strlen($lemma) >= 4 && !in_array($lemma, $this->stopWords) && !in_array($lemma, $modifiersToIgnore)) {
+                $canonical[] = $lemma;
+            }
+        }
+
+        return array_values(array_unique($canonical));
     }
 }
