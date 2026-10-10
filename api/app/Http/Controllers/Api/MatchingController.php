@@ -47,6 +47,15 @@ class MatchingController extends Controller
                 ], 404);
             }
 
+            if (!empty($validated['skills']) && is_array($validated['skills'])) {
+                $existingIds = $seeker->skills->pluck('id')->toArray();
+                $missingIds = array_diff($validated['skills'], $existingIds);
+                if (!empty($missingIds)) {
+                    $additionalSkills = \App\Models\SkillNode::whereIn('id', $missingIds)->get();
+                    $seeker->setRelation('skills', $seeker->skills->concat($additionalSkills));
+                }
+            }
+
             // 1. Query Lowongan Kerja dari tabel req_pk_loker via model LowonganKerja (Hanya yang berstatus Published)
             $query = \App\Models\LowonganKerja::published()->with(['skills', 'province', 'regency', 'educationLevel']);
 
@@ -101,7 +110,7 @@ class MatchingController extends Controller
                     }
                 }
 
-                $titleLower = strtolower($lowongan->judul_lowongan ?? '');
+                $titleLower = strtolower($lowongan->judul_lowongan ?? $lowongan->judul_pekerjaan ?? '');
                 $isExactPhrase = (!empty($keywordLower) && str_contains($titleLower, $keywordLower)) ? 1 : 0;
 
                 // Lampirkan hasil skill sintesis ke objek lowongan agar dapat dirender oleh modal analisis gap di frontend

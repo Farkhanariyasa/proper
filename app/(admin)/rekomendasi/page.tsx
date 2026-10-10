@@ -1556,8 +1556,11 @@ function MatchingWizard() {
                       ) : (
                         selectedRecommendation.lowongan.skills.map((skill: any) => {
                           const matchedItem = pencakerSkills.find(ps => ps.id === skill.id || ps.esco_skill_id === skill.id);
-                          const isMatch = !!matchedItem;
-                          const rawSource = matchedItem?.source || matchedItem?.pivot?.source || (matchedItem?.pivot?.is_manual ? 'manual' : '');
+                          const backendMatch = selectedRecommendation.matched_skills?.find((ms: any) => 
+                            ms.id === skill.id || (ms.title && (skill.title || skill.name) && ms.title.toLowerCase() === (skill.title || skill.name).toLowerCase())
+                          );
+                          const isMatch = !!matchedItem || !!backendMatch;
+                          const rawSource = matchedItem?.source || matchedItem?.pivot?.source || (matchedItem?.pivot?.is_manual ? 'manual' : '') || (backendMatch?.match_type ? 'profile' : '');
                           
                           let sourceLabel = '';
                           let sourceIcon = null;
@@ -1567,8 +1570,8 @@ function MatchingWizard() {
                           } else if (rawSource.includes('sertifikasi')) {
                             sourceLabel = 'Sertifikasi';
                             sourceIcon = <Award className="w-3 h-3 text-purple-600 inline mr-1" />;
-                          } else if (rawSource.includes('keahlian')) {
-                            sourceLabel = 'Keahlian';
+                          } else if (rawSource.includes('keahlian') || rawSource.includes('profile')) {
+                            sourceLabel = 'Keahlian / CV';
                             sourceIcon = <Target className="w-3 h-3 text-sky-600 inline mr-1" />;
                           } else if (rawSource.includes('manual')) {
                             sourceLabel = 'Manual';
