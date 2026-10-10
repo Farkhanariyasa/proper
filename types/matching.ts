@@ -28,11 +28,11 @@ export interface MatchClassification {
 }
 
 export interface ScoreBreakdown {
-  role_score: number;
   skill_score: number;
   education_score: number;
   experience_score: number;
   location_score: number;
+  role_score?: number;
 }
 
 export interface EducationMatchInfo {

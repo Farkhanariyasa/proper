@@ -116,38 +116,15 @@ export default function SkillGapModal({
               <span className="text-[11px] text-slate-400 font-medium">Bobot Komposit Total: 100%</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
-              {/* Dimensi 1: Jabatan & Peran (35%) */}
-              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1.5">
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
-                  <span className="flex items-center gap-1 text-sky-800">
-                    <Briefcase className="w-3.5 h-3.5 text-sky-600" />
-                    Jabatan / Peran
-                  </span>
-                  <span className="text-[10px] px-1.5 py-0.2 bg-sky-50 text-sky-700 rounded font-bold">35%</span>
-                </div>
-                <div className="text-xl font-black text-slate-900">
-                  {data.score_breakdown?.role_score ?? 80}%
-                </div>
-                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-sky-600 rounded-full" 
-                    style={{ width: `${data.score_breakdown?.role_score ?? 80}%` }} 
-                  />
-                </div>
-                <p className="text-[10px] text-slate-400 leading-tight">
-                  Kesesuaian minat & rekam jejak okupasi
-                </p>
-              </div>
-
-              {/* Dimensi 2: Kompetensi & Keahlian (30%) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {/* Dimensi 1: Kompetensi & Keahlian (40%) */}
               <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
                   <span className="flex items-center gap-1 text-emerald-800">
                     <Target className="w-3.5 h-3.5 text-emerald-600" />
                     Kompetensi / Skill
                   </span>
-                  <span className="text-[10px] px-1.5 py-0.2 bg-emerald-50 text-emerald-700 rounded font-bold">30%</span>
+                  <span className="text-[10px] px-1.5 py-0.2 bg-emerald-50 text-emerald-700 rounded font-bold">40%</span>
                 </div>
                 <div className="text-xl font-black text-slate-900">
                   {data.score_breakdown?.skill_score ?? Math.round((matched_skills.length / Math.max(1, matched_skills.length + gap_skills.length)) * 100)}%
@@ -163,14 +140,14 @@ export default function SkillGapModal({
                 </p>
               </div>
 
-              {/* Dimensi 3: Kualifikasi Pendidikan (20%) */}
+              {/* Dimensi 2: Kualifikasi Pendidikan (30%) */}
               <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
                   <span className="flex items-center gap-1 text-purple-800">
                     <GraduationCap className="w-3.5 h-3.5 text-purple-600" />
                     Pendidikan
                   </span>
-                  <span className="text-[10px] px-1.5 py-0.2 bg-purple-50 text-purple-700 rounded font-bold">20%</span>
+                  <span className="text-[10px] px-1.5 py-0.2 bg-purple-50 text-purple-700 rounded font-bold">30%</span>
                 </div>
                 <div className="text-xl font-black text-slate-900">
                   {data.score_breakdown?.education_score ?? (data.education_match?.is_matched ? 100 : 50)}%
@@ -186,14 +163,14 @@ export default function SkillGapModal({
                 </p>
               </div>
 
-              {/* Dimensi 4: Pengalaman Kerja (10%) */}
+              {/* Dimensi 3: Pengalaman Kerja (20%) */}
               <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
                   <span className="flex items-center gap-1 text-amber-800">
                     <Layers className="w-3.5 h-3.5 text-amber-600" />
                     Pengalaman Kerja
                   </span>
-                  <span className="text-[10px] px-1.5 py-0.2 bg-amber-50 text-amber-700 rounded font-bold">10%</span>
+                  <span className="text-[10px] px-1.5 py-0.2 bg-amber-50 text-amber-700 rounded font-bold">20%</span>
                 </div>
                 <div className="text-xl font-black text-slate-900">
                   {data.score_breakdown?.experience_score ?? 80}%
@@ -209,14 +186,14 @@ export default function SkillGapModal({
                 </p>
               </div>
 
-              {/* Dimensi 5: Wilayah & Lokasi (5%) */}
+              {/* Dimensi 4: Wilayah & Lokasi (10%) */}
               <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
                   <span className="flex items-center gap-1 text-indigo-800">
                     <MapPin className="w-3.5 h-3.5 text-indigo-600" />
                     Lokasi Wilayah
                   </span>
-                  <span className="text-[10px] px-1.5 py-0.2 bg-indigo-50 text-indigo-700 rounded font-bold">5%</span>
+                  <span className="text-[10px] px-1.5 py-0.2 bg-indigo-50 text-indigo-700 rounded font-bold">10%</span>
                 </div>
                 <div className="text-xl font-black text-slate-900">
                   {data.score_breakdown?.location_score ?? 100}%

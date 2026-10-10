@@ -1265,7 +1265,7 @@ function MatchingWizard() {
                   </h2>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Perhitungan komprehensif berdasarkan 5 dimensi: Jabatan (35%), Kompetensi/Skill (30%), Pendidikan (20%), Pengalaman (10%), dan Lokasi (5%)
+                  Perhitungan komprehensif berdasarkan 4 dimensi: Kompetensi/Skill (40%), Pendidikan (30%), Pengalaman (20%), dan Lokasi (10%)
                 </p>
               </div>
               <button 
@@ -1307,7 +1307,7 @@ function MatchingWizard() {
                     <p className="text-xs text-slate-600 leading-relaxed">
                       {selectedRecommendation.classification?.description || (
                         selectedRecommendation.match_score >= 100
-                          ? 'Kandidat memiliki kesesuaian sempurna pada jabatan, kompetensi, dan seluruh kualifikasi industri.'
+                          ? 'Kandidat memiliki kesesuaian sempurna pada kompetensi dan seluruh kualifikasi industri.'
                           : selectedRecommendation.match_score >= 70
                           ? 'Tingkat kesesuaian tinggi. Kandidat memenuhi sebagian besar syarat inti dan siap ditempatkan.'
                           : selectedRecommendation.match_score >= 40
@@ -1316,7 +1316,7 @@ function MatchingWizard() {
                       )}
                     </p>
                     <p className="text-[11px] text-slate-400 italic">
-                      Formula Multi-Kriteria: (35% Jabatan) + (30% Kompetensi) + (20% Pendidikan) + (10% Pengalaman) + (5% Lokasi)
+                      Formula Multi-Kriteria: (40% Kompetensi) + (30% Pendidikan) + (20% Pengalaman) + (10% Lokasi)
                     </p>
                   </div>
 
@@ -1331,48 +1331,25 @@ function MatchingWizard() {
                 </div>
               </div>
 
-              {/* 2. Rincian Evaluasi 5 Dimensi Multi-Kriteria */}
+              {/* 2. Rincian Evaluasi 4 Dimensi Multi-Kriteria */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                     <BarChart3 className="w-4 h-4 text-[#0E385E]" />
-                    <span>Rincian Evaluasi 5 Dimensi Multi-Kriteria</span>
+                    <span>Rincian Evaluasi 4 Dimensi Multi-Kriteria</span>
                   </h4>
                   <span className="text-[11px] text-slate-400 font-medium">Bobot Komposit Total: 100%</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-                  {/* Dimensi 1: Jabatan & Peran (35%) */}
-                  <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
-                      <span className="flex items-center gap-1.5 text-sky-800">
-                        <Briefcase className="w-3.5 h-3.5 text-sky-600" />
-                        Peran / Jabatan
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-sky-50 text-sky-700 rounded font-bold">35%</span>
-                    </div>
-                    <div className="text-2xl font-black text-slate-900">
-                      {selectedRecommendation.score_breakdown?.role_score ?? (selectedRecommendation.is_exact_phrase ? 100 : 75)}%
-                    </div>
-                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-sky-600 rounded-full transition-all" 
-                        style={{ width: `${selectedRecommendation.score_breakdown?.role_score ?? (selectedRecommendation.is_exact_phrase ? 100 : 75)}%` }} 
-                      />
-                    </div>
-                    <p className="text-[11px] text-slate-500 leading-tight">
-                      Kesesuaian minat & profil okupasi dengan judul posisi
-                    </p>
-                  </div>
-
-                  {/* Dimensi 2: Kompetensi & Keahlian (30%) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Dimensi 1: Kompetensi & Keahlian (40%) */}
                   <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
                     <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
                       <span className="flex items-center gap-1.5 text-emerald-800">
                         <Target className="w-3.5 h-3.5 text-emerald-600" />
                         Kompetensi / Skill
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded font-bold">30%</span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded font-bold">40%</span>
                     </div>
                     <div className="text-2xl font-black text-slate-900">
                       {selectedRecommendation.score_breakdown?.skill_score ?? Math.round((selectedRecommendation.matched_skills_count / Math.max(1, selectedRecommendation.lowongan.skills?.length || 1)) * 100)}%
@@ -1388,14 +1365,14 @@ function MatchingWizard() {
                     </p>
                   </div>
 
-                  {/* Dimensi 3: Kualifikasi Pendidikan (20%) */}
+                  {/* Dimensi 2: Kualifikasi Pendidikan (30%) */}
                   <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
                     <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
                       <span className="flex items-center gap-1.5 text-purple-800">
                         <GraduationCap className="w-3.5 h-3.5 text-purple-600" />
                         Pendidikan
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded font-bold">20%</span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded font-bold">30%</span>
                     </div>
                     <div className="text-2xl font-black text-slate-900">
                       {selectedRecommendation.score_breakdown?.education_score ?? (selectedRecommendation.education_match?.is_matched ? 100 : 50)}%
@@ -1411,14 +1388,14 @@ function MatchingWizard() {
                     </p>
                   </div>
 
-                  {/* Dimensi 4: Pengalaman Kerja (10%) */}
+                  {/* Dimensi 3: Pengalaman Kerja (20%) */}
                   <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
                     <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
                       <span className="flex items-center gap-1.5 text-amber-800">
                         <Award className="w-3.5 h-3.5 text-amber-600" />
                         Pengalaman Kerja
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded font-bold">10%</span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded font-bold">20%</span>
                     </div>
                     <div className="text-2xl font-black text-slate-900">
                       {selectedRecommendation.score_breakdown?.experience_score ?? 80}%
@@ -1434,14 +1411,14 @@ function MatchingWizard() {
                     </p>
                   </div>
 
-                  {/* Dimensi 5: Wilayah & Lokasi (5%) */}
+                  {/* Dimensi 4: Wilayah & Lokasi (10%) */}
                   <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
                     <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
                       <span className="flex items-center gap-1.5 text-indigo-800">
                         <MapPin className="w-3.5 h-3.5 text-indigo-600" />
                         Lokasi Wilayah
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded font-bold">5%</span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded font-bold">10%</span>
                     </div>
                     <div className="text-2xl font-black text-slate-900">
                       {selectedRecommendation.score_breakdown?.location_score ?? 100}%
