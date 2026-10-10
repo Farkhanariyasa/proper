@@ -353,42 +353,36 @@ class MatchingEngineService
 
     /**
      * Algoritma Komputasi Multi-Criteria Weighted Match
-     * Menggabungkan 5 Dimensi:
-     * 1. Kesesuaian Jabatan / Peran (35%)
-     * 2. Kesesuaian Keahlian & Kualifikasi (30%)
-     * 3. Kesesuaian Pendidikan & Bidang Studi (20%)
-     * 4. Kesesuaian Pengalaman Kerja (10%)
-     * 5. Kesesuaian Lokasi & Sistem Kerja (5%)
+     * Menggabungkan 4 Dimensi:
+     * 1. Kesesuaian Keahlian & Kualifikasi / Kompetensi (40%)
+     * 2. Kesesuaian Pendidikan & Bidang Studi (30%)
+     * 3. Kesesuaian Pengalaman Kerja (20%)
+     * 4. Kesesuaian Lokasi & Sistem Kerja (10%)
      */
     public function computeCompositeMatch(JobSeeker $candidate, object $job): array
     {
-        // 1. Evaluasi Dimensi Jabatan (Role) - Bobot 35%
-        $roleMatch = $this->evaluateRoleMatch($candidate, $job);
-        $roleScore = $roleMatch['score'];
-
-        // 2. Evaluasi Dimensi Keahlian (Skills & Competencies) - Bobot 30%
+        // 1. Evaluasi Dimensi Keahlian (Skills & Competencies) - Bobot 40%
         $skillMatch = $this->evaluateCompetencyMatch($candidate, $job);
         $skillScore = $skillMatch['score'];
 
-        // 3. Evaluasi Dimensi Pendidikan (Education) - Bobot 20%
+        // 2. Evaluasi Dimensi Pendidikan (Education) - Bobot 30%
         $eduMatch = $this->evaluateEducationAndFieldMatch($candidate, $job);
         $eduScore = $eduMatch['score'];
 
-        // 4. Evaluasi Dimensi Pengalaman (Experience) - Bobot 10%
+        // 3. Evaluasi Dimensi Pengalaman (Experience) - Bobot 20%
         $expMatch = $this->evaluateExperienceMatch($candidate, $job);
         $expScore = $expMatch['score'];
 
-        // 5. Evaluasi Dimensi Lokasi (Location) - Bobot 5%
+        // 4. Evaluasi Dimensi Lokasi (Location) - Bobot 10%
         $locMatch = $this->evaluateLocationMatch($candidate, $job);
         $locScore = $locMatch['score'];
 
-        // Hitung Komposit Skor Berbobot
+        // Hitung Komposit Skor Berbobot (Total 100%)
         $totalWeightedScore = (int) round(
-            (0.35 * $roleScore) +
-            (0.30 * $skillScore) +
-            (0.20 * $eduScore) +
-            (0.10 * $expScore) +
-            (0.05 * $locScore)
+            (0.40 * $skillScore) +
+            (0.30 * $eduScore) +
+            (0.20 * $expScore) +
+            (0.10 * $locScore)
         );
 
         $totalWeightedScore = max(0, min(100, $totalWeightedScore));
@@ -411,6 +405,8 @@ class MatchingEngineService
         $matchedSkills = $skillMatch['matched_skills'];
         $gapSkills = $skillMatch['gap_skills'];
         $totalRequired = count($matchedSkills) + count($gapSkills);
+
+        $kbjiMatch = $this->evaluateKbjiMatch($candidate->kbji, $job->kbji);
 
         return [
             'candidate' => [
@@ -445,12 +441,11 @@ class MatchingEngineService
             'total_matched' => count($matchedSkills),
             'total_gap' => count($gapSkills),
             'classification' => $classification,
-            'kbji_match' => $roleMatch['kbji_match'],
+            'kbji_match' => $kbjiMatch,
             'education_match' => $eduMatch['education_level_match'],
             'matched_skills' => $matchedSkills,
             'gap_skills' => $gapSkills,
             'score_breakdown' => [
-                'role_score' => $roleScore,
                 'skill_score' => $skillScore,
                 'education_score' => $eduScore,
                 'experience_score' => $expScore,
@@ -499,7 +494,7 @@ class MatchingEngineService
             }
         }
 
-        $bestScore = 15; // Baseline jika tidak ada kesamaan
+        $bestScore = 0; // Baseline jika tidak ada kesamaan (0%)
         $jobTitleLower = mb_strtolower($jobTitle);
         $jobTitleTokens = $this->tokenizeText($jobTitle);
         $jobDescTokens = $this->tokenizeText($jobDesc);
@@ -510,7 +505,13 @@ class MatchingEngineService
 
             if (empty($roleTokens)) continue;
 
-            // Kasus 1: Judul persis atau substring lengkap (misal: "Frontend Developer" di "Senior Frontend Developer")
+            // Kasus 1A: Judul persis sama (Exact Match 100%)
+            if ($jobTitleLower === $roleLower) {
+                $bestScore = max($bestScore, 100);
+                continue;
+            }
+
+            // Kasus 1B: Substring lengkap (misal: "Frontend Developer" di "Senior Frontend Developer")
             if (str_contains($jobTitleLower, $roleLower) || str_contains($roleLower, $jobTitleLower)) {
                 $bestScore = max($bestScore, 95);
                 continue;
@@ -552,7 +553,7 @@ class MatchingEngineService
         $kbjiMatch = $this->evaluateKbjiMatch($candidate->kbji, $job->kbji);
 
         return [
-            'score' => min(100, max(15, $bestScore)),
+            'score' => min(100, max(0, $bestScore)),
             'kbji_match' => $kbjiMatch,
             'title_similarity' => $bestScore / 100,
         ];
@@ -761,13 +762,10 @@ class MatchingEngineService
             $skillScore = (int) round((0.65 * $itemRatioScore) + (0.35 * ($tokenCoverage * 100)));
         } else {
             $skillScore = (int) round($tokenCoverage * 100);
-            if ($skillScore === 0 && !empty($candidate->keahlian)) {
-                $skillScore = 30; // Baseline bila memiliki keahlian terisi
-            }
         }
 
         return [
-            'score' => min(100, max(15, $skillScore)),
+            'score' => min(100, max(0, $skillScore)),
             'matched_skills' => $matchedSkills,
             'gap_skills' => $gapSkills,
         ];
@@ -778,7 +776,8 @@ class MatchingEngineService
      */
     protected function evaluateEducationAndFieldMatch(JobSeeker $candidate, object $job): array
     {
-        $eduLevelMatch = $this->evaluateEducationMatch($candidate->educationLevel, $job->educationLevel);
+        $candidateEdu = $candidate->educationLevel ?? $candidate->pendidikan ?? null;
+        $eduLevelMatch = $this->evaluateEducationMatch($candidateEdu, $job->educationLevel);
         $levelScore = $eduLevelMatch['score'];
 
         // Kesesuaian Jurusan
@@ -786,7 +785,8 @@ class MatchingEngineService
         $candField = trim($candidate->jurusan ?? '');
 
         if ($jobField === '' || mb_strtolower($jobField) === 'semua jurusan' || mb_strtolower($jobField) === 'semua') {
-            $fieldScore = 100;
+            // Jika jenjang pendidikan di bawah syarat, skor jurusan proporsional dengan kesesuaian jenjang
+            $fieldScore = $eduLevelMatch['is_matched'] ? 100 : $levelScore;
         } elseif ($candField === '') {
             $fieldScore = 50;
         } else {
@@ -816,6 +816,13 @@ class MatchingEngineService
     {
         $reqYears = $job->pengalaman_minimal_tahun ?? 0;
 
+        // Ekstraksi kebutuhan pengalaman dari deskripsi jika belum terdata di kolom khusus
+        if ($reqYears <= 0 && !empty($job->deskripsi_pekerjaan)) {
+            if (preg_match('/(?:pengalaman\s*(?:kerja\s*)?(?:minimal|min\.?)\s*(\d+)\s*tahun|(?:minimal|min\.?)\s*(\d+)\s*tahun\s*(?:pengalaman|bekerja))/i', $job->deskripsi_pekerjaan, $m)) {
+                $reqYears = (int) (!empty($m[1]) ? $m[1] : (!empty($m[2]) ? $m[2] : 0));
+            }
+        }
+
         if ($reqYears <= 0) {
             return ['score' => 100, 'label' => 'Terbuka Fresh Graduate'];
         }
@@ -843,7 +850,7 @@ class MatchingEngineService
             $score = 100;
         } else {
             $gap = $reqYears - $candYears;
-            $score = max(20, (int) round(100 - ($gap * 25)));
+            $score = max(0, (int) round(100 - ($gap * 25)));
         }
 
         return [
@@ -865,21 +872,34 @@ class MatchingEngineService
             return ['score' => 100, 'label' => 'Fleksibel (Remote/WFH)'];
         }
 
-        $cReg = $candidate->regency_id;
-        $jReg = $job->regency_id;
+        $cReg = $candidate->regency_id ? trim((string) $candidate->regency_id) : null;
+        $jReg = $job->regency_id ? trim((string) $job->regency_id) : null;
 
         if ($cReg && $jReg && $cReg === $jReg) {
             return ['score' => 100, 'label' => 'Kabupaten/Kota Sama'];
         }
 
-        $cProv = $candidate->province_id;
-        $jProv = $job->provinsi_id;
+        $cProv = $candidate->province_id ? trim((string) $candidate->province_id) : null;
+        $jProv = $job->provinsi_id ? trim((string) $job->provinsi_id) : null;
 
         if ($cProv && $jProv && $cProv === $jProv) {
             return ['score' => 70, 'label' => 'Provinsi Sama'];
         }
 
-        return ['score' => 35, 'label' => 'Luar Wilayah'];
+        // Fallback teks jika regency_id/province_id kosong tapi nama kota/provinsi ada
+        $candKab = mb_strtolower(trim($candidate->kab_kota ?? ''));
+        $candProv = mb_strtolower(trim($candidate->provinsi ?? ''));
+        $jobRegion = mb_strtolower(trim(($job->region_pembeker ?? '') . ' ' . ($job->reg ?? '')));
+
+        if ($candKab !== '' && str_contains($jobRegion, $candKab)) {
+            return ['score' => 100, 'label' => 'Kabupaten/Kota Sama (Cocok Alamat)'];
+        }
+
+        if ($candProv !== '' && str_contains($jobRegion, $candProv)) {
+            return ['score' => 70, 'label' => 'Provinsi Sama (Cocok Alamat)'];
+        }
+
+        return ['score' => 0, 'label' => 'Luar Wilayah'];
     }
 
     /**
@@ -887,10 +907,31 @@ class MatchingEngineService
      */
     public function evaluateEducationMatch($candidateEdu, $jobEdu): array
     {
-        $cLevel = is_object($candidateEdu) ? ($candidateEdu->sort_order ?? $candidateEdu->id ?? null) : (is_numeric($candidateEdu) ? (int)$candidateEdu : null);
-        $jLevel = is_object($jobEdu) ? ($jobEdu->sort_order ?? $jobEdu->id ?? null) : (is_numeric($jobEdu) ? (int)$jobEdu : null);
+        // Parsing level pencaker jika berupa string (fallback dari kolom req_pk_pencaker.pendidikan)
+        $cLevel = null;
+        $cName = '-';
 
-        $cName = is_object($candidateEdu) ? ($candidateEdu->name ?? '-') : (is_string($candidateEdu) && $candidateEdu !== '' ? $candidateEdu : '-');
+        if (is_object($candidateEdu)) {
+            $cLevel = $candidateEdu->sort_order ?? $candidateEdu->id ?? null;
+            $cName = $candidateEdu->name ?? '-';
+        } elseif (is_numeric($candidateEdu)) {
+            $cLevel = (int) $candidateEdu;
+        } elseif (is_string($candidateEdu) && trim($candidateEdu) !== '') {
+            $cName = trim($candidateEdu);
+            $cStr = mb_strtolower($cName);
+            $cLevel = match (true) {
+                str_contains($cStr, 's3') || str_contains($cStr, 'doktor') => 7,
+                str_contains($cStr, 's2') || str_contains($cStr, 'magister') => 6,
+                str_contains($cStr, 's1') || str_contains($cStr, 'sarjana') || str_contains($cStr, 'd4') || str_contains($cStr, 'profesi') => 5,
+                str_contains($cStr, 'd3') || str_contains($cStr, 'd2') || str_contains($cStr, 'd1') || str_contains($cStr, 'diploma') => 4,
+                str_contains($cStr, 'sma') || str_contains($cStr, 'smk') || str_contains($cStr, 'sederajat') => 3,
+                str_contains($cStr, 'smp') => 2,
+                str_contains($cStr, 'sd') => 1,
+                default => null,
+            };
+        }
+
+        $jLevel = is_object($jobEdu) ? ($jobEdu->sort_order ?? $jobEdu->id ?? null) : (is_numeric($jobEdu) ? (int)$jobEdu : null);
         $jName = is_object($jobEdu) ? ($jobEdu->name ?? 'Semua Jenjang') : (is_string($jobEdu) && $jobEdu !== '' ? $jobEdu : 'Semua Jenjang');
 
         if (!$jLevel) {
@@ -931,7 +972,7 @@ class MatchingEngineService
             'is_matched' => $gap <= 1, // Toleransi 1 tingkat masih diizinkan
             'status' => 'di_bawah_syarat',
             'label' => 'Di Bawah Syarat (Butuh Min. ' . $jName . ')',
-            'score' => max(10, 100 - ($gap * 35)),
+            'score' => max(0, 100 - ($gap * 35)),
             'required_level' => $jName,
             'candidate_level' => $cName,
         ];

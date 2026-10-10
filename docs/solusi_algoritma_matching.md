@@ -22,11 +22,10 @@ Pada arsitektur lama, sistem mengalami kegagalan karena membandingkan ID taksono
 ## 2. Formula Komposit Multi-Kriteria (Title & Description First)
 
 ```
-Total Skor = (35% * Skor_Peran_Judul_Deskripsi)
-           + (30% * Skor_Kompetensi_Teks)
-           + (20% * Skor_Pendidikan_Jurusan)
-           + (10% * Skor_Pengalaman_Kerja)
-           + ( 5% * Skor_Lokasi)
+Total Skor = (40% * Skor_Kompetensi_Skill)
+           + (30% * Skor_Pendidikan_Jurusan)
+           + (20% * Skor_Pengalaman_Kerja)
+           + (10% * Skor_Lokasi)
 ```
 
 ---
