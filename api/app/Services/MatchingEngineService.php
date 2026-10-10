@@ -10,9 +10,10 @@ use Illuminate\Support\Facades\DB;
 class MatchingEngineService
 {
     /**
-     * Stopwords umum bahasa Indonesia untuk normalisasi teks
+     * Stopwords bilingual (Bahasa Indonesia & Bahasa Inggris) untuk normalisasi teks
      */
     protected array $stopWords = [
+        // Stopwords Bahasa Indonesia
         'dan', 'atau', 'di', 'ke', 'dari', 'yang', 'untuk', 'pada', 'dengan', 'adalah',
         'sebagai', 'seorang', 'staf', 'staff', 'karyawan', 'pegawai', 'pekerja',
         'magang', 'intern', 'internship', 'kerja', 'praktek', 'pkl', 'kursus',
@@ -20,7 +21,136 @@ class MatchingEngineService
         'terbiasa', 'menguasai', 'memahami', 'aplikasi', 'software', 'program',
         'alat', 'bidang', 'bagian', 'divisi', 'dll', 'dsb', 'dst', 'baik', 'benar',
         'secara', 'tingkat', 'level', 'minimal', 'maksimal', 'tahun', 'pengalaman',
-        'pria', 'wanita', 'usia', 'pendidikan', 'jurusan', 'lulusan', 'tamatan'
+        'pria', 'wanita', 'usia', 'pendidikan', 'jurusan', 'lulusan', 'tamatan',
+        'kami', 'kita', 'anda', 'kamu', 'mereka', 'ia', 'dia', 'ini', 'itu',
+        'tersebut', 'setiap', 'semua', 'oleh', 'tentang', 'serta', 'juga', 'saat',
+        'ketika', 'selama', 'akan', 'telah', 'sudah', 'hanya', 'saja',
+        // Stopwords Bahasa Inggris (mencegah kata sambung seperti 'and', 'the' dijadikan padanan)
+        'and', 'or', 'the', 'a', 'an', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
+        'by', 'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+        'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall', 'should',
+        'can', 'could', 'may', 'might', 'must', 'this', 'that', 'these', 'those',
+        'it', 'its', 'their', 'they', 'them', 'our', 'we', 'us', 'you', 'your',
+        'he', 'she', 'him', 'her', 'his', 'such', 'all', 'any', 'both', 'each',
+        'more', 'most', 'other', 'some', 'than', 'too', 'very', 'into', 'over',
+        'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when',
+        'where', 'why', 'how', 'about', 'between', 'through', 'during', 'before',
+        'after', 'above', 'below', 'up', 'down', 'out', 'off', 'same', 'so',
+        'student', 'students', 'pupil', 'pupils', 'lesson', 'lessons', 'session',
+        'sessions', 'event', 'events', 'program', 'programs', 'school', 'class', 'classes'
+    ];
+
+    /**
+     * Klaster padanan sinonim & konsep keahlian industri (Bilingual ID/EN & Bebas Taksonomi)
+     * Mencakup 52 domain industri & profesi ketenagakerjaan Indonesia secara presisi dengan frasa spesifik
+     */
+    protected array $skillSynonymClusters = [
+        // 1. Sales & Pemasaran B2B/B2C
+        ['sales', 'penjualan', 'menjual', 'selling', 'pemasaran', 'marketing', 'canvassing', 'telemarketing', 'promosi penjualan', 'account manager', 'account executive', 'komersial', 'business development', 'b2b sales', 'field sales', 'merchandiser', 'direct selling'],
+        // 2. Customer Service & Pelayanan Pelanggan
+        ['customer service', 'layanan pelanggan', 'pelayanan pelanggan', 'client relation', 'customer relationship', 'crm', 'umpan balik pelanggan', 'kepuasan pelanggan', 'keluhan pelanggan', 'call center', 'helpdesk', 'contact center', 'client care', 'layanan purna jual'],
+        // 3. Komunikasi Bisnis & Public Relations
+        ['komunikasi efektif', 'effective communication', 'interpersonal skills', 'negosiasi bisnis', 'business negotiation', 'lobi', 'komunikatif', 'diplomasi', 'hubungan masyarakat', 'public relations'],
+        // 4. Administrasi & Tata Kelola Dokumen
+        ['administrasi', 'administration', 'admin perkantoran', 'filing dokumen', 'arsip', 'data entry', 'tata kelola dokumen', 'pembukuan kantor', 'surat menyurat', 'clerical', 'kesekretariatan', 'rekapitulasi data', 'notulensi rapat'],
+        // 5. Aplikasi Komputer & Microsoft Office Perkantoran
+        ['microsoft office', 'aplikasi perkantoran', 'excel', 'ms word', 'microsoft word', 'powerpoint', 'spreadsheet', 'pengolahan data perkantoran', 'komputer dasar', 'vlookup', 'pivot table', 'formula excel', 'google workspace', 'google docs', 'google sheets'],
+        // 6. Akuntansi & Pembukuan
+        ['akuntansi', 'accounting', 'keuangan', 'finance', 'pembukuan akuntansi', 'laporan keuangan', 'penagihan piutang', 'jurnal umum', 'buku besar', 'rekonsiliasi bank'],
+        // 7. Perpajakan (Taxation)
+        ['pajak', 'taxation', 'brevet pajak', 'efaktur', 'e-faktur', 'pph 21', 'pph 23', 'ppn', 'spt masa', 'spt tahunan', 'perhitungan pajak', 'tax planning', 'kepatuhan pajak'],
+        // 8. Keuangan & Financial Planning
+        ['manajemen keuangan', 'financial analysis', 'financial planning', 'anggaran biaya', 'budgeting', 'cash flow', 'arus kas', 'analisis laporan keuangan', 'investasi'],
+        // 9. Perbankan & Analisis Kredit
+        ['perbankan', 'banking', 'teller bank', 'analis kredit', 'credit analyst', 'loan officer', 'funding officer', 'lending officer', 'underwriting', 'manajemen risiko kredit'],
+        // 10. Asuransi & Underwriting
+        ['asuransi', 'insurance', 'klaim asuransi', 'underwriting asuransi', 'polis asuransi', 'bancassurance'],
+        // 11. IT Support & Helpdesk
+        ['it support', 'helpdesk it', 'troubleshooting komputer', 'instalasi software', 'hardware pc', 'perawatan komputer', 'teknisi komputer', 'jaringan lan', 'printer sharing'],
+        // 12. Software Engineering & Web Development
+        ['software development', 'rekayasa perangkat lunak', 'pemrograman', 'developer', 'coding', 'web development', 'frontend developer', 'backend developer', 'fullstack developer', 'laravel', 'react js', 'vue js', 'next js', 'node js', 'api integration', 'restful api'],
+        // 13. Mobile App Development
+        ['mobile app development', 'aplikasi mobile', 'flutter developer', 'react native', 'android developer', 'ios developer', 'kotlin', 'swift'],
+        // 14. Database Management & SQL
+        ['database management', 'manajemen database', 'sql query', 'mysql', 'postgresql', 'sql server', 'database administrator', 'dba', 'relational database'],
+        // 15. DevOps & Cloud Infrastructure
+        ['devops', 'cloud computing', 'aws cloud', 'google cloud', 'azure cloud', 'docker container', 'kubernetes', 'ci cd pipeline', 'linux server', 'server administration'],
+        // 16. Cybersecurity & Keamanan Informasi
+        ['cybersecurity', 'keamanan informasi', 'network security', 'penetration testing', 'firewall', 'vulnerability assessment', 'iso 27001', 'security compliance'],
+        // 17. Technical Pre-Sales & Solution Architecture (IT Enterprise)
+        ['solution design', 'solution architecture', 'pre-sales engineer', 'solution presentation', 'technical consulting', 'demand analysis', 'perancangan solusi it', 'enterprise solution'],
+        // 18. Data Analysis, SQL & Visualisasi
+        ['data analyst', 'analisis data', 'data analytics', 'sql database', 'tableau', 'power bi', 'data visualization', 'dashboard reporting', 'pengolahan dataset', 'excel advance'],
+        // 19. Data Science, Machine Learning & AI
+        ['data science', 'machine learning', 'artificial intelligence', 'python data science', 'deep learning', 'nlp', 'predictive modeling', 'big data'],
+        // 20. Desain Grafis & Creative Media
+        ['desain grafis', 'graphic design', 'photoshop', 'canva', 'adobe illustrator', 'kreatif visual', 'creative design', 'layouting', 'tipografi', 'branding visual'],
+        // 21. UI/UX Design & Product Design
+        ['ui design', 'ux design', 'user interface', 'user experience', 'figma', 'wireframing', 'prototyping', 'design system', 'user research', 'product designer'],
+        // 22. Video Editing & Motion Graphics
+        ['video editing', 'editor video', 'premiere pro', 'after effects', 'motion graphics', 'color grading', 'produksi video', 'videografi'],
+        // 23. Digital Marketing, SEO & SEM
+        ['digital marketing', 'pemasaran digital', 'seo', 'search engine optimization', 'sem', 'google ads', 'meta ads', 'facebook ads', 'email marketing', 'conversion rate'],
+        // 24. Content Creation & Social Media Management
+        ['social media', 'media sosial', 'content creator', 'social media specialist', 'copywriting', 'tiktok marketing', 'manajemen konten digital', 'content planning'],
+        // 25. Pergudangan & Inventory Control
+        ['pergudangan', 'warehouse', 'manajemen stok', 'inventory control', 'inventaris barang', 'fifo lifo', 'stok opname', 'picking packing', 'bongkar muat', 'surat jalan'],
+        // 26. Logistik, Freight Forwarding & Supply Chain
+        ['logistik', 'supply chain', 'distribusi barang', 'pengiriman kargo', 'freight forwarding', 'manajemen armada', 'route planning', 'ekspedisi', 'surat muatan'],
+        // 27. Perdagangan Internasional, Ekspor Impor & Bea Cukai
+        ['perdagangan internasional', 'international trade', 'ekspor impor', 'export import', 'bea cukai', 'customs clearance', 'fta', 'peraturan perdagangan', 'letter of credit', 'bill of lading', 'dokumen ekspor impor', 'shipping instruction', 'peb pib'],
+        // 28. Manajemen Risiko & Kepatuhan Bisnis
+        ['manajemen risiko', 'risk management', 'penilaian risiko', 'risk assessment', 'mitigasi risiko', 'audit kepatuhan', 'compliance audit', 'tata kelola risiko', 'analisis risiko bisnis'],
+        // 29. Manajemen Proyek & Agile/Scrum
+        ['manajemen proyek', 'project management', 'project manager', 'agile scrum', 'timeline proyek', 'monitoring progress proyek', 'manajemen stakeholder', 'pmp'],
+        // 30. Manajemen Operasional & Standar SOP
+        ['manajemen operasional', 'kepemimpinan', 'leadership', 'supervisor', 'koordinator tim', 'manajerial', 'pengawasan operasional', 'standar operasional prosedur', 'sop perusahaan', 'key performance indicator', 'kpi'],
+        // 31. HRD, Rekrutmen & Talent Acquisition
+        ['human resources', 'hrd', 'personalia', 'rekrutmen', 'recruitment', 'talent acquisition', 'sourcing kandidat', 'interview wawancara', 'onboarding karyawan', 'evaluasi kinerja karyawan'],
+        // 32. Payroll, Kompensasi & Hubungan Industrial
+        ['payroll gaji', 'penggajian', 'bpjs ketenagakerjaan', 'bpjs kesehatan', 'hubungan industrial', 'ketenagakerjaan', 'kompensasi dan benefit', 'pajak pph 21'],
+        // 33. K3 & Keselamatan Kerja (HSE / EHS)
+        ['k3', 'keselamatan dan kesehatan kerja', 'hse', 'ehs', 'safety officer', 'smk3', 'alat pelindung diri', 'apd', 'inspeksi k3', 'manajemen keselamatan kerja', 'investigasi insiden', 'tanggap darurat', 'first aid', 'p3k', 'hazard identification'],
+        // 34. Quality Control & Quality Assurance (QC/QA)
+        ['quality control', 'qc inspector', 'quality assurance', 'qa specialist', 'pengendalian mutu', 'penjaminan mutu', 'iso 9001', 'inspeksi kualitas', 'six sigma', '5s kaizen', 'standar kualitas produksi', 'pengujian produk'],
+        // 35. Teknik Mesin & Perawatan Mesin (Maintenance)
+        ['teknik mesin', 'mechanical engineering', 'pemeliharaan mesin', 'preventive maintenance', 'perbaikan mesin', 'sistem hidrolik', 'pneumatik', 'troubleshooting mekanikal'],
+        // 36. Pengelasan & Fabrikasi Logam (Welder, CNC)
+        ['welding', 'pengelasan', 'welder bersertifikat', 'las listrik', 'las argon', 'las tig', 'las mig', 'fabrikasi logam', 'bubut', 'milling', 'cnc operator', 'machining'],
+        // 37. Teknik Elektro & Kelistrikan Industri
+        ['teknik elektro', 'electrical engineering', 'instalasi listrik', 'panel listrik', 'arus kuat', 'arus lemah', 'wiring listrik', 'kelistrikan industri', 'genset maintenance'],
+        // 38. Otomasi Industri, PLC & SCADA
+        ['plc programming', 'scada', 'otomasi industri', 'instrumentasi industri', 'sensor industri', 'hmi programming', 'inverter motor'],
+        // 39. Teknik Sipil & Manajemen Konstruksi
+        ['teknik sipil', 'civil engineering', 'konstruksi bangunan', 'mandor proyek', 'site supervisor', 'quantity surveyor', 'rencana anggaran biaya', 'rab proyek', 'surveyor tanah', 'pengawasan konstruksi'],
+        // 40. Arsitektur & Desain Bangunan (AutoCAD, SketchUp)
+        ['arsitektur', 'autocad', 'sketchup', 'revit', 'desain interior', 'gambar teknik', 'drafting arsitektur', '3d modeling bangunan'],
+        // 41. Otomotif & Mekanik Kendaraan (Mobil/Motor)
+        ['teknik otomotif', 'mekanik mobil', 'mekanik motor', 'tune up kendaraan', 'spooring balancing', 'servis kendaraan', 'sistem transmisi', 'sistem pengereman', 'overhaul mesin', 'perawatan armada'],
+        // 42. Tata Boga, Chef & Bakery
+        ['kuliner', 'chef', 'koki', 'cook', 'tata boga', 'pastry baker', 'memasak', 'pembuatan kue', 'food production', 'haccp keamanan pangan', 'hygiene sanitasi makanan', 'resep makanan'],
+        // 43. Food & Beverage Service, Barista & Hospitality
+        ['food and beverage service', 'f&b service', 'barista', 'bartender', 'pramusaji', 'waiter waitress', 'pembuatan kopi', 'hospitality f&b'],
+        // 44. Perhotelan, Front Office & Housekeeping
+        ['hospitality perhotelan', 'housekeeping', 'room attendant', 'front office hotel', 'resepsionis hotel', 'reservasi kamar', 'laundry hotel'],
+        // 45. Keperawatan & Pelayanan Medis
+        ['keperawatan', 'perawat', 'bidan', 'rekam medis', 'pelayanan pasien', 'laboratorium medis', 'tindakan medis dasar', 'asuhan keperawatan', 'pelayanan kesehatan', 'tenaga kesehatan'],
+        // 46. Farmasi & Asisten Apoteker
+        ['farmasi', 'asisten apoteker', 'dispensing obat', 'klinik kesehatan', 'pengelolaan obat', 'resep dokter', 'edukasi obat pasien'],
+        // 47. Pendidikan, Guru & Instruktur Pelatihan
+        ['tenaga pendidik', 'pengajar', 'guru', 'tutor belajar', 'instruktur pelatihan', 'pedagogi', 'kurikulum pembelajaran', 'metode pengajaran', 'penyusunan silabus', 'kegiatan belajar mengajar'],
+        // 48. Legal Corporate & Drafting Kontrak
+        ['legal corporate', 'staf hukum', 'drafting kontrak', 'perjanjian kerja sama', 'kepatuhan hukum', 'legal compliance', 'perizinan usaha', 'oss rba', 'litigasi', 'konsultasi hukum'],
+        // 49. Procurement, Purchasing & Manajemen Vendor
+        ['pengadaan barang', 'procurement', 'purchasing officer', 'pembelian material', 'manajemen vendor', 'sourcing supplier', 'purchase order', 'negosiasi harga supplier'],
+        // 50. Bahasa Asing & Penerjemahan
+        ['bahasa inggris', 'english communication', 'toefl', 'toeic', 'ielts', 'bahasa jepang', 'jlpt', 'bahasa mandarin', 'hsk', 'penerjemah', 'translator', 'interpreter'],
+        // 51. Keamanan & Pengamanan Fisik (Security Garda Pratama)
+        ['security', 'satpam', 'petugas pengamanan', 'patroli keamanan', 'pengamanan aset', 'gardapratama', 'penjagaan pos'],
+        // 52. Driver Profesional & Transportasi Logistik
+        ['pengemudi', 'sopir profesional', 'driver logistik', 'sim b1', 'sim b2', 'safety driving', 'pengantaran barang', 'navigasi rute'],
+        // 53. Kasir, Teller Toko & Point of Sales (POS)
+        ['kasir', 'cashier', 'mesin kasir', 'sistem pos', 'point of sales', 'transaksi kasir', 'pembayaran kasir', 'hitung uang kas', 'closing kasir', 'operasional kasir'],
     ];
 
     /**
@@ -564,95 +694,206 @@ class MatchingEngineService
      * Mengekstrak poin-poin kompetensi profil kandidat (keahlian, sertifikasi, experience)
      * dan mencocokkannya dengan kebutuhan lowongan secara tekstual & semantik.
      */
+    /**
+     * Dimensi 1 (Utama): Evaluasi Keahlian & Kualifikasi Profil (Bobot 40%)
+     * 100% BEBAS TAKSONOMI ESCO / KBJI:
+     * Menilai kesesuaian murni dari teks riil kompetensi profil kandidat (keahlian, sertifikasi, experience)
+     * terhadap deskripsi, persyaratan, dan tag skill lowongan melalui semantic & synonym clustering.
+     */
     protected function evaluateCompetencyMatch(JobSeeker $candidate, object $job): array
     {
-        $rawProfileText = trim(
-            ($candidate->keahlian ?? '') . ' ' .
-            ($candidate->sertifikasi ?? '') . ' ' .
-            ($candidate->experience ?? '')
-        );
+        $candKeahlian = trim($candidate->keahlian ?? '');
+        $candSertifikasi = trim($candidate->sertifikasi ?? '');
+        $candExperience = trim($candidate->experience ?? '');
 
-        $jobReqText = trim(
-            ($job->judul_lowongan ?? $job->judul_pekerjaan ?? '') . ' ' .
-            ($job->deskripsi_pekerjaan ?? '') . ' ' .
-            ($job->persyaratan_tambahan ?? '')
-        );
+        // Kumpulkan item skill mandiri kandidat dari keahlian, sertifikasi, dan relasi jika ada (nama teksnya)
+        $candidateSkillItems = $this->extractSkillsFromText($candKeahlian);
+        if (!empty($candSertifikasi)) {
+            $candidateSkillItems = array_merge($candidateSkillItems, $this->extractSkillsFromText($candSertifikasi));
+        }
+        if (!empty($candidate->skills) && $candidate->skills->isNotEmpty()) {
+            foreach ($candidate->skills as $csk) {
+                if (!empty($csk->title)) $candidateSkillItems[] = $csk->title;
+                if (!empty($csk->title_en)) $candidateSkillItems[] = $csk->title_en;
+            }
+        }
+        $candidateSkillItems = array_values(array_unique(array_filter($candidateSkillItems)));
+
+        $rawProfileText = mb_strtolower(trim($candKeahlian . ' ' . $candSertifikasi . ' ' . $candExperience . ' ' . implode(' ', $candidateSkillItems)));
+        $profileTokens = $this->tokenizeText($rawProfileText);
+
+        $jobTitle = $job->judul_lowongan ?? $job->judul_pekerjaan ?? '';
+        $jobDesc = $job->deskripsi_pekerjaan ?? '';
+        $jobPersyaratan = $job->persyaratan_tambahan ?? '';
+        $jobReqText = mb_strtolower(trim($jobTitle . ' ' . $jobDesc . ' ' . $jobPersyaratan));
+        $jobReqTokens = $this->tokenizeText($jobReqText);
 
         $matchedSkills = [];
         $gapSkills = [];
+        $matchedSkillTitles = [];
+        $dummyId = 1000;
 
-        // 1. Jika Lowongan memiliki relasi skills (misal dari inputan HR atau referensi)
-        $jobSkills = $job->skills;
-        $candidateEscoSkills = $candidate->skills;
-        $candidateSkillIds = $candidateEscoSkills->pluck('id')->toArray();
+        // 1. Kumpulkan Target Kebutuhan Skill Lowongan
+        $targetRequirements = [];
 
-        if ($jobSkills->isNotEmpty()) {
-            foreach ($jobSkills as $reqSkill) {
-                // Layer A: Cek exact ID / relasi taksonomi
-                if (in_array($reqSkill->id, $candidateSkillIds)) {
-                    $matchedSkills[] = [
-                        'id' => $reqSkill->id,
-                        'title' => $reqSkill->title,
-                        'title_en' => $reqSkill->title_en,
-                        'tipe_keahlian' => $reqSkill->pivot->tipe_keahlian ?? 'wajib',
-                        'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
-                        'match_type' => 'Exact Match',
-                        'matched_with' => $reqSkill->title,
-                        'status_verifikasi' => 'Terverifikasi (Taksonomi)',
-                    ];
-                    continue;
-                }
+        // A. Prioritaskan Ekstraksi Poin Kualifikasi Riil dari Deskripsi & Persyaratan Lowongan
+        $extractedFromText = $this->extractRequirementsFromJobText($jobDesc . "\n" . $jobPersyaratan, $jobTitle);
 
-                // Layer B: Cek kemiripan teks nama skill di profil kandidat
-                $skillTitle = mb_strtolower(trim($reqSkill->title));
-                $skillTitleEn = mb_strtolower(trim($reqSkill->title_en ?? ''));
-
-                if (
-                    ($skillTitle !== '' && str_contains(mb_strtolower($rawProfileText), $skillTitle)) ||
-                    ($skillTitleEn !== '' && str_contains(mb_strtolower($rawProfileText), $skillTitleEn))
-                ) {
-                    $matchedSkills[] = [
-                        'id' => $reqSkill->id,
-                        'title' => $reqSkill->title,
-                        'title_en' => $reqSkill->title_en,
-                        'tipe_keahlian' => $reqSkill->pivot->tipe_keahlian ?? 'wajib',
-                        'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
-                        'match_type' => 'Padanan Teks Profil',
-                        'matched_with' => $reqSkill->title,
-                        'status_verifikasi' => 'Terpenuhi di CV/Profil',
-                    ];
-                    continue;
-                }
-
-                // Layer C: Cek kemiripan token kata kunci
-                $tokens = $this->tokenizeText($skillTitle);
-                $profileTokens = $this->tokenizeText($rawProfileText);
-                $common = array_intersect($tokens, $profileTokens);
-
-                if (count($common) >= 1 && (count($common) / max(1, count($tokens))) >= 0.5) {
-                    $matchedSkills[] = [
-                        'id' => $reqSkill->id,
-                        'title' => $reqSkill->title,
-                        'title_en' => $reqSkill->title_en,
-                        'tipe_keahlian' => $reqSkill->pivot->tipe_keahlian ?? 'wajib',
-                        'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
-                        'match_type' => 'Padanan Kata Kunci',
-                        'matched_with' => implode(', ', $common),
-                        'status_verifikasi' => 'Terpenuhi Sebagian',
-                    ];
-                } else {
-                    $gapSkills[] = [
-                        'id' => $reqSkill->id,
-                        'title' => $reqSkill->title,
-                        'title_en' => $reqSkill->title_en,
-                        'tipe_keahlian' => $reqSkill->pivot->tipe_keahlian ?? 'wajib',
-                        'level_kemahiran' => $reqSkill->pivot->level_kemahiran ?? 'menengah',
-                        'status' => 'missing_gap',
+        if (!empty($extractedFromText) && count($extractedFromText) >= 2) {
+            // Jika deskripsi pekerjaan memiliki poin kualifikasi riil, gunakan langsung
+            foreach ($extractedFromText as $ext) {
+                $targetRequirements[] = [
+                    'id' => ++$dummyId,
+                    'title' => $ext['title'],
+                    'raw_text' => $ext['raw_text'] ?? $ext['title'],
+                    'title_en' => null,
+                    'tipe_keahlian' => $ext['tipe_keahlian'] ?? 'wajib',
+                    'level_kemahiran' => $ext['level_kemahiran'] ?? 'menengah',
+                ];
+            }
+        } elseif (!empty($job->skills) && $job->skills->isNotEmpty()) {
+            // B. Fallback: gunakan tag lowongan yang bersih (saring istilah taksonomi asing/aneh)
+            $cleanJobSkills = $job->skills->filter(function($js) {
+                $t = mb_strtolower($js->title ?? $js->name ?? '');
+                return !str_contains($t, 'kebersihan industri') && 
+                       !str_contains($t, 'hewan') && 
+                       !str_contains($t, 'kebun anggur') && 
+                       !str_contains($t, 'kehutanan') &&
+                       mb_strlen($t) >= 3;
+            });
+            if ($cleanJobSkills->isNotEmpty()) {
+                foreach ($cleanJobSkills as $js) {
+                    $targetRequirements[] = [
+                        'id' => ++$dummyId,
+                        'title' => $js->title ?? $js->name ?? '',
+                        'raw_text' => $js->title ?? $js->name ?? '',
+                        'title_en' => $js->title_en ?? null,
+                        'tipe_keahlian' => $js->pivot->tipe_keahlian ?? 'wajib',
+                        'level_kemahiran' => $js->pivot->level_kemahiran ?? 'menengah',
                     ];
                 }
             }
+        }
 
-            // Hitung skor berbasis pemenuhan skill terstruktur lowongan
+        // C. Universal Fallback: Jika masih kosong atau kurang dari 2 (karena deskripsi berupa narasi singkat/hanya judul),
+        // sintesiskan kompetensi standar profesional berdasarkan judul formasi lowongan
+        if (count($targetRequirements) < 2) {
+            $synthesized = $this->synthesizeCompetenciesFromJobTitle($jobTitle, $jobDesc . ' ' . $jobPersyaratan);
+            foreach ($synthesized as $syn) {
+                $targetRequirements[] = [
+                    'id' => ++$dummyId,
+                    'title' => $syn['title'],
+                    'raw_text' => $syn['title'],
+                    'title_en' => null,
+                    'tipe_keahlian' => $syn['tipe_keahlian'] ?? 'wajib',
+                    'level_kemahiran' => 'menengah',
+                ];
+            }
+        }
+
+        // 2. Evaluasi Setiap Target Requirement (Bebas ID Taksonomi)
+        foreach ($targetRequirements as $req) {
+            $reqTitle = $req['title'];
+            $reqRawText = $req['raw_text'] ?? $reqTitle;
+            if (empty(trim($reqTitle))) continue;
+
+            // Evaluasi kecocokan menggunakan gabungan judul ringkas dan teks kualifikasi lengkap
+            $semanticTargetText = $reqTitle . ($reqRawText !== $reqTitle ? ' ' . $reqRawText : '');
+
+            $match = $this->matchSkillConcept(
+                $semanticTargetText,
+                $req['title_en'] ?? null,
+                $candidateSkillItems,
+                $rawProfileText,
+                $profileTokens
+            );
+
+            if ($match['matched']) {
+                $matchedSkills[] = [
+                    'id' => $req['id'],
+                    'title' => $reqTitle,
+                    'raw_description' => $reqRawText,
+                    'title_en' => $req['title_en'] ?? null,
+                    'tipe_keahlian' => $req['tipe_keahlian'],
+                    'level_kemahiran' => $req['level_kemahiran'],
+                    'match_type' => $match['type'],
+                    'matched_with' => $match['matched_with'],
+                    'status_verifikasi' => $match['status_verifikasi'],
+                ];
+                $matchedSkillTitles[] = mb_strtolower($reqTitle);
+            } else {
+                $gapSkills[] = [
+                    'id' => $req['id'],
+                    'title' => $reqTitle,
+                    'raw_description' => $reqRawText,
+                    'title_en' => $req['title_en'] ?? null,
+                    'tipe_keahlian' => $req['tipe_keahlian'],
+                    'level_kemahiran' => $req['level_kemahiran'],
+                    'status' => 'missing_gap',
+                ];
+            }
+        }
+
+        // 3. Tambahan: Cek Keahlian Riil Kandidat yang Secara Jelas Disebut di Deskripsi Pekerjaan
+        // Hanya tambahkan jika keahlian tersebut belum pernah terpakai untuk memenuhi target requirement
+        $alreadyMatchedValues = array_map('mb_strtolower', array_filter(array_column($matchedSkills, 'matched_with')));
+
+        foreach ($candidateSkillItems as $cSkill) {
+            $cSkillLower = mb_strtolower(trim($cSkill));
+            if (empty($cSkillLower) || mb_strlen($cSkillLower) < 3) continue;
+
+            // Lewati jika sudah cocok
+            if (in_array($cSkillLower, $matchedSkillTitles) || in_array($cSkillLower, $alreadyMatchedValues)) continue;
+
+            // Cek apakah keahlian kandidat disebut di deskripsi lowongan secara substantif
+            $hasMatch = false;
+            $matchedWord = $cSkill;
+
+            // 1. Exact phrase dengan word boundary
+            if (preg_match('/\b' . preg_quote($cSkillLower, '/') . '\b/iu', $jobReqText)) {
+                $hasMatch = true;
+            } else {
+                // 2. Token overlap: Jangan izinkan 1 token pendek acak memicu kecocokan skill multi-kata
+                $cTokens = array_values(array_filter($this->tokenizeText($cSkillLower), function($t) {
+                    return mb_strlen($t) >= 4 && !in_array($t, $this->stopWords);
+                }));
+
+                if (count($cTokens) === 1) {
+                    // Jika skill 1 kata substantif, wajib ada di token lowongan
+                    if (in_array($cTokens[0], $jobReqTokens)) {
+                        $hasMatch = true;
+                        $matchedWord = $cTokens[0];
+                    }
+                } elseif (count($cTokens) >= 2) {
+                    // Jika skill multi-kata, minimal 2 kata substantif DAN >= 60% token harus cocok
+                    $common = array_intersect($cTokens, $jobReqTokens);
+                    $threshold = max(2, (int) ceil(count($cTokens) * 0.6));
+                    if (count($common) >= $threshold) {
+                        $hasMatch = true;
+                        $matchedWord = implode(', ', $common);
+                    }
+                }
+            }
+
+            if ($hasMatch) {
+                $matchedSkills[] = [
+                    'id' => ++$dummyId,
+                    'title' => $cSkill,
+                    'title_en' => null,
+                    'tipe_keahlian' => 'tambahan',
+                    'level_kemahiran' => 'menengah',
+                    'match_type' => 'Keahlian Terpenuhi di CV',
+                    'matched_with' => $matchedWord,
+                    'status_verifikasi' => 'Sesuai Deskripsi Pekerjaan',
+                ];
+                $matchedSkillTitles[] = $cSkillLower;
+            }
+        }
+
+        // 4. Hitung Skor Keahlian Proporsional Murni
+        $totalItems = count($matchedSkills) + count($gapSkills);
+
+        if ($totalItems > 0) {
             $totalWeight = 0;
             $matchedWeight = 0;
             foreach ($matchedSkills as $m) {
@@ -667,101 +908,11 @@ class MatchingEngineService
 
             $skillScore = $totalWeight > 0 
                 ? (int) round(($matchedWeight / $totalWeight) * 100) 
-                : 100;
-
-            return [
-                'score' => min(100, max(0, $skillScore)),
-                'matched_skills' => $matchedSkills,
-                'gap_skills' => $gapSkills,
-            ];
-        }
-
-        // 2. Fallback: Jika lowongan belum memiliki daftar skill terstruktur, ekstrak kata kunci kompetensi dari teks profil kandidat vs lowongan
-        $candidateSkillItems = $this->extractSkillsFromText($candidate->keahlian ?? '');
-        if (!empty($candidate->sertifikasi)) {
-            $candidateSkillItems = array_merge($candidateSkillItems, $this->extractSkillsFromText($candidate->sertifikasi));
-        }
-
-        $jobReqLower = mb_strtolower($jobReqText);
-        $jobReqTokens = $this->tokenizeText($jobReqText);
-        $profileTokens = $this->tokenizeText($rawProfileText);
-
-        $dummyId = 10000;
-        foreach ($candidateSkillItems as $cSkill) {
-            // Lewati jika sudah ada di matched
-            $alreadyExists = false;
-            foreach ($matchedSkills as $m) {
-                if (mb_strtolower($m['title']) === mb_strtolower($cSkill)) {
-                    $alreadyExists = true;
-                    break;
-                }
-            }
-            if ($alreadyExists) continue;
-
-            $cSkillLower = mb_strtolower($cSkill);
-            $cTokens = $this->tokenizeText($cSkill);
-            $hasTokenMatch = false;
-            $matchedWord = $cSkill;
-
-            if (str_contains($jobReqLower, $cSkillLower)) {
-                $hasTokenMatch = true;
-            } else {
-                foreach ($cTokens as $tok) {
-                    if (mb_strlen($tok) >= 3 && in_array($tok, $jobReqTokens)) {
-                        $hasTokenMatch = true;
-                        $matchedWord = $tok;
-                        break;
-                    }
-                }
-            }
-
-            if ($hasTokenMatch) {
-                $matchedSkills[] = [
-                    'id' => ++$dummyId,
-                    'title' => $cSkill,
-                    'title_en' => null,
-                    'tipe_keahlian' => 'wajib',
-                    'level_kemahiran' => 'menengah',
-                    'match_type' => 'Keahlian Terpenuhi',
-                    'matched_with' => $matchedWord,
-                    'status_verifikasi' => 'Sesuai Deskripsi Pekerjaan',
-                ];
-            }
-        }
-
-        // 3. Ekstraksi potensi gap skills dari kata kunci penting lowongan jika gap_skills masih kosong
-        if (empty($gapSkills) && count($matchedSkills) < 6) {
-            $importantJobKeywords = array_filter($jobReqTokens, function($t) use ($profileTokens) {
-                return mb_strlen($t) >= 4 
-                    && !in_array($t, $profileTokens) 
-                    && !in_array($t, $this->stopWords);
-            });
-
-            $gapDummyId = 20000;
-            foreach (array_slice(array_values(array_unique($importantJobKeywords)), 0, 4) as $gapWord) {
-                $gapSkills[] = [
-                    'id' => ++$gapDummyId,
-                    'title' => ucwords($gapWord),
-                    'title_en' => null,
-                    'tipe_keahlian' => 'wajib',
-                    'level_kemahiran' => 'menengah',
-                    'status' => 'missing_gap',
-                ];
-            }
-        }
-
-        // 4. Perhitungan Skor Keahlian Komprehensif
-        $commonTokenCount = count(array_intersect($profileTokens, $jobReqTokens));
-        $reqTokenCount = max(1, count($jobReqTokens));
-        $tokenCoverage = min(1.0, $commonTokenCount / min(15, $reqTokenCount));
-
-        $totalItems = count($matchedSkills) + count($gapSkills);
-
-        if ($totalItems > 0) {
-            $itemRatioScore = (count($matchedSkills) / $totalItems) * 100;
-            $skillScore = (int) round((0.65 * $itemRatioScore) + (0.35 * ($tokenCoverage * 100)));
+                : 0;
         } else {
-            $skillScore = (int) round($tokenCoverage * 100);
+            // Fallback token coverage jika tidak ada list item
+            $common = count(array_intersect($profileTokens, $jobReqTokens));
+            $skillScore = min(100, (int) round(($common / max(1, min(10, count($jobReqTokens)))) * 100));
         }
 
         return [
@@ -769,6 +920,655 @@ class MatchingEngineService
             'matched_skills' => $matchedSkills,
             'gap_skills' => $gapSkills,
         ];
+    }
+
+    /**
+     * Pencocokan konsep skill murni berbasis teks & semantik (Bebas ID Taksonomi)
+     */
+    protected function matchSkillConcept(
+        string $targetSkill,
+        ?string $targetSkillEn,
+        array $candidateSkillItems,
+        string $rawProfileText,
+        array $profileTokens
+    ): array {
+        $targetLower = mb_strtolower(trim($targetSkill));
+        $targetEnLower = !empty($targetSkillEn) ? mb_strtolower(trim($targetSkillEn)) : '';
+
+        // 1. Cek Exact atau Substring Berbatas Kata pada Teks Profil
+        // Hanya izinkan jika panjang target >= 5 karakter dan bounded \b...\b (mencegah false match seperti "it", "cv", "pos")
+        if ($targetLower !== '' && mb_strlen($targetLower) >= 5 && preg_match('/\b' . preg_quote($targetLower, '/') . '\b/iu', $rawProfileText)) {
+            return [
+                'matched' => true,
+                'type' => 'Padanan Teks Profil',
+                'matched_with' => $targetSkill,
+                'status_verifikasi' => 'Terpenuhi di CV/Profil',
+            ];
+        }
+
+        if ($targetEnLower !== '' && mb_strlen($targetEnLower) >= 5 && preg_match('/\b' . preg_quote($targetEnLower, '/') . '\b/iu', $rawProfileText)) {
+            return [
+                'matched' => true,
+                'type' => 'Padanan Teks Profil (EN)',
+                'matched_with' => $targetSkillEn,
+                'status_verifikasi' => 'Terpenuhi di CV/Profil',
+            ];
+        }
+
+        // Cek pada daftar item keahlian kandidat
+        foreach ($candidateSkillItems as $cSkill) {
+            $cSkillLower = mb_strtolower(trim($cSkill));
+            if ($cSkillLower === '' || mb_strlen($cSkillLower) < 3) continue;
+
+            $isExactMatch = ($targetLower === $cSkillLower);
+            $minLen = min(mb_strlen($targetLower), mb_strlen($cSkillLower));
+            $maxLen = max(mb_strlen($targetLower), mb_strlen($cSkillLower));
+            $lengthRatio = $minLen / max(1, $maxLen);
+
+            // Substring hanya sah jika rasio panjang >= 70% dan berbatas kata (mencegah kata umum pendek mencocokkan requirement kompleks)
+            $isBoundSubstring = ($lengthRatio >= 0.70) && (
+                preg_match('/\b' . preg_quote($cSkillLower, '/') . '\b/iu', $targetLower) ||
+                preg_match('/\b' . preg_quote($targetLower, '/') . '\b/iu', $cSkillLower)
+            );
+
+            if ($isExactMatch || $isBoundSubstring) {
+                return [
+                    'matched' => true,
+                    'type' => 'Keahlian Terpenuhi',
+                    'matched_with' => $cSkill,
+                    'status_verifikasi' => 'Sesuai Profil Kandidat',
+                ];
+            }
+
+            if ($targetEnLower !== '') {
+                $isExactEn = ($targetEnLower === $cSkillLower);
+                $minLenEn = min(mb_strlen($targetEnLower), mb_strlen($cSkillLower));
+                $maxLenEn = max(mb_strlen($targetEnLower), mb_strlen($cSkillLower));
+                $lengthRatioEn = $minLenEn / max(1, $maxLenEn);
+
+                $isBoundSubstringEn = ($lengthRatioEn >= 0.70) && (
+                    preg_match('/\b' . preg_quote($cSkillLower, '/') . '\b/iu', $targetEnLower) ||
+                    preg_match('/\b' . preg_quote($targetEnLower, '/') . '\b/iu', $cSkillLower)
+                );
+
+                if ($isExactEn || $isBoundSubstringEn) {
+                    return [
+                        'matched' => true,
+                        'type' => 'Keahlian Terpenuhi (EN)',
+                        'matched_with' => $cSkill,
+                        'status_verifikasi' => 'Sesuai Profil Kandidat',
+                    ];
+                }
+            }
+        }
+
+        // 2. Cek Padanan Melalui Klaster Sinonim & Konsep Industri
+        $targetTokens = $this->tokenizeText($targetLower . ' ' . $targetEnLower);
+
+        foreach ($this->skillSynonymClusters as $cluster) {
+            $matchesTargetCluster = false;
+            foreach ($cluster as $syn) {
+                $synLower = mb_strtolower($syn);
+                if (mb_strlen($synLower) <= 3) {
+                    if (in_array($synLower, $targetTokens)) {
+                        $matchesTargetCluster = true;
+                        break;
+                    }
+                } else {
+                    // Gunakan batas kata (\b) agar 'terinformasi' tidak mencocokkan 'informasi'
+                    if (preg_match('/\b' . preg_quote($synLower, '/') . '\b/iu', $targetLower) || in_array($synLower, $targetTokens)) {
+                        $matchesTargetCluster = true;
+                        break;
+                    }
+                }
+            }
+
+            if ($matchesTargetCluster) {
+                // 1. Prioritaskan mencocokkan dengan keahlian eksplisit kandidat ($candidateSkillItems)
+                foreach ($candidateSkillItems as $cSkill) {
+                    $cLower = mb_strtolower($cSkill);
+                    foreach ($cluster as $syn) {
+                        $synLower = mb_strtolower($syn);
+                        if (mb_strlen($synLower) <= 3) {
+                            if ($cLower === $synLower) {
+                                return [
+                                    'matched' => true,
+                                    'type' => 'Padanan Konsep & Sinonim',
+                                    'matched_with' => $cSkill,
+                                    'status_verifikasi' => 'Sesuai Konsep Industri',
+                                ];
+                            }
+                        } else {
+                            if (preg_match('/\b' . preg_quote($synLower, '/') . '\b/iu', $cLower) || 
+                                preg_match('/\b' . preg_quote($cLower, '/') . '\b/iu', $synLower)) {
+                                return [
+                                    'matched' => true,
+                                    'type' => 'Padanan Konsep & Sinonim',
+                                    'matched_with' => $cSkill,
+                                    'status_verifikasi' => 'Sesuai Konsep Industri',
+                                ];
+                            }
+                        }
+                    }
+                }
+
+                // 2. Fallback: jika tidak ada di daftar skill, cek apakah ada konsep kuat di profil kandidat
+                foreach ($cluster as $syn) {
+                    $synLower = mb_strtolower($syn);
+                    $matchedSyn = false;
+                    if (mb_strlen($synLower) <= 3) {
+                        if (in_array($synLower, $profileTokens)) {
+                            $matchedSyn = true;
+                        }
+                    } else {
+                        if (preg_match('/\b' . preg_quote($synLower, '/') . '\b/iu', $rawProfileText)) {
+                            $matchedSyn = true;
+                        }
+                    }
+
+                    if ($matchedSyn) {
+                        return [
+                            'matched' => true,
+                            'type' => 'Padanan Konsep & Sinonim',
+                            'matched_with' => ucwords($syn),
+                            'status_verifikasi' => 'Sesuai Konsep Industri',
+                        ];
+                    }
+                }
+            }
+        }
+
+        // 3. Cek Irisan Token Kata Kunci (Hanya Kata Kunci Substantif Teknis)
+        if (!empty($targetTokens)) {
+            // Saring hanya token kata kunci substantif (panjang >= 4 karakter dan bukan stop words)
+            $substantiveTarget = array_values(array_filter($targetTokens, function ($t) {
+                return mb_strlen($t) >= 4 && !in_array($t, $this->stopWords);
+            }));
+
+            if (!empty($substantiveTarget)) {
+                $targetCount = count($substantiveTarget);
+
+                // 3a. Prioritaskan pengecekan irisan terhadap daftar keahlian eksplisit kandidat
+                foreach ($candidateSkillItems as $cSkill) {
+                    $cTokens = array_values(array_filter($this->tokenizeText(mb_strtolower($cSkill)), function ($t) {
+                        return mb_strlen($t) >= 4 && !in_array($t, $this->stopWords);
+                    }));
+                    if (!empty($cTokens)) {
+                        $commonExplicit = array_values(array_intersect($substantiveTarget, $cTokens));
+                        $cRatio = count($commonExplicit) / max(1, $targetCount);
+                        // Jika 2+ token substantif cocok dan memenuhi >= 50% requirement atau >= 60% skill kandidat
+                        if ((count($commonExplicit) >= 2 && $cRatio >= 0.50) || 
+                            (count($commonExplicit) >= 2 && (count($commonExplicit) / count($cTokens)) >= 0.60)) {
+                            return [
+                                'matched' => true,
+                                'type' => 'Padanan Kata Kunci',
+                                'matched_with' => $cSkill,
+                                'status_verifikasi' => 'Sesuai Keahlian Kandidat',
+                            ];
+                        }
+                    }
+                }
+
+                // 3b. Fallback pengecekan terhadap profil umum (CV) - aturan ketat untuk mencegah false positive
+                $substantiveProfile = array_values(array_filter($profileTokens, function ($t) {
+                    return mb_strlen($t) >= 4 && !in_array($t, $this->stopWords);
+                }));
+
+                if (!empty($substantiveProfile)) {
+                    $common = array_values(array_intersect($substantiveTarget, $substantiveProfile));
+                    $ratio = count($common) / max(1, $targetCount);
+
+                    // Syarat lolos padanan kata kunci teks CV:
+                    // Harus minimal 2 token substantif DAN rasio cakupan >= 50% (jika target 2-3 kata)
+                    // Atau minimal 3 token substantif DAN rasio cakupan >= 50% (jika target >= 4 kata)
+                    $isValidMatch = false;
+                    if ($targetCount <= 3 && count($common) >= 2 && $ratio >= 0.50) {
+                        $isValidMatch = true;
+                    } elseif ($targetCount > 3 && count($common) >= 3 && $ratio >= 0.50) {
+                        $isValidMatch = true;
+                    }
+
+                    if ($isValidMatch) {
+                        return [
+                            'matched' => true,
+                            'type' => 'Padanan Kata Kunci',
+                            'matched_with' => implode(', ', $common),
+                            'status_verifikasi' => 'Terpenuhi Sebagian di CV',
+                        ];
+                    }
+                }
+            }
+        }
+
+        return ['matched' => false];
+    }
+
+    /**
+     * Ekstraksi otomatis poin kualifikasi/keahlian dari teks deskripsi pekerjaan
+     * Menghasilkan daftar kebutuhan riil yang manusiawi dan mengenali 'wajib' vs 'tambahan'
+     */
+    protected function extractRequirementsFromJobText(string $jobText, string $jobTitle = ''): array
+    {
+        // 1. Decode HTML entities terlebih dahulu (&gt;, &amp;, dll)
+        $text = html_entity_decode($jobText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // 2. Ganti tag blok HTML (li, p, div, br, h1-h6) dengan newline agar teks butir daftar tidak menyatu
+        $text = preg_replace('/<\s*(li|p|div|br\s*\/|h[1-6])(\s+[^>]*)?>/i', "\n", $text);
+        $text = preg_replace('/<\s*\/\s*(li|p|div|h[1-6])>/i', "\n", $text);
+
+        // 3. Bersihkan sisa tag HTML
+        $clean = strip_tags($text);
+        $rawLines = preg_split('/[\r\n]+/', $clean);
+        $candidateLines = [];
+
+        // Jika teks berupa satu paragraf narasi panjang tanpa bullet, pecah juga berdasarkan tanda baca kalimat
+        foreach ($rawLines as $rl) {
+            $t = trim($rl);
+            if (mb_strlen($t) < 5) continue;
+
+            // Jika ada tanda bullet/nomor eksplisit di awal (1., 2), -, •), simpan langsung sebagai baris butir
+            if (preg_match('/^[\s\-\*\•\d\.\)\(\]]+/u', $t)) {
+                $candidateLines[] = $t;
+            } elseif (mb_strlen($t) > 75 && (str_contains($t, '. ') || str_contains($t, '; '))) {
+                // Pecah kalimat-kalimat narasi
+                $sentences = preg_split('/(?<=[.;])\s+/u', $t);
+                foreach ($sentences as $s) {
+                    $sTrimmed = trim($s);
+                    if (mb_strlen($sTrimmed) >= 10) {
+                        $candidateLines[] = $sTrimmed;
+                    }
+                }
+            } else {
+                $candidateLines[] = $t;
+            }
+        }
+
+        $reqs = [];
+        $seen = [];
+
+        // Kata/frasa non-skill yang wajib diabaikan
+        $ignorePatterns = [
+            'siap ditempatkan', 'bersedia ditempatkan', 'area proyek', 'perjalanan dinas',
+            'bersedia dinas', 'bersedia lembur', 'bersedia shift', 'bekerja shift',
+            'pria', 'wanita', 'laki-laki', 'perempuan', 'usia maksimal', 'usia minimal',
+            'pendidikan minimal', 'tamatan minimal', 'lulusan minimal', 'gaji', 'upah',
+            'kirim berkas', 'kirim cv', 'surat lamaran', 'portofolio', 'benefit', 'tunjangan',
+            'kualifikasi', 'persyaratan', 'deskripsi pekerjaan', 'tugas dan tanggung jawab',
+            'tugas', 'tanggung jawab', 'kriteria', 'ringkasan', 'front office berperan krusial',
+            'perusahaan kami', 'tentang kami', 'lowongan ini'
+        ];
+
+        // Kata tunggal umum yang DILARANG menjadi requirement mandiri
+        $forbiddenSingleWords = [
+            'saat', 'tamu', 'datang', 'check', 'in', 'out', 'pergi', 'bisa', 'ada', 'yang', 'dan', 'atau',
+            'untuk', 'dengan', 'serta', 'pada', 'dari', 'ke', 'ini', 'itu', 'adalah', 'kami', 'anda',
+            'dalam', 'sangat', 'baik', 'memiliki', 'mampu', 'dapat', 'harus', 'wajib', 'posisi'
+        ];
+
+        foreach ($candidateLines as $line) {
+            $rawLine = trim($line);
+            if (mb_strlen($rawLine) < 5) continue;
+
+            // Bersihkan nomor urut atau simbol bullet di awal: 1., 2), -, *, •
+            $cleanedLine = trim(preg_replace('/^[\s\-\*\•\d\.\)\(\]]+/u', '', $rawLine));
+            $lower = mb_strtolower($cleanedLine);
+
+            if (mb_strlen($cleanedLine) < 6 || mb_strlen($cleanedLine) > 200) {
+                continue;
+            }
+
+            // Cek apakah baris ini instruksi administratif atau deskripsi umum perusahaan
+            $isIgnored = false;
+            foreach ($ignorePatterns as $pattern) {
+                if (str_starts_with($lower, $pattern) || str_contains($lower, $pattern . ':') || $lower === $pattern) {
+                    $isIgnored = true;
+                    break;
+                }
+            }
+            if ($isIgnored) continue;
+
+            // Deteksi tipe keahlian (wajib vs tambahan/nilai plus)
+            $tipeKeahlian = 'wajib';
+            if (
+                str_contains($lower, 'nilai tambah') ||
+                str_contains($lower, 'nilai plus') ||
+                str_contains($lower, 'diutamakan') ||
+                str_contains($lower, 'keuntungan') ||
+                str_contains($lower, 'preferable') ||
+                str_contains($lower, 'opsional')
+            ) {
+                $tipeKeahlian = 'tambahan';
+            }
+
+            $formattedTitle = $this->cleanRequirementTitle($cleanedLine);
+            $titleLower = mb_strtolower($formattedTitle);
+
+            // Validasi kualitas: pastikan minimal 2 kata ATAU istilah teknis domain yang valid
+            $wordCount = count(preg_split('/\s+/u', trim($formattedTitle)));
+            if ($wordCount < 2 && in_array($titleLower, $forbiddenSingleWords)) {
+                continue;
+            }
+            if ($wordCount < 2 && mb_strlen($formattedTitle) < 9) {
+                continue;
+            }
+
+            if (mb_strlen($formattedTitle) >= 6 && !isset($seen[$titleLower])) {
+                $seen[$titleLower] = true;
+                $reqs[] = [
+                    'title' => $formattedTitle,
+                    'raw_text' => $cleanedLine,
+                    'tipe_keahlian' => $tipeKeahlian,
+                    'level_kemahiran' => 'menengah',
+                ];
+            }
+        }
+
+        return $reqs;
+    }
+
+    /**
+     * Sintesis kompetensi standar profesional industri berdasarkan judul formasi pekerjaan
+     * Universal Fallback: Menjamin SEMUA lowongan kerja memiliki rincian kompetensi yang profesional dan masuk akal
+     */
+    protected function synthesizeCompetenciesFromJobTitle(string $jobTitle, string $contextText = ''): array
+    {
+        $cleanTitle = trim($jobTitle);
+        $t = mb_strtolower($cleanTitle . ' ' . $contextText);
+
+        // 1. Front Office / Resepsionis / Perhotelan / Tamu
+        if (str_contains($t, 'front office') || str_contains($t, 'resepsionis') || str_contains($t, 'receptionist') || str_contains($t, 'frontliner') || str_contains($t, 'guest relation') || str_contains($t, 'concierge')) {
+            return [
+                ['title' => 'Pelayanan Tamu & Hospitality', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Komunikasi & Interaksi Pelanggan', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Prosedur Check-in & Administrasi Tamu', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Penanganan Informasi & Kepuasan Tamu', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 2. Kasir / Cashier / Teller
+        if (str_contains($t, 'kasir') || str_contains($t, 'cashier') || str_contains($t, 'teller')) {
+            return [
+                ['title' => 'Pengelolaan Transaksi Kasir & Sistem POS', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Ketelitian Hitung & Rekonsiliasi Kas', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pelayanan Pelanggan (Customer Service)', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pencatatan & Pelaporan Keuangan Harian', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 3. Administrasi / Admin / Tata Usaha / Staff Kantor / Sekretaris
+        if (str_contains($t, 'admin') || str_contains($t, 'administrasi') || str_contains($t, 'tata usaha') || str_contains($t, 'sekretaris') || str_contains($t, 'clerical')) {
+            return [
+                ['title' => 'Administrasi Dokumen & Pengarsipan', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pengoperasian Komputer & Aplikasi Perkantoran (MS Office/Excel)', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Ketelitian Pengolahan Data & Korespondensi', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Komunikasi Internal & Antar Tim', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 4. Sales / Marketing / Pemasaran / Penjualan / Promosi / SPG / SPM
+        if (str_contains($t, 'sales') || str_contains($t, 'marketing') || str_contains($t, 'pemasaran') || str_contains($t, 'penjualan') || str_contains($t, 'spg') || str_contains($t, 'spm') || str_contains($t, 'canvass') || str_contains($t, 'telemarketing')) {
+            return [
+                ['title' => 'Teknik Penjualan & Promosi Produk', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Komunikasi Persuasif & Negosiasi', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Orientasi Pencapaian Target Penjualan', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pengelolaan Hubungan Pelanggan (CRM)', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 5. Customer Service / Layanan Pelanggan / Call Center
+        if (str_contains($t, 'customer service') || str_contains($t, 'layanan pelanggan') || str_contains($t, 'call center') || str_contains($t, 'helpdesk') || str_contains($t, 'cs')) {
+            return [
+                ['title' => 'Komunikasi & Pelayanan Pelanggan', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Penyelesaian Masalah & Keluhan (Problem Solving)', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pemberian Informasi Produk & Layanan', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pencatatan Log & Feedback Pelanggan', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 6. Driver / Supir / Pengemudi / Kurir / Delivery
+        if (str_contains($t, 'driver') || str_contains($t, 'supir') || str_contains($t, 'sopir') || str_contains($t, 'pengemudi') || str_contains($t, 'kurir') || str_contains($t, 'delivery')) {
+            return [
+                ['title' => 'Keterampilan Mengemudi & Keselamatan Berkendara', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pemahaman Rute & Ketepatan Waktu Pengiriman', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Perawatan & Pemeriksaan Kendaraan Berkala', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pelayanan & Komunikasi Pengantaran Barang', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 7. Gudang / Warehouse / Logistik / Inventory / Checker
+        if (str_contains($t, 'gudang') || str_contains($t, 'warehouse') || str_contains($t, 'logistik') || str_contains($t, 'inventory') || str_contains($t, 'stok') || str_contains($t, 'checker')) {
+            return [
+                ['title' => 'Pengelolaan & Pengecekan Stok Barang', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Ketelitian Bongkar Muat & Penataan Gudang', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pencatatan Mutasi Barang (Inventory Control)', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Standar K3 & Keselamatan Kerja Pergudangan', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 8. IT / Programmer / Developer / Software / Web
+        if (str_contains($t, 'developer') || str_contains($t, 'programmer') || str_contains($t, 'software') || str_contains($t, 'web') || str_contains($t, 'frontend') || str_contains($t, 'backend') || str_contains($t, 'fullstack') || str_contains($t, 'it support')) {
+            return [
+                ['title' => 'Pemrograman Komputer & Logika Algoritma', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pengembangan & Pemeliharaan Aplikasi/Sistem', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Analisis Kebutuhan & Problem Solving Teknis', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pengujian & Dokumentasi Sistem Informasi', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 9. Project Manager / Koordinator Proyek
+        if (str_contains($t, 'project manager') || str_contains($t, 'manajer proyek') || str_contains($t, 'koordinator')) {
+            return [
+                ['title' => 'Manajemen Proyek & Timeline Eksekusi', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Koordinasi & Komunikasi Stakeholders', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Monitoring Progress & Mitigasi Risiko Proyek', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Dokumentasi & Pelaporan Proyek Berkala', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 10. Desain Grafis / Graphic Designer / Kreatif / Editor
+        if (str_contains($t, 'desain') || str_contains($t, 'designer') || str_contains($t, 'kreatif') || str_contains($t, 'editor') || str_contains($t, 'video')) {
+            return [
+                ['title' => 'Desain Grafis & Aplikasi Kreatif', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Kreativitas Visual & Tipografi', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pengembangan Aset Konten Visual', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Manajemen Revisi & Deadline Desain', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 11. Akuntansi / Finance / Keuangan / Pajak / Auditor
+        if (str_contains($t, 'akuntan') || str_contains($t, 'finance') || str_contains($t, 'keuangan') || str_contains($t, 'pajak') || str_contains($t, 'accounting')) {
+            return [
+                ['title' => 'Pencatatan Transaksi & Pembukuan Keuangan', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Penyusunan Laporan Keuangan & Rekonsiliasi', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Ketelitian Pengolahan Data Akuntansi', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Kepatuhan Pajak & Administrasi Keuangan', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 12. Koki / Cook / Chef / Barista / Waiter / F&B
+        if (str_contains($t, 'koki') || str_contains($t, 'chef') || str_contains($t, 'cook') || str_contains($t, 'barista') || str_contains($t, 'waiter') || str_contains($t, 'waitress') || str_contains($t, 'f&b') || str_contains($t, 'restoran')) {
+            return [
+                ['title' => 'Persiapan & Pengolahan Makanan/Minuman', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Standar Higienitas, Sanitasi & Kebersihan F&B', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pelayanan Cepat & Ketepatan Pesanan Pelanggan', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Manajemen Waktu & Kerjasama Tim', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 13. Satpam / Keamanan / Security
+        if (str_contains($t, 'satpam') || str_contains($t, 'keamanan') || str_contains($t, 'security')) {
+            return [
+                ['title' => 'Pengawasan & Penjagaan Keamanan Lingkungan', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Penerapan Prosedur SOP Keamanan & Tanggap Darurat', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pelayanan & Pemeriksaan Tamu/Pengunjung', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pencatatan Buku Log & Patroli Area', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 14. Operator Produksi / Teknisi / Mekanik
+        if (str_contains($t, 'operator') || str_contains($t, 'produksi') || str_contains($t, 'teknisi') || str_contains($t, 'mekanik')) {
+            return [
+                ['title' => 'Pengoperasian Mesin & Alat Kerja Sesuai SOP', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pemeriksaan Kualitas (Quality Control) & Ketelitian', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Penerapan Keselamatan dan Kesehatan Kerja (K3)', 'tipe_keahlian' => 'wajib'],
+                ['title' => 'Pemeliharaan & Troubleshooting Peralatan Kerja', 'tipe_keahlian' => 'tambahan'],
+            ];
+        }
+
+        // 15. Universal Default untuk Profesi Lainnya
+        $roleTitle = !empty($cleanTitle) ? ucwords(mb_strtolower($cleanTitle)) : 'Tugas Pokok Formasi';
+        return [
+            ['title' => 'Kompetensi Fungsional: ' . $roleTitle, 'tipe_keahlian' => 'wajib'],
+            ['title' => 'Komunikasi Efektif & Koordinasi Tim', 'tipe_keahlian' => 'wajib'],
+            ['title' => 'Manajemen Waktu & Ketelitian Kerja', 'tipe_keahlian' => 'wajib'],
+            ['title' => 'Kepatuhan Standar Operasional Prosedur (SOP)', 'tipe_keahlian' => 'tambahan'],
+        ];
+    }
+
+    /**
+     * Meringkas dan memurnikan baris persyaratan lowongan menjadi judul keahlian/kompetensi yang to-the-point
+     * Bilingual (Bahasa Indonesia & Bahasa Inggris): Mengubah kalimat narasi panjang menjadi nama keahlian ringkas 2-7 kata
+     */
+    protected function cleanRequirementTitle(string $line): string
+    {
+        $clean = trim($line);
+
+        // 1. Pangkas awalan kata kerja operasional, klise deskripsi, dan pengantar bertele-tele (ID & EN)
+        $prefixPatterns = [
+            // Pola Bahasa Indonesia
+            '/^(tetap\s+terinformasi\s+(tentang|mengenai)\s+|terinformasi\s+(tentang|mengenai)\s+)/ui',
+            '/^(melakukan\s+aktivitas\s+|melaksanakan\s+aktivitas\s+|menjalankan\s+aktivitas\s+|melakukan\s+kegiatan\s+|melaksanakan\s+kegiatan\s+)/ui',
+            '/^(melakukan\s+|melaksanakan\s+|menjalankan\s+|mengerjakan\s+|mengatur\s+|mengelola\s+|menangani\s+|memelihara\s+)/ui',
+            '/^(bertanggung\s+jawab\s+(untuk|atas|dalam|terhadap)\s+|bertanggung\s+jawab\s+)/ui',
+            '/^(memastikan\s+(kepatuhan|kelancaran|tercapainya|akurasi)?\s*(terhadap|pada|dalam)?\s*)/ui',
+            '/^(memiliki\s+kemampuan\s+(dalam|untuk)?\s*|memiliki\s+kapasitas\s+(dalam|untuk)?\s*|memiliki\s+keahlian\s+(dalam|untuk)?\s*|memiliki\s+pengalaman\s+(dalam|sebagai)?\s*|memiliki\s+)/ui',
+            '/^(mampu\s+bekerja\s+secara\s+|mampu\s+melakukan\s+|mampu\s+mengawasi\s+|mampu\s+mengoperasikan\s+|mampu\s+|dapat\s+|terbiasa\s+|bisa\s+)/ui',
+            '/^(memahami\s+alur\s+|memahami\s+konsep\s+|memahami\s+|menguasai\s+)/ui',
+            '/^(berpengalaman\s+(?:>\s*\d+\s*tahun\s+)?(?:minimal\s*\d+\s*tahun\s+)?sebagai\s+|berpengalaman\s+sebagai\s+|pengalaman\s+sebagai\s+)/ui',
+            '/^(wajib\s+|harus\s+|bersedia\s+)/ui',
+
+            // Pola Bahasa Inggris (English Prefixes)
+            '/^(based\s+on\s+.*?\s+(for|in|to)\s+|based\s+on\s+)/ui',
+            '/^(stay\s+informed\s+(about|on)\s+|keep\s+updated\s+(about|on)\s+)/ui',
+            '/^(responsible\s+for\s+(managing|handling|overseeing|leading|executing|performing)?\s*)/ui',
+            '/^(proven\s+experience\s+(in|as|with)?\s*|hands-on\s+experience\s+(in|with)?\s*|experience\s+(in|as|with)?\s*)/ui',
+            '/^(ability\s+to\s+(perform|execute|handle|manage|work|lead|deliver)?\s*|able\s+to\s+)/ui',
+            '/^(proficient\s+(in|with)\s+|expert\s+in\s+|skilled\s+in\s+)/ui',
+            '/^(strong\s+knowledge\s+of\s+|good\s+knowledge\s+of\s+|in-depth\s+knowledge\s+of\s+|deep\s+understanding\s+of\s+|understanding\s+of\s+)/ui',
+            '/^(must\s+have\s+(strong|solid|proven)?\s*|should\s+have\s+(strong|solid|proven)?\s*|must\s+possess\s+|possess\s+)/ui',
+            '/^(ensure\s+(compliance|accuracy|delivery|smooth)?\s*(with|of)?\s*)/ui',
+            '/^(performing\s+|executing\s+|conducting\s+|overseeing\s+)/ui',
+            '/^(perform\s+|execute\s+|conduct\s+|manage\s+|oversee\s+|handle\s+|assist\s+in\s+)/ui',
+            '/^(familiar\s+with\s+|familiarity\s+with\s+|knowledge\s+of\s+)/ui',
+            '/^(demonstrated\s+skills\s+in\s+|skills\s+in\s+)/ui',
+        ];
+        foreach ($prefixPatterns as $p) {
+            $clean = preg_replace($p, '', $clean);
+        }
+
+        // 2. Tangani tanda kurung terlebih dahulu sebelum suffix pattern memotongnya
+        $clean = preg_replace_callback('/\(([^)]+)\)/u', function($m) {
+            $inside = trim($m[1]);
+            $insideLower = mb_strtolower($inside);
+            if (str_contains($insideLower, 'sistem alur kerja') || str_contains($insideLower, 'workflow system') || str_contains($insideLower, 'aturan internal') || str_contains($insideLower, 'internal company') || mb_strlen($inside) > 40) {
+                if (preg_match('/(pemeriksaan dokumen|inspeksi dokumen|audit dokumen|document inspection|document audit)/ui', $inside, $subMatch)) {
+                    return '& ' . ucwords($subMatch[1]);
+                }
+                return ''; // Buang rincian operasional internal yang berbelit-belit
+            }
+            // Bersihkan awalan "misalnya, ", "contoh: ", "aturan ", "e.g., ", "such as "
+            $inside = preg_replace('/^(misalnya,?\s*|contoh:?\s*|aturan\s+|e\.?g\.?,?\s*|such\s+as\s+|for\s+example,?\s*)/ui', '', $inside);
+            $inside = preg_replace('/\b(peraturan|rules)\s+/ui', '', $inside);
+            if (mb_strlen($inside) <= 30) {
+                return '(' . trim($inside) . ')';
+            }
+            return '';
+        }, $clean);
+
+        // 3. Pangkas keterangan konteks internal/eksternal perusahaan di belakang (ID & EN)
+        $suffixPatterns = [
+            // Suffix Indonesia
+            '/\s*(menggunakan|melalui)\s+sistem\s+alur\s+kerja\s+internal\s*.*$/ui',
+            '/\s*sesuai\s+(dengan\s+)?(aturan|kebijakan|standar|prosedur|sop)\s+internal\s+perusahaan.*$/ui',
+            '/\s*sesuai\s+(dengan\s+)?(aturan|kebijakan|standar|prosedur|sop)\s+(yang\s+berlaku|perusahaan).*$/ui',
+            '/\s*di\s+dalam\s+organisasi\s+perusahaan.*$/ui',
+            '/\s*untuk\s+(kebutuhan|kepentingan|tujuan)\s+perusahaan.*$/ui',
+            '/\s*demi\s+(kelancaran|mendukung)\s+operasional.*$/ui',
+            '/\s*dan\s+berbagi\s+informasi\s+terbaru.*$/ui',
+            '/\s*serta\s+melaporkannya\s+kepada\s+.*$/ui',
+            '/\s*(menjadi|sebagai)?\s*(nilai\s+tambah|nilai\s+plus|nilai\s+keuntungan)\s*$/ui',
+            '/\s+yang\s+(sangat\s+)?(baik|unggul|efisien|disiplin|akurat)\s*$/ui',
+            '/\s*(dengan\s+)?(baik\s+dan\s+benar|secara\s+profesional|tepat\s+waktu)\s*$/ui',
+
+            // Keterangan tujuan / klausa subordinatif berlebih (ID & EN)
+            '/\s*,?\s+dalam\s+upaya\s+.*$/ui',
+            '/\s*,?\s+agar\s+(bisa|dapat|mampu|berjalan|mencapai)\s+.*$/ui',
+            '/\s*,?\s+untuk\s+(mencapai|mengarahkan|meningkatkan|mendukung|memaksimalkan|membantu|menghasilkan)\s+.*$/ui',
+            '/\s*,?\s+guna\s+(mencapai|meningkatkan|mendukung|memastikan)\s+.*$/ui',
+
+            // Suffix English
+            '/\s*,?\s+in\s+order\s+to\s+.*$/ui',
+            '/\s*,?\s+so\s+that\s+.*$/ui',
+            '/\s*,?\s+to\s+(achieve|reach|boost|support|drive|ensure|deliver)\s+.*$/ui',
+            '/\s*(in\s+accordance\s+with|according\s+to)\s+company\s+(rules|standards|policies|guidelines|regulations).*$/ui',
+            '/\s*using\s+internal\s+(workflow|company)\s+systems?.*$/ui',
+            '/\s*within\s+the\s+company\s+(organization|group).*$/ui',
+            '/\s*for\s+company\s+(operational|business)\s+needs.*$/ui',
+            '/\s*to\s+ensure\s+smooth\s+operations?.*$/ui',
+            '/\s*and\s+share\s+(the\s+)?latest\s+information.*$/ui',
+            '/\s*and\s+report\s+(it\s+)?to\s+(management|supervisor).*$/ui',
+            '/\s*(is\s+a\s+)?(plus|bonus|an\s+advantage|preferred)\s*$/ui',
+            '/\s+in\s+a\s+timely\s+(and\s+professional\s+)?manner\s*$/ui',
+            '/\s*(with\s+)?high\s+accuracy\s*$/ui',
+        ];
+        foreach ($suffixPatterns as $s) {
+            $clean = preg_replace($s, '', $clean);
+        }
+
+        // 4. Pangkas pelengkap komplementer yang bukan inti skill (ID & EN)
+        $clean = preg_replace('/\s+untuk\s+(barang|produk|jasa|layanan|kebutuhan)\s+.*$/ui', '', $clean);
+        $clean = preg_replace('/\s+for\s+(goods|products|services|business\s+schemes)\s+.*$/ui', '', $clean);
+
+        // 5. Potong klausa koordinatif kedua jika masih terlalu panjang
+        if (mb_strlen($clean) > 45) {
+            $parts = preg_split('/\s+(?:dan|serta|and)\s+(?:berbagi|berkoordinasi|menjalin|memastikan|melaporkan|share|collaborate|coordinate|ensure|report)\s+/ui', $clean);
+            if (!empty($parts[0]) && mb_strlen(trim($parts[0])) >= 8) {
+                $clean = trim($parts[0]);
+            }
+        }
+
+        // 6. Normalisasi kata pemanis dan spasi
+        $clean = preg_replace('/\b(terbaru|terkini|latest|current)\b/ui', '', $clean);
+        $clean = preg_replace('/\s+/', ' ', $clean);
+        $clean = trim($clean, " \t\n\r\0\x0B-.,;()&");
+
+        // Tutup tanda kurung jika terbuka
+        if (str_contains($clean, '(') && !str_contains($clean, ')')) {
+            $clean .= ')';
+        }
+
+        // 7. Jika hasilnya terlalu pendek (< 4 huruf), kembalikan baris asal yang dipangkas
+        if (mb_strlen($clean) < 4) {
+            $clean = trim($line);
+        }
+
+        // 8. Kapitalisasi awal kata judul secara profesional (Bilingual ID/EN)
+        $lowercaseWords = [
+            'dan', 'atau', 'di', 'ke', 'dari', 'yang', 'untuk', 'pada', 'dengan', 'serta',
+            'and', 'or', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'as', 'the', 'a', 'an'
+        ];
+        $words = preg_split('/\s+/u', $clean);
+        $titleWords = [];
+        foreach ($words as $idx => $w) {
+            $wLower = mb_strtolower($w);
+            if ($idx > 0 && in_array($wLower, $lowercaseWords)) {
+                $titleWords[] = $wLower;
+            } else {
+                $titleWords[] = mb_convert_case(mb_substr($w, 0, 1), MB_CASE_UPPER) . mb_substr($w, 1);
+            }
+        }
+
+        return implode(' ', $titleWords);
     }
 
     /**

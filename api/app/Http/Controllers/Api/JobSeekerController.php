@@ -460,23 +460,13 @@ class JobSeekerController extends Controller
         }
 
         $extractor = app(\App\Services\CandidateSkillExtractorService::class);
-        $forceRefresh = $request->boolean('refresh') || $request->boolean('reextract');
-
-        // Jika skill masih kosong atau ada instruksi re-extract
-        if ($jobSeeker->skills->isEmpty() || $forceRefresh) {
-            $extractor->syncSkillsForJobSeeker($jobSeeker, $forceRefresh);
-            $jobSeeker->load(['skills' => function ($q) {
-                $q->select('skill_nodes.id', 'skill_nodes.code', 'skill_nodes.title', 'skill_nodes.title_en', 'skill_nodes.type', 'skill_nodes.description');
-            }]);
-        }
-
-        $allKeywords = $extractor->extractAllKeywords($jobSeeker);
+        $extraction = $extractor->extractForJobSeeker($jobSeeker);
 
         return response()->json([
             'status' => 'success',
-            'data' => $jobSeeker->skills,
+            'data' => $extraction['skills'],
             'meta' => [
-                'keywords' => $allKeywords,
+                'keywords' => $extraction['keywords'],
                 'source_summary' => [
                     'keahlian' => $jobSeeker->keahlian,
                     'experience' => $jobSeeker->experience,
@@ -488,7 +478,7 @@ class JobSeekerController extends Controller
 
     /**
      * POST /api/job-seekers/{id}/extract-skills
-     * Ekstraksi ulang skill dari keahlian, experience, dan sertifikasi secara paksa
+     * Ekstraksi ulang skill dari keahlian, experience, dan sertifikasi secara autentik
      */
     public function extractSkills(Request $request, $id): JsonResponse
     {
@@ -500,29 +490,26 @@ class JobSeekerController extends Controller
 
         $extractor = app(\App\Services\CandidateSkillExtractorService::class);
         $extractor->syncSkillsForJobSeeker($jobSeeker, true);
-        $jobSeeker->load(['skills' => function ($q) {
-            $q->select('skill_nodes.id', 'skill_nodes.code', 'skill_nodes.title', 'skill_nodes.title_en', 'skill_nodes.type', 'skill_nodes.description');
-        }]);
+        $extraction = $extractor->extractForJobSeeker($jobSeeker);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Skill berhasil diekstraksi dari keahlian, pengalaman, dan sertifikasi.',
-            'data' => $jobSeeker->skills,
+            'message' => 'Skill berhasil diekstraksi langsung dari keahlian, pengalaman, dan sertifikasi.',
+            'data' => $extraction['skills'],
             'meta' => [
-                'keywords' => $extractor->extractAllKeywords($jobSeeker),
+                'keywords' => $extraction['keywords'],
             ],
         ]);
     }
 
     /**
      * POST /api/job-seekers/{id}/skills
-     * Update/Overwrite skill pencaker oleh operator
+     * Update/Overwrite skill pencaker oleh operator (Bebas ID Taksonomi)
      */
     public function updateSkills(Request $request, $id): JsonResponse
     {
         $request->validate([
             'skills' => 'required|array',
-            'skills.*' => 'integer|exists:skill_nodes,id'
         ]);
 
         $jobSeeker = JobSeeker::find($id);
@@ -531,24 +518,45 @@ class JobSeekerController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Not found'], 404);
         }
 
-        // Simpan dengan status is_manual = true dan source = manual
-        $syncData = [];
-        foreach ($request->skills as $skillId) {
-            $syncData[$skillId] = [
-                'is_manual' => true,
-                'source' => 'manual',
-            ];
+        $intSkills = [];
+        $textSkills = [];
+
+        foreach ($request->skills as $sk) {
+            if (is_numeric($sk)) {
+                $intSkills[] = (int) $sk;
+            } elseif (is_string($sk) && trim($sk) !== '') {
+                $textSkills[] = trim($sk);
+            }
         }
-        
-        $jobSeeker->skills()->sync($syncData);
-        $jobSeeker->load(['skills' => function ($q) {
-            $q->select('skill_nodes.id', 'skill_nodes.code', 'skill_nodes.title', 'skill_nodes.title_en', 'skill_nodes.type', 'skill_nodes.description');
-        }]);
+
+        // Simpan node ID yang valid ke pivot
+        if (!empty($intSkills)) {
+            $validNodes = \App\Models\SkillNode::whereIn('id', $intSkills)->pluck('id')->all();
+            $syncData = [];
+            foreach ($validNodes as $skillId) {
+                $syncData[$skillId] = [
+                    'is_manual' => true,
+                    'source' => 'manual',
+                ];
+            }
+            $jobSeeker->skills()->sync($syncData);
+        }
+
+        // Simpan free-text skill ke kolom keahlian profil
+        if (!empty($textSkills)) {
+            $existing = array_filter(array_map('trim', explode(',', $jobSeeker->keahlian ?? '')));
+            $merged = array_unique(array_merge($existing, $textSkills));
+            $jobSeeker->keahlian = implode(', ', $merged);
+            $jobSeeker->save();
+        }
+
+        $extractor = app(\App\Services\CandidateSkillExtractorService::class);
+        $extraction = $extractor->extractForJobSeeker($jobSeeker);
 
         return response()->json([
             'status' => 'success',
             'message' => 'Keahlian pencari kerja berhasil diperbarui',
-            'data' => $jobSeeker->skills
+            'data' => $extraction['skills'],
         ]);
     }
 }

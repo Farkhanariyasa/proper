@@ -24,56 +24,99 @@ class CandidateSkillExtractorService
     ];
 
     /**
-     * Ekstraksi skill ESCO secara otomatis untuk seorang pencari kerja
-     * berdasarkan kombinasi: keahlian, experience, dan sertifikasi.
+     * Ekstraksi skill murni dan autentik dari profil kandidat
+     * Berdasarkan 3 pilar: keahlian, experience, dan sertifikasi (Bebas Taksonomi ESCO).
      */
-    public function extractForJobSeeker(JobSeeker $jobSeeker, int $limitPerCategory = 5): array
+    public function extractForJobSeeker(JobSeeker $jobSeeker, int $limitPerCategory = 10): array
     {
         $keywords = $this->extractAllKeywords($jobSeeker);
 
-        $keahlianSkills = $this->searchSkillsForKeywords($keywords['keahlian'], 'keahlian', $limitPerCategory);
-        $experienceSkills = $this->searchSkillsForKeywords($keywords['experience'], 'experience', $limitPerCategory);
-        $sertifikasiSkills = $this->searchSkillsForKeywords($keywords['sertifikasi'], 'sertifikasi', $limitPerCategory);
-
-        // Gabungkan dan hindari duplikasi, sertakan metadata asal sumber
         $mergedSkills = [];
-        $seenIds = [];
+        $seenTitles = [];
+        $dummyId = 2000;
 
-        $addSkill = function ($skill, string $source) use (&$mergedSkills, &$seenIds) {
-            $id = $skill->id;
-            if (isset($seenIds[$id])) {
-                // Tambahkan sumber jika skill yang sama terdeteksi dari sumber lain
-                $existingIndex = $seenIds[$id];
-                $currentSources = explode(', ', $mergedSkills[$existingIndex]['source'] ?? '');
-                if (!in_array($source, $currentSources)) {
-                    $mergedSkills[$existingIndex]['source'] .= ', ' . $source;
-                }
+        $addSkill = function (string $title, string $source, bool $isManual = false) use (&$mergedSkills, &$seenTitles, &$dummyId) {
+            $cleanTitle = trim($title);
+            $lower = mb_strtolower($cleanTitle);
+            if (mb_strlen($cleanTitle) < 2 || isset($seenTitles[$lower])) {
                 return;
             }
 
-            $seenIds[$id] = count($mergedSkills);
+            // Cari HANYA jika ada exact match di skill_nodes, jangan pakai wildcard fuzzy '%...%'
+            $node = SkillNode::whereRaw('LOWER(title) = ?', [$lower])
+                ->orWhereRaw('LOWER(title_en) = ?', [$lower])
+                ->first();
+
+            $seenTitles[$lower] = true;
             $mergedSkills[] = [
-                'id' => $skill->id,
-                'code' => $skill->code,
-                'title' => $skill->title,
-                'title_en' => $skill->title_en,
-                'type' => $skill->type,
-                'description' => $skill->description,
+                'id' => $node ? $node->id : ++$dummyId,
+                'code' => $node?->code ?? null,
+                'title' => $cleanTitle,
+                'title_en' => $node?->title_en ?? null,
+                'type' => $node?->type ?? 'skill',
+                'description' => $node?->description ?? null,
                 'source' => $source,
-                'is_manual' => false,
+                'is_manual' => $isManual,
             ];
         };
 
-        foreach ($keahlianSkills as $skill) {
-            $addSkill($skill, 'keahlian');
+        // 1. Ekstraksi langsung dari kolom Keahlian riil
+        foreach (array_slice($keywords['keahlian'], 0, $limitPerCategory) as $k) {
+            $addSkill($k, 'keahlian');
         }
 
-        foreach ($experienceSkills as $skill) {
-            $addSkill($skill, 'experience');
+        // 2. Ekstraksi langsung dari pengalaman kerja riil
+        foreach (array_slice($keywords['experience'], 0, $limitPerCategory) as $e) {
+            $addSkill($e, 'experience');
         }
 
-        foreach ($sertifikasiSkills as $skill) {
-            $addSkill($skill, 'sertifikasi');
+        // 3. Ekstraksi langsung dari sertifikasi riil
+        foreach (array_slice($keywords['sertifikasi'], 0, $limitPerCategory) as $s) {
+            $addSkill($s, 'sertifikasi');
+        }
+
+        // 4. Sertakan keahlian manual yang pernah ditambahkan operator
+        try {
+            $manualSkills = $jobSeeker->skills()->wherePivot('is_manual', true)->get();
+            foreach ($manualSkills as $ms) {
+                $addSkill($ms->title, 'manual', true);
+            }
+        } catch (\Throwable $e) {
+        }
+
+        // 5. Anti-Redundansi: Bersihkan pecahan kata tunggal jika sudah tercakup dalam frasa lengkap
+        // (contoh: hapus 'Technical', 'Support', 'Client', 'Service' jika sudah ada 'Technical Support & Client Service')
+        $multiWordPhrases = [];
+        foreach ($mergedSkills as $s) {
+            $words = preg_split('/\s+/u', trim($s['title']));
+            if (count($words) >= 2) {
+                $multiWordPhrases[] = mb_strtolower($s['title']);
+            }
+        }
+
+        if (!empty($multiWordPhrases)) {
+            $cleanedMerged = [];
+            foreach ($mergedSkills as $s) {
+                $titleWords = preg_split('/\s+/u', trim($s['title']));
+                $lowerTitle = mb_strtolower(trim($s['title']));
+
+                // Jika hanya 1 kata, cek apakah kata ini merupakan pecahan dari frasa yang lebih lengkap
+                if (count($titleWords) === 1) {
+                    $isRedundantFragment = false;
+                    foreach ($multiWordPhrases as $phrase) {
+                        if (preg_match('/\b' . preg_quote($lowerTitle, '/') . '\b/iu', $phrase)) {
+                            $isRedundantFragment = true;
+                            break;
+                        }
+                    }
+                    if ($isRedundantFragment) {
+                        continue; // Lewati karena redundan
+                    }
+                }
+
+                $cleanedMerged[] = $s;
+            }
+            $mergedSkills = $cleanedMerged;
         }
 
         return [
@@ -81,46 +124,36 @@ class CandidateSkillExtractorService
             'keywords' => $keywords,
             'counts' => [
                 'total' => count($mergedSkills),
-                'from_keahlian' => $keahlianSkills->count(),
-                'from_experience' => $experienceSkills->count(),
-                'from_sertifikasi' => $sertifikasiSkills->count(),
+                'from_keahlian' => count(array_filter($mergedSkills, fn($s) => $s['source'] === 'keahlian')),
+                'from_experience' => count(array_filter($mergedSkills, fn($s) => $s['source'] === 'experience')),
+                'from_sertifikasi' => count(array_filter($mergedSkills, fn($s) => $s['source'] === 'sertifikasi')),
             ],
         ];
     }
 
     /**
-     * Sinkronisasikan skill ke tabel pivot pencaker_esco_skills
-     * Hanya timpa jika force = true atau belum ada skill manual.
+     * Sinkronisasikan skill kandidat ke tabel pivot pencaker_esco_skills
      */
     public function syncSkillsForJobSeeker(JobSeeker $jobSeeker, bool $force = false): array
     {
-        // Cek apakah kandidat sudah memiliki skill manual yang ditambahkan operator
-        $hasManualSkills = $jobSeeker->skills()->wherePivot('is_manual', true)->exists();
-
-        if ($hasManualSkills && !$force) {
-            // Jika ada skill manual dan tidak dipaksa re-extract, jangan timpa
-            return [
-                'skills' => $jobSeeker->skills()->get()->toArray(),
-                'message' => 'Skill manual dipertahankan.',
-            ];
-        }
-
         $extraction = $this->extractForJobSeeker($jobSeeker);
         $extractedSkills = $extraction['skills'];
 
         if (!empty($extractedSkills)) {
             $syncData = [];
             foreach ($extractedSkills as $s) {
-                $syncData[$s['id']] = [
-                    'is_manual' => false,
-                    'source' => $s['source'] ?? 'keahlian',
-                ];
+                $nodeExists = SkillNode::where('id', $s['id'])->exists();
+                if ($nodeExists) {
+                    $syncData[$s['id']] = [
+                        'is_manual' => $s['is_manual'] ?? false,
+                        'source' => $s['source'] ?? 'keahlian',
+                    ];
+                }
             }
 
-            $jobSeeker->skills()->sync($syncData);
-            $jobSeeker->load(['skills' => function ($q) {
-                $q->select('skill_nodes.id', 'skill_nodes.code', 'skill_nodes.title', 'skill_nodes.title_en', 'skill_nodes.type', 'skill_nodes.description');
-            }]);
+            if (!empty($syncData)) {
+                $jobSeeker->skills()->sync($syncData);
+            }
         }
 
         return $extraction;
@@ -272,17 +305,47 @@ class CandidateSkillExtractorService
                 $keywords[] = 'Memasak';
                 $keywords[] = 'Kuliner';
             }
-
-            // Tambahan kata turunan untuk multi-kata (misal: "Admin Gudang" -> "Gudang")
-            $words = preg_split('/\s+/u', $clean);
-            if (count($words) > 1) {
-                foreach ($words as $w) {
-                    $wClean = trim($w);
-                    if (mb_strlen($wClean) >= 4 && !$this->isPureStopword($wClean)) {
-                        $keywords[] = $wClean;
-                    }
-                }
+            if (str_contains($upper, 'K3') || str_contains($upper, 'HSE') || str_contains($upper, 'SAFETY') || str_contains($upper, 'EHS')) {
+                $keywords[] = 'K3 (Keselamatan Kerja)';
+                $keywords[] = 'HSE';
             }
+            if (str_contains($upper, 'HRD') || str_contains($upper, 'RECRUITER') || str_contains($upper, 'PERSONALIA') || str_contains($upper, 'HUMAN RESOURCE')) {
+                $keywords[] = 'Human Resources (HR)';
+                $keywords[] = 'Rekrutmen';
+            }
+            if (str_contains($upper, 'BARISTA') || str_contains($upper, 'BARTENDER') || str_contains($upper, 'WAITRESS') || str_contains($upper, 'WAITER') || str_contains($upper, 'F&B')) {
+                $keywords[] = 'Food & Beverage (F&B)';
+                $keywords[] = 'Pelayanan Pelanggan';
+            }
+            if (str_contains($upper, 'DESAIN') || str_contains($upper, 'DESIGN') || str_contains($upper, 'ILLUSTRATOR') || str_contains($upper, 'PHOTOSHOP')) {
+                $keywords[] = 'Desain Grafis';
+            }
+            if (str_contains($upper, 'LEGAL') || str_contains($upper, 'HUKUM')) {
+                $keywords[] = 'Legal & Kepatuhan';
+            }
+            if (str_contains($upper, 'PURCHASING') || str_contains($upper, 'BUYER') || str_contains($upper, 'PROCUREMENT') || str_contains($upper, 'PENGADAAN')) {
+                $keywords[] = 'Pengadaan (Procurement)';
+            }
+            if (str_contains($upper, 'EKSPOR') || str_contains($upper, 'IMPOR') || str_contains($upper, 'EXPORT') || str_contains($upper, 'IMPORT') || str_contains($upper, 'CUSTOMS')) {
+                $keywords[] = 'Ekspor Impor';
+                $keywords[] = 'Perdagangan Internasional';
+            }
+            if (str_contains($upper, 'DIGITAL MARKETING') || str_contains($upper, 'SEO') || str_contains($upper, 'SOCIAL MEDIA') || str_contains($upper, 'SOSMED')) {
+                $keywords[] = 'Digital Marketing';
+            }
+            if (str_contains($upper, 'LISTRIK') || str_contains($upper, 'ELEKTRO') || str_contains($upper, 'ELECTRIC')) {
+                $keywords[] = 'Kelistrikan';
+                $keywords[] = 'Teknik Elektro';
+            }
+            if (str_contains($upper, 'SIPIL') || str_contains($upper, 'KONSTRUKSI') || str_contains($upper, 'SURVEYOR')) {
+                $keywords[] = 'Teknik Sipil';
+                $keywords[] = 'Konstruksi';
+            }
+            if (str_contains($upper, 'MEKANIK') || str_contains($upper, 'OTOMOTIF')) {
+                $keywords[] = 'Teknik Otomotif';
+                $keywords[] = 'Mekanik';
+            }
+
 
             // Jika peran majemuk (mis: "ADMINISTRASI UMUM DAN BAGIAN KEUANGAN")
             if (preg_match('/\b(dan|&|\/)\b/i', $clean)) {
