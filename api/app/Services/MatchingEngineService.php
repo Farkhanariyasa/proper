@@ -390,8 +390,8 @@ class MatchingEngineService
         // Klasifikasi Skor
         $classification = $this->classifyScore($totalWeightedScore);
 
-        // Jika jenjang pendidikan kandidat jauh di bawah syarat, berikan penanda diskualifikasi
-        if (!$eduMatch['education_level_match']['is_matched'] && $eduMatch['education_level_match']['score'] < 30) {
+        // Jika jenjang pendidikan kandidat di bawah syarat minimal, berikan penanda diskualifikasi
+        if (!$eduMatch['education_level_match']['is_matched']) {
             $classification = [
                 'category' => 'disqualified',
                 'label' => 'Pendidikan Tidak Memenuhi',
@@ -778,6 +778,16 @@ class MatchingEngineService
     {
         $candidateEdu = $candidate->educationLevel ?? $candidate->pendidikan ?? null;
         $eduLevelMatch = $this->evaluateEducationMatch($candidateEdu, $job->educationLevel);
+
+        // Jika jenjang pendidikan di bawah syarat minimal, skor dimensi pendidikan adalah 0%
+        if (!$eduLevelMatch['is_matched']) {
+            return [
+                'score' => 0,
+                'education_level_match' => $eduLevelMatch,
+                'field_score' => 0,
+            ];
+        }
+
         $levelScore = $eduLevelMatch['score'];
 
         // Kesesuaian Jurusan
@@ -785,8 +795,7 @@ class MatchingEngineService
         $candField = trim($candidate->jurusan ?? '');
 
         if ($jobField === '' || mb_strtolower($jobField) === 'semua jurusan' || mb_strtolower($jobField) === 'semua') {
-            // Jika jenjang pendidikan di bawah syarat, skor jurusan proporsional dengan kesesuaian jenjang
-            $fieldScore = $eduLevelMatch['is_matched'] ? 100 : $levelScore;
+            $fieldScore = 100;
         } elseif ($candField === '') {
             $fieldScore = 50;
         } else {
@@ -969,10 +978,11 @@ class MatchingEngineService
 
         $gap = $jLevel - $cLevel;
         return [
-            'is_matched' => $gap <= 1, // Toleransi 1 tingkat masih diizinkan
+            'is_matched' => false,
             'status' => 'di_bawah_syarat',
             'label' => 'Di Bawah Syarat (Butuh Min. ' . $jName . ')',
-            'score' => max(0, 100 - ($gap * 35)),
+            'score' => 0,
+            'gap_levels' => $gap,
             'required_level' => $jName,
             'candidate_level' => $cName,
         ];
