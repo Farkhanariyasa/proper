@@ -96,7 +96,7 @@ class LowonganController extends Controller
     public function store(StoreLowonganRequest $request): JsonResponse
     {
         $validated = $request->validated();
-        $skillsData = $validated['skills'];
+        $skillsData = $validated['skills'] ?? [];
         unset($validated['skills']);
 
         // Default creator
@@ -109,6 +109,18 @@ class LowonganController extends Controller
         $validated['slug'] = $baseSlug . '-' . Str::lower(Str::random(5));
 
         try {
+            $statusLoker = isset($validated['status_lowongan']) ? strtolower($validated['status_lowongan']) : 'draft';
+            $tanggalTayang = $validated['tanggal_buka'] ?? null;
+            if (!$tanggalTayang && $statusLoker === 'published') {
+                $tanggalTayang = now();
+            }
+
+            $gajiTampilkan = $validated['gaji_tampilkan'] ?? true;
+            $rentangGaji = null;
+            if ($gajiTampilkan && (isset($validated['gaji_minimal']) || isset($validated['gaji_maksimal']))) {
+                $rentangGaji = ($validated['gaji_minimal'] ?? '0') . '-' . ($validated['gaji_maksimal'] ?? '0');
+            }
+
             $mappedData = [
                 'job_id' => 'JOB-' . Str::random(4) . '-' . Str::random(4),
                 'vac_id' => 'VAC-' . Str::random(4) . '-' . Str::random(4),
@@ -116,16 +128,16 @@ class LowonganController extends Controller
                 'nama_perusahaan' => $validated['nama_perusahaan'] ?? null,
                 'deskripsi_pekerjaan' => $validated['deskripsi_pekerjaan'] ?? null,
                 'tipe_pekerjaan' => $validated['tipe_pekerjaan'] ?? null,
-                'status_loker' => isset($validated['status_lowongan']) ? strtolower($validated['status_lowongan']) : 'draft',
+                'status_loker' => $statusLoker,
                 'kuota' => $validated['jumlah_kebutuhan'] ?? null,
-                'rentang_gaji' => (isset($validated['gaji_minimal']) || isset($validated['gaji_maksimal'])) 
-                    ? (($validated['gaji_minimal'] ?? '0') . '-' . ($validated['gaji_maksimal'] ?? '0')) 
-                    : null,
+                'rentang_gaji' => $rentangGaji,
                 'reg' => $validated['alamat_lengkap_penempatan'] ?? null,
                 'provinsi_id' => $validated['provinsi_id'] ?? null,
                 'regency_id' => $validated['regency_id'] ?? null,
                 'kbji_2026_id' => $validated['kbji_id'] ?? null,
                 'education_level_id' => $validated['education_level_id'] ?? null,
+                'tanggal_tayang' => $tanggalTayang,
+                'tanggal_expired_lowongan' => $validated['tanggal_tutup'] ?? null,
                 'tanggal_dibuat' => now(),
             ];
 
@@ -133,15 +145,32 @@ class LowonganController extends Controller
                 $item = LowonganKerja::create($mappedData);
 
                 if (!empty($skillsData)) {
+                    $hasLevelCol = \Illuminate\Support\Facades\Schema::hasColumn('lowongan_skills', 'level_kemahiran');
                     $insertSkills = [];
                     foreach ($skillsData as $sk) {
-                        $insertSkills[] = [
+                        $level = in_array($sk['level_kemahiran'] ?? '', ['pemula', 'menengah', 'ahli']) 
+                            ? $sk['level_kemahiran'] 
+                            : 'menengah';
+                        $skor = match($level) {
+                            'ahli' => 1.0,
+                            'pemula' => 0.4,
+                            default => 0.7,
+                        };
+
+                        $row = [
                             'vac_id' => $item->vac_id,
                             'esco_skill_id' => $sk['esco_skill_id'],
                             'tipe_keahlian' => $sk['tipe_keahlian'] ?? 'wajib',
-                            'skor' => 1.0,
+                            'skor' => $skor,
                             'metode' => 'input_manual',
+                            'created_at' => now(),
                         ];
+
+                        if ($hasLevelCol) {
+                            $row['level_kemahiran'] = $level;
+                        }
+
+                        $insertSkills[] = $row;
                     }
                     DB::table('lowongan_skills')->insert($insertSkills);
                 }
@@ -237,14 +266,74 @@ class LowonganController extends Controller
             if (array_key_exists('kbji_id', $validated)) $mappedData['kbji_2026_id'] = $validated['kbji_id'];
             if (array_key_exists('education_level_id', $validated)) $mappedData['education_level_id'] = $validated['education_level_id'];
 
-            if (array_key_exists('gaji_minimal', $validated) || array_key_exists('gaji_maksimal', $validated)) {
-                $mappedData['rentang_gaji'] = ($validated['gaji_minimal'] ?? '0') . '-' . ($validated['gaji_maksimal'] ?? '0');
+            if (array_key_exists('tanggal_buka', $validated)) {
+                $mappedData['tanggal_tayang'] = $validated['tanggal_buka'];
+            }
+            if (array_key_exists('tanggal_tutup', $validated)) {
+                $mappedData['tanggal_expired_lowongan'] = $validated['tanggal_tutup'];
+            }
+            if (($mappedData['status_loker'] ?? '') === 'published' && !$lowongan->tanggal_tayang && empty($mappedData['tanggal_tayang'])) {
+                $mappedData['tanggal_tayang'] = now();
+            }
+
+            if (array_key_exists('gaji_minimal', $validated) || array_key_exists('gaji_maksimal', $validated) || array_key_exists('gaji_tampilkan', $validated)) {
+                $tampilkan = $validated['gaji_tampilkan'] ?? ($lowongan->rentang_gaji !== null);
+                if ($tampilkan && (isset($validated['gaji_minimal']) || isset($validated['gaji_maksimal']))) {
+                    $mappedData['rentang_gaji'] = ($validated['gaji_minimal'] ?? '0') . '-' . ($validated['gaji_maksimal'] ?? '0');
+                } elseif (!$tampilkan) {
+                    $mappedData['rentang_gaji'] = null;
+                }
             }
             
             $mappedData['tanggal_update'] = now();
 
-            DB::transaction(function () use ($lowongan, $mappedData) {
+            DB::transaction(function () use ($lowongan, $mappedData, $hasSkills, $skillsData) {
                 $lowongan->update($mappedData);
+
+                if ($hasSkills && is_array($skillsData)) {
+                    $vacId = $lowongan->vac_id;
+                    if (!$vacId) {
+                        $vacId = 'VAC-' . Str::random(4) . '-' . Str::random(4);
+                        $lowongan->vac_id = $vacId;
+                        $lowongan->save();
+                    }
+
+                    // Hapus skill lama untuk vac_id ini
+                    DB::table('lowongan_skills')->where('vac_id', $vacId)->delete();
+
+                    // Insert skill baru
+                    $hasLevelCol = \Illuminate\Support\Facades\Schema::hasColumn('lowongan_skills', 'level_kemahiran');
+                    $insertSkills = [];
+                    foreach ($skillsData as $sk) {
+                        $level = in_array($sk['level_kemahiran'] ?? '', ['pemula', 'menengah', 'ahli']) 
+                            ? $sk['level_kemahiran'] 
+                            : 'menengah';
+                        $skor = match($level) {
+                            'ahli' => 1.0,
+                            'pemula' => 0.4,
+                            default => 0.7,
+                        };
+
+                        $row = [
+                            'vac_id' => $vacId,
+                            'esco_skill_id' => $sk['esco_skill_id'],
+                            'tipe_keahlian' => $sk['tipe_keahlian'] ?? 'wajib',
+                            'skor' => $skor,
+                            'metode' => 'input_manual',
+                            'created_at' => now(),
+                        ];
+
+                        if ($hasLevelCol) {
+                            $row['level_kemahiran'] = $level;
+                        }
+
+                        $insertSkills[] = $row;
+                    }
+
+                    if (!empty($insertSkills)) {
+                        DB::table('lowongan_skills')->insert($insertSkills);
+                    }
+                }
             });
 
             $lowongan->load([
@@ -261,11 +350,13 @@ class LowonganController extends Controller
                 'data' => new LowonganResource($lowongan),
             ]);
         } catch (Exception $e) {
-            Log::error('Gagal memperbarui lowongan: ' . $e->getMessage());
+            Log::error('Gagal memperbarui lowongan: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
 
             return response()->json([
                 'status' => 'error',
-                'message' => 'Terjadi kesalahan sistem saat memperbarui lowongan.',
+                'message' => 'Terjadi kesalahan sistem saat memperbarui lowongan: ' . $e->getMessage(),
             ], 500);
         }
     }

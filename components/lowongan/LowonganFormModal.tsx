@@ -229,13 +229,19 @@ export default function LowonganFormModal({
 
       if (initialData.skills) {
         setSkills(
-          initialData.skills.map((s) => ({
-            esco_skill_id: s.id,
-            title: s.title,
-            title_en: s.title_en,
-            tipe_keahlian: s.tipe_keahlian,
-            level_kemahiran: s.level_kemahiran,
-          }))
+          initialData.skills.map((s) => {
+            const validLevels = ['pemula', 'menengah', 'ahli'];
+            const level = validLevels.includes(s.level_kemahiran as any)
+              ? (s.level_kemahiran as 'pemula' | 'menengah' | 'ahli')
+              : 'menengah';
+            return {
+              esco_skill_id: s.id,
+              title: s.title,
+              title_en: s.title_en,
+              tipe_keahlian: s.tipe_keahlian || 'wajib',
+              level_kemahiran: level,
+            };
+          })
         );
       } else {
         setSkills([]);
@@ -375,7 +381,9 @@ export default function LowonganFormModal({
       skills: skills.map((s) => ({
         esco_skill_id: s.esco_skill_id,
         tipe_keahlian: s.tipe_keahlian,
-        level_kemahiran: s.level_kemahiran,
+        level_kemahiran: ['pemula', 'menengah', 'ahli'].includes(s.level_kemahiran)
+          ? s.level_kemahiran
+          : 'menengah',
       })),
     };
 
