@@ -150,16 +150,16 @@ export default function SkillGapModal({
                   <span className="text-[10px] px-1.5 py-0.2 bg-purple-50 text-purple-700 rounded font-bold">30%</span>
                 </div>
                 <div className="text-xl font-black text-slate-900">
-                  {data.score_breakdown?.education_score ?? (data.education_match?.is_matched ? 100 : 50)}%
+                  {data.score_breakdown?.education_score ?? (data.education_match?.is_matched ? 100 : 0)}%
                 </div>
                 <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-purple-600 rounded-full" 
-                    style={{ width: `${data.score_breakdown?.education_score ?? (data.education_match?.is_matched ? 100 : 50)}%` }} 
+                    style={{ width: `${data.score_breakdown?.education_score ?? (data.education_match?.is_matched ? 100 : 0)}%` }} 
                   />
                 </div>
                 <p className="text-[10px] text-slate-400 leading-tight">
-                  {data.education_match?.is_matched ? 'Memenuhi Syarat' : 'Di Bawah Syarat'}
+                  {data.education_match?.is_matched ? 'Memenuhi Syarat' : 'Di Bawah Syarat (0%)'}
                 </p>
               </div>
 
@@ -264,6 +264,22 @@ export default function SkillGapModal({
             </div>
           </div>
 
+          {/* Keterangan Bobot Wajib & Tambahan */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600 bg-slate-50 border border-slate-200/90 rounded-xl px-3.5 py-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-slate-700">Aturan Bobot Keahlian:</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 uppercase">
+                Wajib (Bobot 1.0)
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 uppercase">
+                Tambahan (Bobot 0.7)
+              </span>
+            </div>
+            <div className="text-[11px] text-emerald-700 font-medium">
+              Pencocokan Semantik & Konsep Industri (Bebas ID Taksonomi)
+            </div>
+          </div>
+
           {/* Rincian Komparasi Dua Kolom: Matched vs Gap */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Kolom Kiri: Kompetensi Memenuhi (Matched Skills) */}
@@ -293,10 +309,11 @@ export default function SkillGapModal({
                           className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${
                             sk.tipe_keahlian === 'wajib'
                               ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                              : 'bg-slate-100 text-slate-600'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
                           }`}
+                          title={sk.tipe_keahlian === 'wajib' ? 'Keahlian Wajib (Bobot 1.0)' : 'Keahlian Tambahan (Bobot 0.7)'}
                         >
-                          {sk.tipe_keahlian}
+                          {sk.tipe_keahlian === 'wajib' ? 'Wajib' : 'Tambahan'}
                         </span>
                       </div>
 
@@ -350,8 +367,9 @@ export default function SkillGapModal({
                           className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${
                             sk.tipe_keahlian === 'wajib'
                               ? 'bg-red-50 text-red-700 border border-red-200'
-                              : 'bg-slate-100 text-slate-600'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
                           }`}
+                          title={sk.tipe_keahlian === 'wajib' ? 'Keahlian Wajib (Bobot 1.0)' : 'Keahlian Tambahan (Bobot 0.7)'}
                         >
                           {sk.tipe_keahlian === 'wajib' ? 'Wajib Dimiliki' : 'Tambahan'}
                         </span>

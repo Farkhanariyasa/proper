@@ -49,10 +49,17 @@ class MatchingController extends Controller
 
             if (!empty($validated['skills']) && is_array($validated['skills'])) {
                 $existingIds = $seeker->skills->pluck('id')->toArray();
-                $missingIds = array_diff($validated['skills'], $existingIds);
+                $numericIds = array_filter($validated['skills'], fn($s) => is_numeric($s));
+                $stringSkills = array_filter($validated['skills'], fn($s) => !is_numeric($s));
+
+                $missingIds = array_diff($numericIds, $existingIds);
                 if (!empty($missingIds)) {
                     $additionalSkills = \App\Models\SkillNode::whereIn('id', $missingIds)->get();
                     $seeker->setRelation('skills', $seeker->skills->concat($additionalSkills));
+                }
+
+                if (!empty($stringSkills)) {
+                    $seeker->keahlian = trim(($seeker->keahlian ?? '') . ', ' . implode(', ', $stringSkills));
                 }
             }
 

@@ -142,7 +142,7 @@ export async function recommendLowonganApi(payload: {
   kbji_code?: string;
   provinsi_id?: string;
   kabkota_id?: string;
-  skills: number[];
+  skills: (number | string)[];
   filter_pendidikan?: boolean;
 }): Promise<any[]> {
   const baseUrl = getApiBaseUrl();
