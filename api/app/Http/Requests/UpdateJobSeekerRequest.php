@@ -2,12 +2,15 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\JobSeekerFields;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
 class UpdateJobSeekerRequest extends FormRequest
 {
+    use JobSeekerFields;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -17,31 +20,16 @@ class UpdateJobSeekerRequest extends FormRequest
     }
 
     /**
-     * Get the validation rules that apply to the request.
+     * Sama dengan form Tambah, tetapi hanya kolom yang dikirim yang divalidasi
+     * (form Edit mengirim kolom yang berubah saja).
      */
     public function rules(): array
     {
-        return [
-            'name' => ['sometimes', 'required', 'string', 'max:150'],
-            'full_name' => ['sometimes', 'required', 'string', 'max:150'],
-            'gender' => ['nullable', 'in:L,P,Laki-laki,Perempuan'],
-            'jenis_kelamin' => ['nullable', 'string', 'max:20'],
-            'birth_date' => ['nullable', 'date', 'before:today'],
-            'umur' => ['nullable', 'integer', 'min:15', 'max:80'],
-            'province_id' => ['nullable', 'string', 'size:2', 'exists:provinces,id'],
-            'regency_id' => ['nullable', 'string', 'size:5', 'exists:regencies,id'],
-            'education_level_id' => ['nullable', 'integer', 'exists:education_levels,id'],
-            'jurusan' => ['nullable', 'string', 'max:150'],
-            'nama_sekolah' => ['nullable', 'string', 'max:150'],
-            'experience' => ['nullable', 'string', 'max:255'],
-            'keahlian' => ['nullable', 'string'],
-            'sertifikasi' => ['nullable', 'string'],
-            'lembaga_pelatihan' => ['nullable', 'string'],
-            'progpel' => ['nullable', 'string'],
-            'status_bekerja' => ['nullable', 'string', 'max:100'],
-            'skills' => ['nullable', 'array'],
-            'skills.*' => ['integer', 'exists:skill_nodes,id'],
-        ];
+        $rules = $this->jobSeekerFieldRules();
+        foreach (['full_name', 'gender', 'province_id', 'regency_id', 'education_level_id'] as $field) {
+            array_unshift($rules[$field], 'sometimes', 'required');
+        }
+        return $rules;
     }
 
     /**

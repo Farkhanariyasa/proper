@@ -18,7 +18,8 @@ class UpdateLowonganRequest extends FormRequest
         return [
             'judul_lowongan' => ['sometimes', 'required', 'string', 'max:150'],
             'nama_perusahaan' => ['sometimes', 'required', 'string', 'max:150'],
-            'kbji_id' => ['sometimes', 'required', 'integer', 'exists:kbji_classifications_2026,id'],
+            // KBJI opsional (disembunyikan dari form)
+            'kbji_id' => ['sometimes', 'nullable', 'integer', 'exists:kbji_classifications_2026,id'],
             'lapangan_usaha_id' => ['nullable', 'integer'],
             'deskripsi_pekerjaan' => ['sometimes', 'required', 'string'],
             'tipe_pekerjaan' => ['sometimes', 'required', 'string', 'in:Full time,Part time,Contract,Internship'],

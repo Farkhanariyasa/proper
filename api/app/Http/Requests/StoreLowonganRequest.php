@@ -18,7 +18,8 @@ class StoreLowonganRequest extends FormRequest
         return [
             'judul_lowongan' => ['required', 'string', 'max:150'],
             'nama_perusahaan' => ['required', 'string', 'max:150'],
-            'kbji_id' => ['required', 'integer', 'exists:kbji_classifications_2026,id'],
+            // KBJI & skill ESCO opsional (disembunyikan dari form)
+            'kbji_id' => ['nullable', 'integer', 'exists:kbji_classifications_2026,id'],
             'lapangan_usaha_id' => ['nullable', 'integer'],
             'deskripsi_pekerjaan' => ['required', 'string'],
             'tipe_pekerjaan' => ['required', 'string', 'in:Full time,Part time,Contract,Internship'],
@@ -41,9 +42,9 @@ class StoreLowonganRequest extends FormRequest
             'status_lowongan' => ['nullable', 'string', 'in:Draft,Published,Closed,Expired,Suspended,Blocked,Archived'],
             'tanggal_buka' => ['nullable', 'date'],
             'tanggal_tutup' => ['required', 'date', 'after_or_equal:tanggal_buka'],
-            'skills' => ['required', 'array', 'min:1'],
-            'skills.*.esco_skill_id' => ['required', 'integer', 'exists:skill_nodes,id'],
-            'skills.*.tipe_keahlian' => ['required', 'string', 'in:wajib,tambahan'],
+            'skills' => ['nullable', 'array'],
+            'skills.*.esco_skill_id' => ['required_with:skills', 'integer', 'exists:skill_nodes,id'],
+            'skills.*.tipe_keahlian' => ['required_with:skills', 'string', 'in:wajib,tambahan'],
             'skills.*.level_kemahiran' => ['nullable', 'string', 'in:pemula,menengah,ahli'],
         ];
     }
@@ -53,7 +54,6 @@ class StoreLowonganRequest extends FormRequest
         return [
             'judul_lowongan.required' => 'Judul lowongan wajib diisi.',
             'nama_perusahaan.required' => 'Nama perusahaan wajib diisi.',
-            'kbji_id.required' => 'Jabatan KBJI wajib dipilih.',
             'kbji_id.exists' => 'Jabatan KBJI yang dipilih tidak terdaftar.',
             'education_level_id.required' => 'Pendidikan minimal wajib dipilih.',
             'education_level_id.exists' => 'Pendidikan yang dipilih tidak valid.',
@@ -62,7 +62,6 @@ class StoreLowonganRequest extends FormRequest
             'gaji_maksimal.gte' => 'Gaji maksimal harus lebih besar atau sama dengan gaji minimal.',
             'usia_maksimal.gte' => 'Usia maksimal harus lebih besar atau sama dengan usia minimal.',
             'tanggal_tutup.after_or_equal' => 'Tanggal tutup harus sama atau setelah tanggal buka.',
-            'skills.required' => 'Minimal tentukan 1 keahlian standar ESCO.',
             'skills.*.esco_skill_id.exists' => 'Skill ESCO yang dipilih tidak valid.',
         ];
     }

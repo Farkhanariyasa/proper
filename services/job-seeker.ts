@@ -1,5 +1,4 @@
 import {
-  CreateJobSeekerPayload,
   EducationLevel,
   EscoSkillItem,
   JobSeeker,
@@ -141,7 +140,7 @@ export async function getJobSeekerDetail(id: number | string): Promise<JobSeeker
 /**
  * Mendaftarkan profil pencari kerja baru
  */
-export async function createJobSeeker(payload: CreateJobSeekerPayload): Promise<JobSeeker> {
+export async function createJobSeeker(payload: Record<string, unknown>): Promise<JobSeeker> {
   const baseUrl = getApiBaseUrl();
   const res = await fetch(`${baseUrl}/api/job-seekers`, {
     method: 'POST',
@@ -247,7 +246,7 @@ export async function updateJobSeekerSkills(id: number | string, skills: number[
  */
 export async function updateJobSeeker(
   id: number | string,
-  payload: Record<string, any>
+  payload: Record<string, unknown>
 ): Promise<JobSeeker> {
   const baseUrl = getApiBaseUrl();
   const res = await fetch(`${baseUrl}/api/job-seekers/${id}`, {

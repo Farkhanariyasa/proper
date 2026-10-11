@@ -1,1170 +1,520 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Loader2, X } from 'lucide-react';
 import SearchableSelect from '@/components/ui/SearchableSelect';
-import KbjiSelector from '@/components/lowongan/KbjiSelector';
 import {
-  X,
-  Plus,
-  Trash2,
-  Search,
-  Check,
-  AlertCircle,
-  Loader2,
-  BookOpen,
-  Award,
-  MapPin,
-  User,
-  Briefcase,
-  ChevronRight,
-  ChevronLeft,
-  GraduationCap,
-} from 'lucide-react';
-import {
-  Province,
-  Regency,
-  EducationLevel,
-  EscoSkillItem,
-  CreateJobSeekerPayload,
-  TrainingItem,
-  CertificationItem,
-} from '@/types/job-seeker';
-import { getProvinces, getRegencies } from '@/services/wilayah';
-import {
-  getEducationLevels,
-  getJobSeekerOptions,
-  searchEscoSkills,
   createJobSeeker,
+  getEducationLevels,
+  getJobSeekerDetail,
+  updateJobSeeker,
 } from '@/services/job-seeker';
+import { getProvinces, getRegencies } from '@/services/wilayah';
+import { EducationLevel, JobSeeker, Province, Regency } from '@/types/job-seeker';
 
-interface JobSeekerFormModalProps {
+/**
+ * Form Tambah & Edit profil pencari kerja. Kolom mengikuti tabel req_pk_pencaker.
+ * - Tambah: isOpen = true, jobSeekerId = null
+ * - Edit  : isOpen = true, jobSeekerId = <id>  (hanya kolom yang berubah yang dikirim)
+ */
+interface Props {
   isOpen: boolean;
+  jobSeekerId?: number | null;
   onClose: () => void;
-  onSuccess: () => void;
+  onSaved: () => void;
 }
 
-export default function JobSeekerFormModal({
-  isOpen,
-  onClose,
-  onSuccess,
-}: JobSeekerFormModalProps) {
-  // Stepper State
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+// Nilai kategori sesuai data req_pk_pencaker
+const STATUS_BEKERJA = ['Fresh Graduate', 'Ter-PHK', 'Masih Bekerja'];
+const MARITAL = ['BELUM MENIKAH', 'MENIKAH', 'JANDA', 'DUDA'];
+const JENIS_DISABILITAS = ['Tuna Daksa', 'Tuna Rungu', 'Tuna Netra', 'Tuna Wicara', 'Tuna Grahita'];
 
-  // Master options state
+interface FormState {
+  name: string;
+  jenis_kelamin: string;
+  umur: string;
+  marital: string;
+  province_id: string;
+  regency_id: string;
+  kondisi_fisik: string;
+  jenis_disabilitas: string;
+  education_level_id: string;
+  jurusan: string;
+  nama_sekolah: string;
+  status_bekerja: string;
+  experience: string;
+  sertifikasi: string;
+  lembaga_pelatihan: string;
+  progpel: string;
+  keahlian: string;
+  bahasa: string;
+  rencana_kerja_luar_negeri: string;
+  country_wish: string;
+}
+
+const EMPTY_FORM: FormState = {
+  name: '',
+  jenis_kelamin: '',
+  umur: '',
+  marital: '',
+  province_id: '',
+  regency_id: '',
+  kondisi_fisik: 'Non Disabilitas',
+  jenis_disabilitas: '',
+  education_level_id: '',
+  jurusan: '',
+  nama_sekolah: '',
+  status_bekerja: '',
+  experience: '',
+  sertifikasi: '',
+  lembaga_pelatihan: '',
+  progpel: '',
+  keahlian: '',
+  bahasa: 'Bahasa Indonesia',
+  rencana_kerja_luar_negeri: 'Tidak',
+  country_wish: '',
+};
+
+const toForm = (d: JobSeeker): FormState => ({
+  name: d.name ?? '',
+  jenis_kelamin: d.jenis_kelamin ?? '',
+  umur: d.umur != null ? String(d.umur) : '',
+  marital: d.marital ?? '',
+  province_id: d.province_id ?? '',
+  regency_id: d.regency_id ?? '',
+  kondisi_fisik: d.kondisi_fisik ?? '',
+  jenis_disabilitas: d.jenis_disabilitas ?? '',
+  education_level_id: d.education_level_id != null ? String(d.education_level_id) : '',
+  jurusan: d.jurusan ?? '',
+  nama_sekolah: d.nama_sekolah ?? '',
+  status_bekerja: d.status_bekerja ?? '',
+  experience: d.experience ?? '',
+  sertifikasi: d.sertifikasi ?? '',
+  lembaga_pelatihan: d.lembaga_pelatihan ?? '',
+  progpel: d.progpel ?? '',
+  keahlian: d.keahlian ?? '',
+  bahasa: d.bahasa ?? '',
+  rencana_kerja_luar_negeri: d.rencana_kerja_luar_negeri ?? '',
+  country_wish: d.country_wish ?? '',
+});
+
+// Kolom teks yang dikirim apa adanya (string kosong = dikosongkan)
+const TEXT_FIELDS = [
+  'marital', 'kondisi_fisik', 'jenis_disabilitas', 'jurusan', 'nama_sekolah', 'status_bekerja',
+  'experience', 'sertifikasi', 'lembaga_pelatihan', 'progpel', 'keahlian', 'bahasa',
+  'rencana_kerja_luar_negeri', 'country_wish',
+] as const;
+
+const inputClass =
+  'w-full px-3 py-2 text-xs sm:text-sm rounded-md border border-slate-300 bg-white focus:outline-hidden focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]';
+
+function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="block text-xs font-semibold text-slate-600 mb-1">{label}</span>
+      {children}
+      {error && <span className="mt-1 block text-[11px] text-red-600">{error}</span>}
+    </label>
+  );
+}
+
+/** Pilihan dropdown, menyertakan nilai lama yang tidak ada di daftar baku */
+const withCurrent = (options: string[], current: string) =>
+  current && !options.includes(current) ? [current, ...options] : options;
+
+export default function JobSeekerFormModal({ isOpen, jobSeekerId = null, onClose, onSaved }: Props) {
+  const isEdit = jobSeekerId != null;
+
+  const [detail, setDetail] = useState<JobSeeker | null>(null);
+  const [initial, setInitial] = useState<FormState | null>(null);
+  const [form, setForm] = useState<FormState | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [regencies, setRegencies] = useState<Regency[]>([]);
+  const [regenciesLoading, setRegenciesLoading] = useState(false);
   const [educationLevels, setEducationLevels] = useState<EducationLevel[]>([]);
-  const [studyFieldGroups, setStudyFieldGroups] = useState<string[]>([]);
-  const [experienceRanges, setExperienceRanges] = useState<string[]>([]);
 
-  // Loading states
-  const [isLoadingMaster, setIsLoadingMaster] = useState(false);
-  const [isLoadingRegencies, setIsLoadingRegencies] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
-  // Form State
-  const [formData, setFormData] = useState({
-    nik: '',
-    full_name: '',
-    phone: '',
-    birth_date: '',
-    gender: 'L' as 'L' | 'P',
-    province_id: '',
-    regency_id: '',
-    education_level_id: '' as string | number,
-    study_field_group: '',
-    study_field_detail: '',
-    experience_range: 'fresh_graduate',
-    desired_occupation: '',
-    kbji_id: null as number | null,
-    kbji_label: '',
-  });
-
-  const [selectedSkills, setSelectedSkills] = useState<EscoSkillItem[]>([]);
-  const [trainings, setTrainings] = useState<TrainingItem[]>([]);
-  const [certifications, setCertifications] = useState<CertificationItem[]>([]);
-
-  // Skill Search State
-  const [skillSearchQuery, setSkillSearchQuery] = useState('');
-  const [skillSearchResults, setSkillSearchResults] = useState<EscoSkillItem[]>([]);
-  const [isSearchingSkills, setIsSearchingSkills] = useState(false);
-  const [isSkillDropdownOpen, setIsSkillDropdownOpen] = useState(false);
-  const skillDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Reset Stepper & Error on Open
-  useEffect(() => {
-    if (isOpen) {
-      setCurrentStep(1);
-      setErrorMessage(null);
-      setFieldErrors({});
-    }
-  }, [isOpen]);
-
-  // Load Initial Master Data
+  // Siapkan form setiap kali jendela dibuka
   useEffect(() => {
     if (!isOpen) return;
-
-    let isMounted = true;
-    setIsLoadingMaster(true);
-    setErrorMessage(null);
+    setDetail(null);
+    setLoadError(null);
+    setSaveError(null);
     setFieldErrors({});
 
-    Promise.all([getProvinces(), getEducationLevels(), getJobSeekerOptions()])
-      .then(([provData, eduData, optData]) => {
-        if (isMounted) {
-          setProvinces(provData);
-          setEducationLevels(eduData);
-          setStudyFieldGroups(optData.study_field_groups);
-          setExperienceRanges(optData.experience_ranges);
-          if (optData.study_field_groups.length > 0) {
-            setFormData((prev) => ({
-              ...prev,
-              study_field_group: prev.study_field_group || optData.study_field_groups[0],
-            }));
-          }
-          if (eduData.length > 0) {
-            setFormData((prev) => ({
-              ...prev,
-              education_level_id: prev.education_level_id || eduData[0].id,
-            }));
-          }
-        }
-      })
-      .catch((err) => {
-        if (isMounted) setErrorMessage(err.message || 'Gagal memuat master data wilayah');
-      })
-      .finally(() => {
-        if (isMounted) setIsLoadingMaster(false);
-      });
+    if (isEdit) {
+      setForm(null);
+      getJobSeekerDetail(jobSeekerId)
+        .then((d) => {
+          const f = toForm(d);
+          setDetail(d);
+          setForm(f);
+          setInitial(f);
+        })
+        .catch((err: Error) => setLoadError(err.message));
+    } else {
+      setForm(EMPTY_FORM);
+      setInitial(EMPTY_FORM);
+    }
 
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen]);
+    getProvinces().then(setProvinces).catch(() => setProvinces([]));
+    getEducationLevels().then(setEducationLevels).catch(() => setEducationLevels([]));
+  }, [isOpen, isEdit, jobSeekerId]);
 
-  // Opsi wilayah untuk SearchableSelect (urut berdasarkan ID)
-  const provinceOptions = useMemo(
-    () =>
-      provinces.map((p) => ({
-        value: p.id,
-        label: p.name,
-        code: p.id,
-      })),
-    [provinces]
-  );
-
-  const regencyOptions = useMemo(
-    () =>
-      regencies.map((r) => ({
-        value: r.id,
-        label: r.name,
-        code: r.id,
-      })),
-    [regencies]
-  );
-
-  // Load Regencies when Province changes
+  // Daftar kab/kota mengikuti provinsi terpilih
+  const provinceId = form?.province_id ?? '';
   useEffect(() => {
-    if (!formData.province_id) {
+    if (!provinceId) {
       setRegencies([]);
-      setFormData((prev) => ({ ...prev, regency_id: '' }));
       return;
     }
+    setRegenciesLoading(true);
+    getRegencies(provinceId)
+      .then(setRegencies)
+      .catch(() => setRegencies([]))
+      .finally(() => setRegenciesLoading(false));
+  }, [provinceId]);
 
-    let isMounted = true;
-    setIsLoadingRegencies(true);
-    getRegencies(formData.province_id)
-      .then((data) => {
-        if (isMounted) {
-          setRegencies(data);
-          setFormData((prev) => ({ ...prev, regency_id: '' }));
-        }
-      })
-      .catch((err) => {
-        console.error('Error fetching regencies:', err);
-      })
-      .finally(() => {
-        if (isMounted) setIsLoadingRegencies(false);
-      });
+  // Data yang dikirim: Tambah = semua kolom terisi; Edit = kolom yang berubah saja
+  const payload = useMemo(() => {
+    if (!form || !initial) return {};
+    const changed = (key: keyof FormState) => !isEdit || form[key] !== initial[key];
+    const p: Record<string, unknown> = {};
 
-    return () => {
-      isMounted = false;
-    };
-  }, [formData.province_id]);
+    if (changed('name')) p.full_name = form.name.trim();
+    if (changed('jenis_kelamin') && form.jenis_kelamin) p.gender = form.jenis_kelamin;
+    if (changed('umur') && (isEdit || form.umur !== '')) p.umur = form.umur === '' ? null : Number(form.umur);
+    if (changed('province_id') && form.province_id) p.province_id = form.province_id;
+    if (changed('regency_id') && form.regency_id) p.regency_id = form.regency_id;
+    if (changed('education_level_id') && form.education_level_id) p.education_level_id = Number(form.education_level_id);
 
-  // Debounced ESCO Skill Search
-  useEffect(() => {
-    if (!skillSearchQuery.trim()) {
-      setSkillSearchResults([]);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setIsSearchingSkills(true);
-      try {
-        const results = await searchEscoSkills(skillSearchQuery, 10);
-        setSkillSearchResults(results);
-        setIsSkillDropdownOpen(true);
-      } catch (err) {
-        console.error('Skill search error:', err);
-      } finally {
-        setIsSearchingSkills(false);
-      }
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [skillSearchQuery]);
-
-  // Close skill dropdown on click outside
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        skillDropdownRef.current &&
-        !skillDropdownRef.current.contains(e.target as Node)
-      ) {
-        setIsSkillDropdownOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleAddSkill = (skill: EscoSkillItem) => {
-    if (!selectedSkills.some((s) => s.id === skill.id)) {
-      setSelectedSkills((prev) => [...prev, skill]);
-    }
-    setSkillSearchQuery('');
-    setIsSkillDropdownOpen(false);
-  };
-
-  const handleRemoveSkill = (skillId: number) => {
-    setSelectedSkills((prev) => prev.filter((s) => s.id !== skillId));
-  };
-
-  // Repeater handlers
-  const handleAddTraining = () => {
-    setTrainings((prev) => [...prev, { name: '', organizer: '', year: new Date().getFullYear() }]);
-  };
-
-  const handleUpdateTraining = (
-    index: number,
-    field: keyof TrainingItem,
-    value: string | number | null
-  ) => {
-    setTrainings((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      return updated;
+    TEXT_FIELDS.forEach((key) => {
+      if (!changed(key)) return;
+      const value = form[key].trim();
+      if (isEdit || value !== '') p[key] = value === '' ? null : value;
     });
+    return p;
+  }, [form, initial, isEdit]);
+
+  const isDirty = isEdit ? Object.keys(payload).length > 0 : true;
+
+  const requestClose = () => {
+    const hasInput = isEdit ? isDirty : JSON.stringify(form) !== JSON.stringify(EMPTY_FORM);
+    if (hasInput && !window.confirm('Perubahan belum disimpan. Tutup tanpa menyimpan?')) return;
+    onClose();
   };
 
-  const handleRemoveTraining = (index: number) => {
-    setTrainings((prev) => prev.filter((_, i) => i !== index));
-  };
+  const set = (key: keyof FormState, value: string) => setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
 
-  const handleAddCertification = () => {
-    setCertifications((prev) => [...prev, { name: '', type: 'Nasional', year: new Date().getFullYear() }]);
-  };
-
-  const handleUpdateCertification = (
-    index: number,
-    field: keyof CertificationItem,
-    value: string | number | null
-  ) => {
-    setCertifications((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      return updated;
-    });
-  };
-
-  const handleRemoveCertification = (index: number) => {
-    setCertifications((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // Step Validation & Navigation
-  const validateStep1 = (): boolean => {
-    setErrorMessage(null);
+  // Tambah: semua kolom bertanda * wajib. Edit: data impor lama bisa belum lengkap,
+  // jadi hanya nama yang wajib (dan kab/kota bila provinsi dipilih).
+  const validate = (f: FormState): Record<string, string[]> => {
     const errors: Record<string, string[]> = {};
+    if (!f.name.trim()) errors.full_name = ['Nama lengkap wajib diisi.'];
+    if (f.province_id && !f.regency_id) errors.regency_id = ['Kabupaten/Kota wajib dipilih.'];
+    if (!isEdit) {
+      if (!f.jenis_kelamin) errors.gender = ['Jenis kelamin wajib dipilih.'];
+      if (!f.province_id) errors.province_id = ['Provinsi wajib dipilih.'];
+      if (!f.regency_id) errors.regency_id = ['Kabupaten/Kota wajib dipilih.'];
+      if (!f.education_level_id) errors.education_level_id = ['Pendidikan terakhir wajib dipilih.'];
+    }
+    return errors;
+  };
 
-    if (!formData.nik || formData.nik.length !== 16 || !/^\d+$/.test(formData.nik)) {
-      errors.nik = ['NIK wajib diisi tepat 16 digit numerik.'];
-    }
-    if (!formData.full_name.trim()) {
-      errors.full_name = ['Nama lengkap wajib diisi.'];
-    }
-    if (!formData.phone.trim()) {
-      errors.phone = ['Nomor HP / WhatsApp wajib diisi.'];
-    }
-    if (!formData.birth_date) {
-      errors.birth_date = ['Tanggal lahir wajib diisi.'];
-    }
-    if (!formData.province_id) {
-      errors.province_id = ['Provinsi wajib dipilih.'];
-    }
-    if (!formData.regency_id) {
-      errors.regency_id = ['Kabupaten / Kota wajib dipilih.'];
-    }
-
+  const handleSave = async () => {
+    if (!form) return;
+    const errors = validate(form);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      setErrorMessage('Harap lengkapi semua kolom wajib di Step 1 dengan benar.');
-      return false;
-    }
-
-    setFieldErrors({});
-    return true;
-  };
-
-  const validateStep2 = (): boolean => {
-    setErrorMessage(null);
-    const errors: Record<string, string[]> = {};
-
-    if (!formData.education_level_id) {
-      errors.education_level_id = ['Jenjang pendidikan wajib dipilih.'];
-    }
-    if (!formData.study_field_group) {
-      errors.study_field_group = ['Rumpun bidang pendidikan wajib dipilih.'];
-    }
-    if (!formData.experience_range) {
-      errors.experience_range = ['Rentang pengalaman wajib dipilih.'];
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
-      setErrorMessage('Harap lengkapi informasi pendidikan & pengalaman kerja.');
-      return false;
-    }
-
-    setFieldErrors({});
-    return true;
-  };
-
-  const handleNext = () => {
-    if (currentStep === 1) {
-      if (validateStep1()) setCurrentStep(2);
-    } else if (currentStep === 2) {
-      if (validateStep2()) setCurrentStep(3);
-    }
-  };
-
-  const handlePrev = () => {
-    setErrorMessage(null);
-    if (currentStep === 3) setCurrentStep(2);
-    else if (currentStep === 2) setCurrentStep(1);
-  };
-
-  // Submit Handler
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-    setFieldErrors({});
-
-    if (!validateStep1() || !validateStep2()) {
+      setSaveError('Lengkapi kolom yang wajib diisi.');
       return;
     }
-
-    if (selectedSkills.length === 0) {
-      setErrorMessage('Minimal pilih 1 Keahlian (Skill ESCO) pada Step 3.');
-      return;
-    }
-
-    const payload: CreateJobSeekerPayload = {
-      nik: formData.nik,
-      full_name: formData.full_name,
-      phone: formData.phone,
-      birth_date: formData.birth_date,
-      gender: formData.gender,
-      regency_id: formData.regency_id,
-      education_level_id: Number(formData.education_level_id),
-      study_field_group: formData.study_field_group,
-      study_field_detail: formData.study_field_detail || undefined,
-      experience_range: formData.experience_range as any,
-      desired_occupation: formData.desired_occupation || undefined,
-      kbji_id: formData.kbji_id || undefined,
-      trainings: trainings.filter((t) => t.name.trim() !== ''),
-      certifications: certifications.filter((c) => c.name.trim() !== ''),
-      skills: selectedSkills.map((s) => s.id),
-    };
-
-    setIsSubmitting(true);
+    setSaving(true);
+    setSaveError(null);
+    setFieldErrors({});
     try {
-      await createJobSeeker(payload);
-      onSuccess();
-      onClose();
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Terjadi kesalahan saat menyimpan data');
-      if (err.errors) {
-        setFieldErrors(err.errors);
-        // Jika error berasal dari field step 1 atau 2, lompatkan ke step terkait
-        if (err.errors.nik || err.errors.full_name || err.errors.regency_id) {
-          setCurrentStep(1);
-        } else if (err.errors.education_level_id || err.errors.study_field_group) {
-          setCurrentStep(2);
-        }
+      if (isEdit) {
+        await updateJobSeeker(jobSeekerId, payload);
+      } else {
+        await createJobSeeker(payload);
       }
+      onSaved();
+      onClose();
+    } catch (err) {
+      const e = err as Error & { errors?: Record<string, string[]> };
+      setSaveError(e.message || 'Gagal menyimpan profil.');
+      setFieldErrors(e.errors ?? {});
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
   };
 
   if (!isOpen) return null;
 
+  const err = (key: string) => fieldErrors[key]?.[0];
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        
-        {/* Header Modal */}
-        <div className="px-5 py-3.5 bg-gradient-to-r from-[#0E385E] to-[#1E5282] text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-              <User className="w-4 h-4 text-sky-200" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold">Registrasi Profil Pencari Kerja</h3>
-            </div>
+    <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/50 p-2 sm:p-4" onMouseDown={requestClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={isEdit ? 'Edit profil pencari kerja' : 'Tambah profil pencari kerja'}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-slate-900">
+              {isEdit ? 'Edit Profil Pencari Kerja' : 'Tambah Profil Pencari Kerja'}
+            </h2>
+            <p className="mt-0.5 truncate text-xs text-slate-500">
+              {isEdit && detail
+                ? `${detail.profile_id || detail.id} · ${detail.name}`
+                : 'Kolom bertanda * wajib diisi.'}
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <X className="w-5 h-5" />
+          <button type="button" onClick={requestClose} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 cursor-pointer" aria-label="Tutup">
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* 3-Step Wizard Navigation Bar */}
-        <div className="bg-slate-50 border-b border-slate-200 px-4 sm:px-8 py-3">
-          <div className="flex items-center justify-between max-w-xl mx-auto">
-            {/* Step 1 Tab */}
+        {loadError ? (
+          <div className="p-10 text-center text-sm text-red-600">
+            <AlertCircle className="mx-auto mb-2 h-6 w-6" />
+            {loadError}
+          </div>
+        ) : !form ? (
+          <div className="p-16 text-center text-sm text-slate-500">
+            <Loader2 className="mx-auto mb-2 h-7 w-7 animate-spin text-[#0E385E]" />
+            Memuat data pencari kerja...
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-6">
+            {/* Data diri */}
+            <section>
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Data Diri</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <Field label="Nama Lengkap *" error={err('full_name')}>
+                    <input className={inputClass} value={form.name} onChange={(e) => set('name', e.target.value)} />
+                  </Field>
+                </div>
+                <Field label="Jenis Kelamin *" error={err('gender')}>
+                  <select className={inputClass} value={form.jenis_kelamin} onChange={(e) => set('jenis_kelamin', e.target.value)}>
+                    <option value="">-- Pilih --</option>
+                    <option value="Laki-laki">Laki-laki</option>
+                    <option value="Perempuan">Perempuan</option>
+                  </select>
+                </Field>
+                <Field label="Umur (tahun)" error={err('umur')}>
+                  <input type="number" min={15} max={80} className={inputClass} value={form.umur} onChange={(e) => set('umur', e.target.value)} />
+                </Field>
+                <Field label="Status Perkawinan" error={err('marital')}>
+                  <select className={inputClass} value={form.marital} onChange={(e) => set('marital', e.target.value)}>
+                    <option value="">-- Pilih --</option>
+                    {withCurrent(MARITAL, form.marital).map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Kondisi Fisik" error={err('kondisi_fisik')}>
+                  <select
+                    className={inputClass}
+                    value={form.kondisi_fisik}
+                    onChange={(e) => setForm((prev) => prev ? {
+                      ...prev,
+                      kondisi_fisik: e.target.value,
+                      jenis_disabilitas: e.target.value === 'Disabilitas' ? prev.jenis_disabilitas : '',
+                    } : prev)}
+                  >
+                    <option value="">-- Pilih --</option>
+                    <option value="Non Disabilitas">Non Disabilitas</option>
+                    <option value="Disabilitas">Disabilitas</option>
+                  </select>
+                </Field>
+                {form.kondisi_fisik === 'Disabilitas' && (
+                  <Field label="Jenis Disabilitas" error={err('jenis_disabilitas')}>
+                    <select className={inputClass} value={form.jenis_disabilitas} onChange={(e) => set('jenis_disabilitas', e.target.value)}>
+                      <option value="">-- Pilih --</option>
+                      {withCurrent(JENIS_DISABILITAS, form.jenis_disabilitas).map((j) => (
+                        <option key={j} value={j}>{j}</option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
+              </div>
+            </section>
+
+            {/* Domisili */}
+            <section>
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Domisili</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <span className="block text-xs font-semibold text-slate-600 mb-1">Provinsi *</span>
+                  <SearchableSelect
+                    options={provinces.map((p) => ({ value: p.id, label: p.name, code: p.id }))}
+                    value={form.province_id}
+                    onChange={(value) => setForm((prev) => (prev ? { ...prev, province_id: value, regency_id: '' } : prev))}
+                    placeholder="Pilih provinsi"
+                    searchPlaceholder="Cari provinsi..."
+                    hasError={Boolean(err('province_id'))}
+                  />
+                  {err('province_id') && <span className="mt-1 block text-[11px] text-red-600">{err('province_id')}</span>}
+                </div>
+                <div>
+                  <span className="block text-xs font-semibold text-slate-600 mb-1">Kabupaten / Kota *</span>
+                  <SearchableSelect
+                    options={regencies.map((r) => ({ value: r.id, label: r.name, code: r.id }))}
+                    value={form.regency_id}
+                    onChange={(value) => set('regency_id', value)}
+                    placeholder={form.province_id ? 'Pilih kabupaten/kota' : 'Pilih provinsi dulu'}
+                    searchPlaceholder="Cari kabupaten/kota..."
+                    disabled={!form.province_id}
+                    isLoading={regenciesLoading}
+                    hasError={Boolean(err('regency_id'))}
+                  />
+                  {err('regency_id') && <span className="mt-1 block text-[11px] text-red-600">{err('regency_id')}</span>}
+                </div>
+              </div>
+            </section>
+
+            {/* Pendidikan & pekerjaan */}
+            <section>
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Pendidikan & Pekerjaan</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Pendidikan Terakhir *" error={err('education_level_id')}>
+                  <select className={inputClass} value={form.education_level_id} onChange={(e) => set('education_level_id', e.target.value)}>
+                    <option value="">-- Pilih --</option>
+                    {educationLevels.map((lvl) => (
+                      <option key={lvl.id} value={lvl.id}>{lvl.name}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Status Bekerja" error={err('status_bekerja')}>
+                  <select className={inputClass} value={form.status_bekerja} onChange={(e) => set('status_bekerja', e.target.value)}>
+                    <option value="">-- Pilih --</option>
+                    {withCurrent(STATUS_BEKERJA, form.status_bekerja).map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Jurusan" error={err('jurusan')}>
+                  <input className={inputClass} value={form.jurusan} onChange={(e) => set('jurusan', e.target.value)} />
+                </Field>
+                <Field label="Nama Sekolah / Kampus" error={err('nama_sekolah')}>
+                  <input className={inputClass} value={form.nama_sekolah} onChange={(e) => set('nama_sekolah', e.target.value)} />
+                </Field>
+                <div className="sm:col-span-2">
+                  <Field label="Pengalaman Kerja" error={err('experience')}>
+                    <textarea
+                      rows={3}
+                      className={inputClass}
+                      value={form.experience}
+                      onChange={(e) => set('experience', e.target.value)}
+                      placeholder="Contoh: Staf Admin; PT Maju Jaya; Januari 2023 - Desember 2024"
+                    />
+                  </Field>
+                </div>
+              </div>
+            </section>
+
+            {/* Keahlian, pelatihan, bahasa */}
+            <section>
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Keahlian, Pelatihan & Bahasa</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <Field label="Keahlian" error={err('keahlian')}>
+                    <textarea
+                      rows={2}
+                      className={inputClass}
+                      value={form.keahlian}
+                      onChange={(e) => set('keahlian', e.target.value)}
+                      placeholder="Pisahkan dengan koma. Contoh: Microsoft Excel, Akuntansi, Komunikasi"
+                    />
+                  </Field>
+                </div>
+                <Field label="Sertifikasi" error={err('sertifikasi')}>
+                  <textarea rows={2} className={inputClass} value={form.sertifikasi} onChange={(e) => set('sertifikasi', e.target.value)} />
+                </Field>
+                <Field label="Lembaga Pelatihan" error={err('lembaga_pelatihan')}>
+                  <textarea rows={2} className={inputClass} value={form.lembaga_pelatihan} onChange={(e) => set('lembaga_pelatihan', e.target.value)} />
+                </Field>
+                <Field label="Program Pelatihan" error={err('progpel')}>
+                  <textarea rows={2} className={inputClass} value={form.progpel} onChange={(e) => set('progpel', e.target.value)} />
+                </Field>
+                <Field label="Bahasa" error={err('bahasa')}>
+                  <input
+                    className={inputClass}
+                    value={form.bahasa}
+                    onChange={(e) => set('bahasa', e.target.value)}
+                    placeholder="Contoh: Bahasa Indonesia, English (Bahasa Inggris)"
+                  />
+                </Field>
+              </div>
+            </section>
+
+            {/* Rencana kerja luar negeri */}
+            <section>
+              <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Rencana Kerja Luar Negeri</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Berminat bekerja di luar negeri?" error={err('rencana_kerja_luar_negeri')}>
+                  <select
+                    className={inputClass}
+                    value={form.rencana_kerja_luar_negeri}
+                    onChange={(e) => setForm((prev) => prev ? {
+                      ...prev,
+                      rencana_kerja_luar_negeri: e.target.value,
+                      country_wish: e.target.value === 'Ya' ? prev.country_wish : '',
+                    } : prev)}
+                  >
+                    <option value="">-- Pilih --</option>
+                    <option value="Ya">Ya</option>
+                    <option value="Tidak">Tidak</option>
+                  </select>
+                </Field>
+                {form.rencana_kerja_luar_negeri === 'Ya' && (
+                  <Field label="Negara Tujuan" error={err('country_wish')}>
+                    <input
+                      className={inputClass}
+                      value={form.country_wish}
+                      onChange={(e) => set('country_wish', e.target.value)}
+                      placeholder="Contoh: Jepang"
+                    />
+                  </Field>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-3">
+          <p className="text-xs text-red-600">{saveError}</p>
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => {
-                if (currentStep > 1) setCurrentStep(1);
-              }}
-              className="flex items-center gap-2 group text-left cursor-pointer focus:outline-hidden"
+              onClick={requestClose}
+              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
             >
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                  currentStep === 1
-                    ? 'bg-[#0E385E] text-white ring-4 ring-[#0E385E]/15'
-                    : currentStep > 1
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-200 text-slate-500'
-                }`}
-              >
-                {currentStep > 1 ? <Check className="w-3.5 h-3.5" /> : '1'}
-              </div>
-              <div className="hidden sm:block">
-                <div
-                  className={`text-xs font-semibold ${
-                    currentStep === 1 ? 'text-[#0E385E]' : 'text-slate-600'
-                  }`}
-                >
-                  Data Diri & Domisili
-                </div>
-                <div className="text-[10px] text-slate-400">Biodata & Wilayah</div>
-              </div>
+              Batal
             </button>
-
-            {/* Separator 1 */}
-            <div
-              className={`flex-1 h-0.5 mx-3 sm:mx-4 transition-colors ${
-                currentStep > 1 ? 'bg-emerald-500' : 'bg-slate-200'
-              }`}
-            />
-
-            {/* Step 2 Tab */}
             <button
               type="button"
-              onClick={() => {
-                if (currentStep > 2) setCurrentStep(2);
-                else if (currentStep === 1) validateStep1() && setCurrentStep(2);
-              }}
-              className="flex items-center gap-2 group text-left cursor-pointer focus:outline-hidden"
+              onClick={handleSave}
+              disabled={!form || saving || !isDirty}
+              className="inline-flex items-center gap-1.5 rounded-md bg-[#0E385E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#163A5F] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                  currentStep === 2
-                    ? 'bg-[#0E385E] text-white ring-4 ring-[#0E385E]/15'
-                    : currentStep > 2
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-200 text-slate-500'
-                }`}
-              >
-                {currentStep > 2 ? <Check className="w-3.5 h-3.5" /> : '2'}
-              </div>
-              <div className="hidden sm:block">
-                <div
-                  className={`text-xs font-semibold ${
-                    currentStep === 2 ? 'text-[#0E385E]' : 'text-slate-600'
-                  }`}
-                >
-                  Pendidikan & Karir
-                </div>
-                <div className="text-[10px] text-slate-400">Rumpun & Target</div>
-              </div>
-            </button>
-
-            {/* Separator 2 */}
-            <div
-              className={`flex-1 h-0.5 mx-3 sm:mx-4 transition-colors ${
-                currentStep > 2 ? 'bg-emerald-500' : 'bg-slate-200'
-              }`}
-            />
-
-            {/* Step 3 Tab */}
-            <button
-              type="button"
-              onClick={() => {
-                if (currentStep < 3 && validateStep1() && validateStep2()) {
-                  setCurrentStep(3);
-                }
-              }}
-              className="flex items-center gap-2 group text-left cursor-pointer focus:outline-hidden"
-            >
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                  currentStep === 3
-                    ? 'bg-[#0E385E] text-white ring-4 ring-[#0E385E]/15'
-                    : 'bg-slate-200 text-slate-500'
-                }`}
-              >
-                3
-              </div>
-              <div className="hidden sm:block">
-                <div
-                  className={`text-xs font-semibold ${
-                    currentStep === 3 ? 'text-[#0E385E]' : 'text-slate-600'
-                  }`}
-                >
-                  Skill & Portofolio
-                </div>
-                <div className="text-[10px] text-slate-400">ESCO & Sertifikasi</div>
-              </div>
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isEdit ? 'Simpan Perubahan' : 'Simpan Profil'}
             </button>
           </div>
         </div>
-
-        {/* Modal Form Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
-          {errorMessage && (
-            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs sm:text-sm flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          {isLoadingMaster ? (
-            <div className="py-16 flex flex-col items-center justify-center text-slate-500 gap-3">
-              <Loader2 className="w-7 h-7 animate-spin text-[#0E385E]" />
-              <p className="text-sm">Memuat referensi wilayah & data...</p>
-            </div>
-          ) : (
-            <>
-              {/* ======================================================== */}
-              {/* STEP 1: DATA DIRI & DOMISILI WILAYAH                    */}
-              {/* ======================================================== */}
-              {currentStep === 1 && (
-                <div className="space-y-5 animate-in fade-in duration-150">
-                  {/* Bagian Identitas */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs sm:text-sm pb-1.5 border-b border-slate-200">
-                      <User className="w-4 h-4 text-[#0E385E]" />
-                      <span>Identitas Pribadi & Kontak</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          NIK (16 Digit Numerik) <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          maxLength={16}
-                          value={formData.nik}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              nik: e.target.value.replace(/\D/g, ''),
-                            })
-                          }
-                          placeholder="Contoh: 3171012345670001"
-                          className={`w-full px-3 py-2 text-xs sm:text-sm rounded-md border ${
-                            fieldErrors.nik ? 'border-red-400 bg-red-50/50' : 'border-slate-300'
-                          } focus:outline-hidden focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] font-mono`}
-                          required
-                        />
-                        {fieldErrors.nik && (
-                          <p className="text-[11px] text-red-600 mt-1">{fieldErrors.nik[0]}</p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Nama Lengkap <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.full_name}
-                          onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                          placeholder="Nama lengkap sesuai KTP"
-                          className={`w-full px-3 py-2 text-xs sm:text-sm rounded-md border ${
-                            fieldErrors.full_name ? 'border-red-400 bg-red-50/50' : 'border-slate-300'
-                          } focus:outline-hidden focus:border-[#2563EB]`}
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Nomor HP / WhatsApp <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          placeholder="Contoh: 08123456789"
-                          className="w-full px-3 py-2 text-xs sm:text-sm rounded-md border border-slate-300 focus:outline-hidden focus:border-[#2563EB]"
-                          required
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Tanggal Lahir <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="date"
-                            value={formData.birth_date}
-                            onChange={(e) =>
-                              setFormData({ ...formData, birth_date: e.target.value })
-                            }
-                            className="w-full px-2.5 py-2 text-xs rounded-md border border-slate-300 focus:outline-hidden focus:border-[#2563EB]"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Jenis Kelamin <span className="text-red-500">*</span>
-                          </label>
-                          <div className="flex items-center gap-3 mt-2.5">
-                            <label className="inline-flex items-center gap-1.5 text-xs cursor-pointer">
-                              <input
-                                type="radio"
-                                name="gender"
-                                value="L"
-                                checked={formData.gender === 'L'}
-                                onChange={() => setFormData({ ...formData, gender: 'L' })}
-                                className="text-[#0E385E] focus:ring-[#0E385E]"
-                              />
-                              <span>Laki-laki</span>
-                            </label>
-                            <label className="inline-flex items-center gap-1.5 text-xs cursor-pointer">
-                              <input
-                                type="radio"
-                                name="gender"
-                                value="P"
-                                checked={formData.gender === 'P'}
-                                onChange={() => setFormData({ ...formData, gender: 'P' })}
-                                className="text-[#0E385E] focus:ring-[#0E385E]"
-                              />
-                              <span>Perempuan</span>
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bagian Domisili Wilayah */}
-                  <div className="space-y-3 pt-2">
-                    <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs sm:text-sm pb-1.5 border-b border-slate-200">
-                      <MapPin className="w-4 h-4 text-[#0E385E]" />
-                      <span>Domisili Wilayah (Standar Kepmendagri)</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Provinsi <span className="text-red-500">*</span>
-                        </label>
-                        <SearchableSelect
-                          options={provinceOptions}
-                          value={formData.province_id}
-                          onChange={(val) => setFormData({ ...formData, province_id: val })}
-                          placeholder="-- Cari & Pilih Provinsi --"
-                          searchPlaceholder="Ketik nama atau kode (contoh: 31 / Jakarta)..."
-                          hasError={!!fieldErrors.province_id}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Kabupaten / Kota <span className="text-red-500">*</span>
-                        </label>
-                        <SearchableSelect
-                          options={regencyOptions}
-                          value={formData.regency_id}
-                          onChange={(val) => setFormData({ ...formData, regency_id: val })}
-                          disabled={!formData.province_id || isLoadingRegencies}
-                          isLoading={isLoadingRegencies}
-                          placeholder={
-                            !formData.province_id
-                              ? '-- Pilih Provinsi Terlebih Dahulu --'
-                              : '-- Cari & Pilih Kabupaten / Kota --'
-                          }
-                          searchPlaceholder="Ketik nama atau kode (contoh: 31.71 / Bogor)..."
-                          hasError={!!fieldErrors.regency_id}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ======================================================== */}
-              {/* STEP 2: PENDIDIKAN & TARGET KARIR                        */}
-              {/* ======================================================== */}
-              {currentStep === 2 && (
-                <div className="space-y-5 animate-in fade-in duration-150">
-                  <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs sm:text-sm pb-1.5 border-b border-slate-200">
-                    <GraduationCap className="w-4 h-4 text-[#0E385E]" />
-                    <span>Latar Belakang Pendidikan & Minat Karir</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Jenjang Pendidikan Terakhir <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.education_level_id}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            education_level_id: Number(e.target.value),
-                          })
-                        }
-                        className="w-full px-3 py-2 text-xs sm:text-sm rounded-md border border-slate-300 bg-white focus:outline-hidden focus:border-[#2563EB]"
-                        required
-                      >
-                        {educationLevels.map((lvl) => (
-                          <option key={lvl.id} value={lvl.id}>
-                            {lvl.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Rumpun Bidang Pendidikan <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.study_field_group}
-                        onChange={(e) =>
-                          setFormData({ ...formData, study_field_group: e.target.value })
-                        }
-                        className="w-full px-3 py-2 text-xs sm:text-sm rounded-md border border-slate-300 bg-white focus:outline-hidden focus:border-[#2563EB]"
-                        required
-                      >
-                        {studyFieldGroups.map((group) => (
-                          <option key={group} value={group}>
-                            {group}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Program Studi / Jurusan Spesifik
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.study_field_detail}
-                        onChange={(e) =>
-                          setFormData({ ...formData, study_field_detail: e.target.value })
-                        }
-                        placeholder="Contoh: Teknik Informatika / Manajemen SDM"
-                        className="w-full px-3 py-2 text-xs sm:text-sm rounded-md border border-slate-300 focus:outline-hidden focus:border-[#2563EB]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Rentang Pengalaman Kerja <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.experience_range}
-                        onChange={(e) =>
-                          setFormData({ ...formData, experience_range: e.target.value as any })
-                        }
-                        className="w-full px-3 py-2 text-xs sm:text-sm rounded-md border border-slate-300 bg-white focus:outline-hidden focus:border-[#2563EB]"
-                        required
-                      >
-                        <option value="fresh_graduate">Fresh Graduate (Belum Berpengalaman)</option>
-                        <option value="<1">&lt; 1 Tahun</option>
-                        <option value="1-3">1 - 3 Tahun</option>
-                        <option value="3-5">3 - 5 Tahun</option>
-                        <option value=">5">&gt; 5 Tahun</option>
-                      </select>
-                    </div>
-
-                    <div className="sm:col-span-2 space-y-3">
-                      <div>
-                        <KbjiSelector
-                          value={formData.kbji_id}
-                          selectedLabel={formData.kbji_label}
-                          onChange={(id, opt) => {
-                            setFormData({
-                              ...formData,
-                              kbji_id: id,
-                              kbji_label: `[${opt.code}] ${opt.title}`,
-                              desired_occupation: opt.title,
-                            });
-                          }}
-                          error={fieldErrors.kbji_id?.[0]}
-                        />
-                        <p className="text-[11px] text-slate-400 mt-1">
-                          Pilih klasifikasi jabatan standar KBJI 2026 untuk meningkatkan akurasi penjodohan dengan lowongan kerja.
-                        </p>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Detail Spesifik Posisi / Minat Pekerjaan (Opsional)
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.desired_occupation}
-                          onChange={(e) =>
-                            setFormData({ ...formData, desired_occupation: e.target.value })
-                          }
-                          placeholder="Contoh: Backend Golang Developer, Tax Accountant, Drafter ME"
-                          className="w-full px-3 py-2 text-xs sm:text-sm rounded-md border border-slate-300 focus:outline-hidden focus:border-[#2563EB]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ======================================================== */}
-              {/* STEP 3: KEAHLIAN ESCO, PELATIHAN & SERTIFIKASI          */}
-              {/* ======================================================== */}
-              {currentStep === 3 && (
-                <div className="space-y-5 animate-in fade-in duration-150">
-                  {/* Skill ESCO Autocomplete */}
-                  <div className="space-y-2.5">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
-                      <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs sm:text-sm">
-                        <Briefcase className="w-4 h-4 text-[#0E385E]" />
-                        <span>Keahlian & Skill Terstandar ESCO</span>
-                        <span className="text-red-500">*</span>
-                      </div>
-                      <span className="text-xs text-sky-800 font-medium bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
-                        {selectedSkills.length} skill terpilih
-                      </span>
-                    </div>
-
-                    {/* Autocomplete Input */}
-                    <div className="relative" ref={skillDropdownRef}>
-                      <div className="relative">
-                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input
-                          type="text"
-                          value={skillSearchQuery}
-                          onChange={(e) => {
-                            setSkillSearchQuery(e.target.value);
-                            setIsSkillDropdownOpen(true);
-                          }}
-                          onFocus={() => {
-                            if (skillSearchResults.length > 0) setIsSkillDropdownOpen(true);
-                          }}
-                          placeholder="Cari keahlian (contoh: python, data analysis, public speaking)..."
-                          className="w-full pl-9 pr-9 py-2 text-xs sm:text-sm rounded-md border border-slate-300 focus:outline-hidden focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
-                        />
-                        {isSearchingSkills && (
-                          <Loader2 className="w-4 h-4 animate-spin text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                        )}
-                      </div>
-
-                      {/* Dropdown Options */}
-                      {isSkillDropdownOpen && skillSearchResults.length > 0 && (
-                        <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg border border-slate-200 shadow-xl max-h-52 overflow-y-auto z-30 divide-y divide-slate-100">
-                          {skillSearchResults.map((skill) => {
-                            const isAlreadySelected = selectedSkills.some((s) => s.id === skill.id);
-                            return (
-                              <button
-                                type="button"
-                                key={skill.id}
-                                disabled={isAlreadySelected}
-                                onClick={() => handleAddSkill(skill)}
-                                className={`w-full px-3.5 py-2 text-left flex items-center justify-between text-xs sm:text-sm transition-colors ${
-                                  isAlreadySelected
-                                    ? 'bg-slate-50 text-slate-400 cursor-not-allowed'
-                                    : 'hover:bg-sky-50 text-slate-800'
-                                }`}
-                              >
-                                <div>
-                                  <div className="font-medium">{skill.title}</div>
-                                  {skill.title_en && skill.title_en !== skill.title && (
-                                    <div className="text-[11px] text-slate-400 italic">
-                                      {skill.title_en}
-                                    </div>
-                                  )}
-                                </div>
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">
-                                  {skill.type}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Selected Tag Pills */}
-                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 min-h-[50px] flex flex-wrap gap-1.5 items-center">
-                      {selectedSkills.length === 0 ? (
-                        <span className="text-xs text-slate-400 italic">
-                          Belum ada skill yang dipilih. Silakan ketik nama keahlian pada kotak pencarian di atas.
-                        </span>
-                      ) : (
-                        selectedSkills.map((skill) => (
-                          <span
-                            key={skill.id}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-[#0E385E] text-white shadow-2xs"
-                          >
-                            <span>{skill.title}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveSkill(skill.id)}
-                              className="hover:text-red-300 transition-colors ml-0.5"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </span>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Riwayat Pelatihan & Sertifikasi Tabs / Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                    {/* Pelatihan Repeater */}
-                    <div className="p-3.5 rounded-lg border border-slate-200 bg-white space-y-2.5">
-                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                        <div className="flex items-center gap-1.5 text-slate-800 font-semibold text-xs">
-                          <BookOpen className="w-3.5 h-3.5 text-[#0E385E]" />
-                          <span>Riwayat Pelatihan (Opsional)</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleAddTraining}
-                          className="inline-flex items-center gap-0.5 text-xs text-[#0E385E] font-medium hover:underline"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Tambah</span>
-                        </button>
-                      </div>
-
-                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                        {trainings.length === 0 ? (
-                          <p className="text-xs text-slate-400 italic py-2">
-                            Belum ada riwayat pelatihan.
-                          </p>
-                        ) : (
-                          trainings.map((t, idx) => (
-                            <div
-                              key={idx}
-                              className="p-2 rounded bg-slate-50 border border-slate-200 space-y-1.5 relative text-xs"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveTraining(idx)}
-                                className="absolute right-1.5 top-1.5 text-slate-400 hover:text-red-600"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                              <input
-                                type="text"
-                                placeholder="Nama Pelatihan"
-                                value={t.name}
-                                onChange={(e) => handleUpdateTraining(idx, 'name', e.target.value)}
-                                className="w-[88%] px-2 py-1 text-xs rounded border border-slate-300 bg-white"
-                              />
-                              <div className="grid grid-cols-2 gap-1.5">
-                                <input
-                                  type="text"
-                                  placeholder="Penyelenggara"
-                                  value={t.organizer || ''}
-                                  onChange={(e) =>
-                                    handleUpdateTraining(idx, 'organizer', e.target.value)
-                                  }
-                                  className="px-2 py-1 text-xs rounded border border-slate-300 bg-white"
-                                />
-                                <input
-                                  type="number"
-                                  placeholder="Tahun"
-                                  value={t.year || ''}
-                                  onChange={(e) =>
-                                    handleUpdateTraining(
-                                      idx,
-                                      'year',
-                                      e.target.value ? Number(e.target.value) : null
-                                    )
-                                  }
-                                  className="px-2 py-1 text-xs rounded border border-slate-300 bg-white"
-                                />
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Sertifikasi Repeater */}
-                    <div className="p-3.5 rounded-lg border border-slate-200 bg-white space-y-2.5">
-                      <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                        <div className="flex items-center gap-1.5 text-slate-800 font-semibold text-xs">
-                          <Award className="w-3.5 h-3.5 text-[#0E385E]" />
-                          <span>Sertifikasi Kompetensi (Opsional)</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleAddCertification}
-                          className="inline-flex items-center gap-0.5 text-xs text-[#0E385E] font-medium hover:underline"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Tambah</span>
-                        </button>
-                      </div>
-
-                      <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                        {certifications.length === 0 ? (
-                          <p className="text-xs text-slate-400 italic py-2">
-                            Belum ada sertifikasi.
-                          </p>
-                        ) : (
-                          certifications.map((c, idx) => (
-                            <div
-                              key={idx}
-                              className="p-2 rounded bg-slate-50 border border-slate-200 space-y-1.5 relative text-xs"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveCertification(idx)}
-                                className="absolute right-1.5 top-1.5 text-slate-400 hover:text-red-600"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                              <input
-                                type="text"
-                                placeholder="Nama Sertifikasi (BNSP / AWS / dll)"
-                                value={c.name}
-                                onChange={(e) =>
-                                  handleUpdateCertification(idx, 'name', e.target.value)
-                                }
-                                className="w-[88%] px-2 py-1 text-xs rounded border border-slate-300 bg-white"
-                              />
-                              <div className="grid grid-cols-2 gap-1.5">
-                                <input
-                                  type="text"
-                                  placeholder="Jenis (Nasional / Internasional)"
-                                  value={c.type || ''}
-                                  onChange={(e) =>
-                                    handleUpdateCertification(idx, 'type', e.target.value)
-                                  }
-                                  className="px-2 py-1 text-xs rounded border border-slate-300 bg-white"
-                                />
-                                <input
-                                  type="number"
-                                  placeholder="Tahun"
-                                  value={c.year || ''}
-                                  onChange={(e) =>
-                                    handleUpdateCertification(
-                                      idx,
-                                      'year',
-                                      e.target.value ? Number(e.target.value) : null
-                                    )
-                                  }
-                                  className="px-2 py-1 text-xs rounded border border-slate-300 bg-white"
-                                />
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Wizard Footer Controls */}
-          <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
-            {currentStep > 1 ? (
-              <button
-                type="button"
-                onClick={handlePrev}
-                disabled={isSubmitting}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-slate-300 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                <span>Kembali</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={isSubmitting}
-                className="px-4 py-2 rounded-md border border-slate-300 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
-              >
-                Batal
-              </button>
-            )}
-
-            <div className="flex items-center gap-2">
-              {currentStep < 3 ? (
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-md bg-[#0E385E] text-white text-xs sm:text-sm font-semibold hover:bg-[#163A5F] transition-colors shadow-xs"
-                >
-                  <span>Lanjut</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={isSubmitting || isLoadingMaster}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-md bg-emerald-700 text-white text-xs sm:text-sm font-semibold hover:bg-emerald-800 transition-colors shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Menyimpan...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4" />
-                      <span>Simpan Profil Pencari Kerja</span>
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-        </form>
       </div>
     </div>
   );

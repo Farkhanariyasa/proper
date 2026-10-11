@@ -33,6 +33,11 @@ import SearchableSelect from '@/components/ui/SearchableSelect';
 import KbjiSelector from './KbjiSelector';
 import LowonganSkillPicker, { SelectedSkillRequirement } from './LowonganSkillPicker';
 
+// Klasifikasi Jabatan KBJI & Keahlian Standar ESCO sementara disembunyikan dan tidak wajib.
+// Selama false, form TIDAK mengirim kbji_id / skills sehingga data KBJI & pemetaan skill
+// ESCO yang sudah ada pada lowongan tidak ikut terhapus saat disimpan.
+const SHOW_KBJI_ESCO = false;
+
 interface LowonganFormModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -291,7 +296,7 @@ export default function LowonganFormModal({
       setErrorMessage('Nama perusahaan/instansi wajib diisi.');
       return false;
     }
-    if (!kbjiId) {
+    if (SHOW_KBJI_ESCO && !kbjiId) {
       setErrorMessage('Klasifikasi jabatan standar KBJI wajib dipilih.');
       return false;
     }
@@ -308,7 +313,7 @@ export default function LowonganFormModal({
       setErrorMessage('Pendidikan minimal wajib dipilih.');
       return false;
     }
-    if (skills.length === 0) {
+    if (SHOW_KBJI_ESCO && skills.length === 0) {
       setErrorMessage('Minimal tentukan 1 keahlian standar ESCO yang disyaratkan.');
       return false;
     }
@@ -356,7 +361,7 @@ export default function LowonganFormModal({
     const payload: CreateLowonganPayload = {
       judul_lowongan: judulLowongan,
       nama_perusahaan: namaPerusahaan,
-      kbji_id: kbjiId!,
+      ...(SHOW_KBJI_ESCO && kbjiId ? { kbji_id: kbjiId } : {}),
       deskripsi_pekerjaan: deskripsiPekerjaan,
       tipe_pekerjaan: tipePekerjaan,
       sistem_kerja: sistemKerja,
@@ -378,13 +383,17 @@ export default function LowonganFormModal({
       status_lowongan: statusLowongan,
       tanggal_buka: tanggalBuka ? `${tanggalBuka} 00:00:00` : undefined,
       tanggal_tutup: `${tanggalTutup} 23:59:59`,
-      skills: skills.map((s) => ({
-        esco_skill_id: s.esco_skill_id,
-        tipe_keahlian: s.tipe_keahlian,
-        level_kemahiran: ['pemula', 'menengah', 'ahli'].includes(s.level_kemahiran)
-          ? s.level_kemahiran
-          : 'menengah',
-      })),
+      ...(SHOW_KBJI_ESCO
+        ? {
+            skills: skills.map((s) => ({
+              esco_skill_id: s.esco_skill_id,
+              tipe_keahlian: s.tipe_keahlian,
+              level_kemahiran: ['pemula', 'menengah', 'ahli'].includes(s.level_kemahiran)
+                ? s.level_kemahiran
+                : 'menengah',
+            })),
+          }
+        : {}),
     };
 
     setIsSubmitting(true);
@@ -455,7 +464,9 @@ export default function LowonganFormModal({
                 >
                   Posisi & Perusahaan
                 </div>
-                <div className="text-[10px] text-slate-400">Identitas & KBJI</div>
+                <div className="text-[10px] text-slate-400">
+                  {SHOW_KBJI_ESCO ? 'Identitas & KBJI' : 'Identitas & Deskripsi'}
+                </div>
               </div>
             </button>
 
@@ -492,9 +503,11 @@ export default function LowonganFormModal({
                     currentStep === 2 ? 'text-[#0E385E]' : 'text-slate-700'
                   }`}
                 >
-                  Kualifikasi & Skill
+                  {SHOW_KBJI_ESCO ? 'Kualifikasi & Skill' : 'Kualifikasi'}
                 </div>
-                <div className="text-[10px] text-slate-400">Pendidikan & ESCO</div>
+                <div className="text-[10px] text-slate-400">
+                  {SHOW_KBJI_ESCO ? 'Pendidikan & ESCO' : 'Pendidikan & Kriteria'}
+                </div>
               </div>
             </button>
 
@@ -594,15 +607,17 @@ export default function LowonganFormModal({
                 </div>
               </div>
 
-              {/* KBJI Selector */}
-              <KbjiSelector
-                value={kbjiId}
-                selectedLabel={kbjiLabel}
-                onChange={(id, opt) => {
-                  setKbjiId(id);
-                  setKbjiLabel(`${opt.code} - ${opt.title}`);
-                }}
-              />
+              {/* KBJI Selector (disembunyikan, lihat SHOW_KBJI_ESCO) */}
+              {SHOW_KBJI_ESCO && (
+                <KbjiSelector
+                  value={kbjiId}
+                  selectedLabel={kbjiLabel}
+                  onChange={(id, opt) => {
+                    setKbjiId(id);
+                    setKbjiLabel(`${opt.code} - ${opt.title}`);
+                  }}
+                />
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
@@ -801,10 +816,12 @@ export default function LowonganFormModal({
                 />
               </div>
 
-              {/* Pemetaan Skill ESCO */}
-              <div className="pt-2">
-                <LowonganSkillPicker skills={skills} onChange={setSkills} />
-              </div>
+              {/* Pemetaan Skill ESCO (disembunyikan, lihat SHOW_KBJI_ESCO) */}
+              {SHOW_KBJI_ESCO && (
+                <div className="pt-2">
+                  <LowonganSkillPicker skills={skills} onChange={setSkills} />
+                </div>
+              )}
             </div>
           )}
 
@@ -999,7 +1016,7 @@ export default function LowonganFormModal({
                 onClick={handleNextFromStep1}
                 className="inline-flex items-center gap-1.5 px-5 py-2 text-xs sm:text-sm font-semibold rounded-md bg-[#0E385E] text-white hover:bg-[#163A5F] transition-colors"
               >
-                <span>Lanjut: Kualifikasi & Skill</span>
+                <span>Lanjut: {SHOW_KBJI_ESCO ? 'Kualifikasi & Skill' : 'Kualifikasi'}</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             )}

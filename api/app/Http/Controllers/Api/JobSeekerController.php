@@ -122,117 +122,27 @@ class JobSeekerController extends Controller
 
     /**
      * POST /api/job-seekers
-     * Simpan data pencari kerja & keahlian dengan Database Transaction
+     * Tambah profil pencari kerja langsung ke tabel req_pk_pencaker
      */
     public function store(StoreJobSeekerRequest $request): JsonResponse
     {
-        $validated = $request->validated();
-        $skillIds = $validated['skills'] ?? [];
-        unset($validated['skills']);
-
-        // Default created_by to current authenticated user if available
-        if (!isset($validated['created_by']) && $request->user()) {
-            $validated['created_by'] = $request->user()->id;
-        }
-
         try {
-            // Lookup Wilayah
-            $province = null;
-            $regency = null;
-            if (!empty($validated['regency_id'])) {
-                $regency = Regency::with('province')->find($validated['regency_id']);
-                $province = $regency?->province;
-            }
-
-            // Lookup Jenjang Pendidikan
-            $educationLevel = null;
-            if (!empty($validated['education_level_id'])) {
-                $educationLevel = EducationLevel::find($validated['education_level_id']);
-            }
-
-            // Hitung umur dari tanggal lahir
-            $umur = null;
-            if (!empty($validated['birth_date'])) {
-                $umur = \Carbon\Carbon::parse($validated['birth_date'])->age;
-            }
-
-            $jenisKelamin = ($validated['gender'] ?? '') === 'L' ? 'Laki-laki' : 'Perempuan';
-
-            // Ekstraksi sertifikasi & pelatihan dari array menjadi string
-            $sertifikasi = null;
-            if (!empty($validated['certifications']) && is_array($validated['certifications'])) {
-                $certNames = array_filter(array_column($validated['certifications'], 'name'));
-                $sertifikasi = !empty($certNames) ? implode(', ', $certNames) : null;
-            }
-
-            $pelatihan = null;
-            if (!empty($validated['trainings']) && is_array($validated['trainings'])) {
-                $trainNames = array_filter(array_column($validated['trainings'], 'name'));
-                $pelatihan = !empty($trainNames) ? implode(', ', $trainNames) : null;
-            }
-
-            // Ringkasan keahlian teks dari skill ESCO yang dipilih
-            $skillNames = [];
-            if (!empty($skillIds)) {
-                $skillNames = SkillNode::whereIn('id', $skillIds)->pluck('title')->toArray();
-            }
-            $keahlian = !empty($skillNames) ? implode(', ', array_slice($skillNames, 0, 5)) : null;
-
-            $mappedData = [
-                'profile_id' => 'PROFILE-' . Str::lower(Str::random(4)) . '-' . Str::lower(Str::random(4)),
-                'name' => $validated['full_name'],
-                'provinsi' => $province?->name,
-                'province_id' => $province?->id,
-                'kab_kota' => $regency?->name,
-                'regency_id' => $regency?->id,
-                'region_name' => ($regency?->name ? $regency->name . ', ' : '') . ($province?->name ?? ''),
-                'umur' => $umur,
-                'jenis_kelamin' => $jenisKelamin,
+            $mappedData = array_merge([
+                // Nilai bawaan untuk kolom yang tidak diisi lewat form
                 'kondisi_fisik' => 'Non Disabilitas',
-                'marital' => 'BELUM MENIKAH',
-                'status_bekerja' => ($validated['experience_range'] ?? '') === 'fresh_graduate' ? 'Fresh Graduate' : 'Mencari Kerja',
+                'rencana_kerja_luar_negeri' => 'Tidak',
+                'bahasa' => 'Bahasa Indonesia',
+            ], $this->mapFields($request->validated()), [
+                'profile_id' => 'PROFILE-' . Str::lower(Str::random(9)),
                 'start_date' => now()->format('d/m/Y'),
                 'recent_start' => now()->format('d/m/Y'),
                 'status_sekarang' => 'active',
                 'tanggal_kedaluwarsa' => now()->addMonths(6)->format('d/m/Y'),
-                'pendidikan' => $educationLevel?->name,
-                'education_level_id' => $validated['education_level_id'],
-                'jurusan' => $validated['study_field_detail'] ?? $validated['study_field_group'] ?? null,
-                'experience' => $validated['experience_range'] ?? null,
-                'sertifikasi' => $sertifikasi,
-                'progpel' => $pelatihan,
-                'keahlian' => $keahlian,
-                'bahasa' => 'Bahasa Indonesia',
-                'rencana_kerja_luar_negeri' => 'Tidak',
                 'lamaran_diajukan' => 0,
-            ];
-
-            $jobSeeker = DB::transaction(function () use ($mappedData, $skillIds) {
-                // 1. Insert data profil pencari kerja ke req_pk_pencaker
-                $seeker = JobSeeker::create($mappedData);
-
-                // 2. Hubungkan keahlian terpilih ke pivot pencaker_esco_skills
-                if (!empty($skillIds)) {
-                    $syncData = [];
-                    foreach ($skillIds as $sId) {
-                        $syncData[$sId] = [
-                            'is_manual' => true,
-                            'source' => 'manual',
-                        ];
-                    }
-                    $seeker->skills()->sync($syncData);
-                }
-
-                return $seeker;
-            });
-
-            // Load relasi lengkap untuk response
-            $jobSeeker->load([
-                'province:id,name',
-                'regency:id,name',
-                'educationLevel:id,name',
-                'skills:id,code,title,title_en,type',
             ]);
+
+            $jobSeeker = JobSeeker::create($mappedData);
+            $jobSeeker->load(['province:id,name', 'regency:id,name', 'educationLevel:id,name']);
 
             return response()->json([
                 'status' => 'success',
@@ -246,9 +156,78 @@ class JobSeekerController extends Controller
 
             return response()->json([
                 'status' => 'error',
-                'message' => 'Terjadi kesalahan sistem saat menyimpan profil pencari kerja: ' . $e->getMessage(),
+                'message' => 'Terjadi kesalahan sistem saat menyimpan profil pencari kerja.',
             ], 500);
         }
+    }
+
+    /**
+     * Petakan input form (Tambah/Edit) ke kolom req_pk_pencaker.
+     * Hanya kolom yang ada di input yang dipetakan (form Edit mengirim yang berubah saja).
+     */
+    private function mapFields(array $v): array
+    {
+        $m = [];
+
+        if (array_key_exists('full_name', $v)) $m['name'] = trim($v['full_name']);
+        if (array_key_exists('gender', $v)) $m['jenis_kelamin'] = $v['gender'];
+        if (array_key_exists('umur', $v)) $m['umur'] = $v['umur'];
+
+        // Wilayah: id master + nama dalam format data pencaker ("KAB. BOGOR", "DKI JAKARTA")
+        if (!empty($v['regency_id'])) {
+            $regency = Regency::with('province')->find($v['regency_id']);
+            if ($regency) {
+                $m['regency_id'] = $regency->id;
+                $m['kab_kota'] = $this->normalizeRegionName($regency->name);
+                $m['province_id'] = $regency->province_id;
+                $m['provinsi'] = $this->normalizeRegionName($regency->province?->name);
+                $m['region_name'] = $m['kab_kota'] . ', ' . $m['provinsi'];
+            }
+        } elseif (!empty($v['province_id'])) {
+            $province = Province::find($v['province_id']);
+            if ($province) {
+                $m['province_id'] = $province->id;
+                $m['provinsi'] = $this->normalizeRegionName($province->name);
+            }
+        }
+
+        if (array_key_exists('education_level_id', $v)) {
+            $m['education_level_id'] = $v['education_level_id'];
+            $m['pendidikan'] = EducationLevel::find($v['education_level_id'])?->name;
+        }
+
+        foreach ([
+            'marital', 'kondisi_fisik', 'jenis_disabilitas', 'status_bekerja', 'jurusan', 'nama_sekolah',
+            'experience', 'sertifikasi', 'lembaga_pelatihan', 'progpel', 'keahlian', 'bahasa',
+            'rencana_kerja_luar_negeri', 'country_wish',
+        ] as $field) {
+            if (array_key_exists($field, $v)) {
+                $value = is_string($v[$field]) ? trim($v[$field]) : $v[$field];
+                $m[$field] = $value === '' ? null : $value;
+            }
+        }
+
+        // Jenis disabilitas & negara tujuan hanya relevan bila kondisinya terpenuhi
+        if (($m['kondisi_fisik'] ?? null) === 'Non Disabilitas') $m['jenis_disabilitas'] = null;
+        if (($m['rencana_kerja_luar_negeri'] ?? null) === 'Tidak') $m['country_wish'] = null;
+
+        return $m;
+    }
+
+    /**
+     * "Kabupaten Bogor" -> "KAB. BOGOR", "Kota Administrasi Jakarta Pusat" -> "KOTA ADM. JAKARTA PUSAT",
+     * "Daerah Khusus Ibukota Jakarta" -> "DKI JAKARTA" (mengikuti penulisan data req_pk_pencaker)
+     */
+    private function normalizeRegionName(?string $name): ?string
+    {
+        if ($name === null || $name === '') {
+            return null;
+        }
+        $name = mb_strtoupper(trim($name));
+        $name = preg_replace('/^KABUPATEN ADMINISTRASI /', 'KAB. ADM. ', $name);
+        $name = preg_replace('/^KABUPATEN /', 'KAB. ', $name);
+        $name = preg_replace('/^KOTA ADMINISTRASI /', 'KOTA ADM. ', $name);
+        return $name === 'DAERAH KHUSUS IBUKOTA JAKARTA' ? 'DKI JAKARTA' : $name;
     }
 
     /**
@@ -279,7 +258,7 @@ class JobSeekerController extends Controller
 
     /**
      * PUT /api/job-seekers/{id}
-     * Perbarui data profil pencari kerja
+     * Perbarui profil pencari kerja di tabel req_pk_pencaker (hanya kolom yang dikirim)
      */
     public function update(UpdateJobSeekerRequest $request, $id): JsonResponse
     {
@@ -292,89 +271,14 @@ class JobSeekerController extends Controller
             ], 404);
         }
 
-        $validated = $request->validated();
-        $hasSkills = array_key_exists('skills', $validated);
-        $skillIds = $hasSkills ? $validated['skills'] : null;
-        unset($validated['skills']);
-
         try {
-            $mappedData = [];
+            $mappedData = $this->mapFields($request->validated());
 
-            if (array_key_exists('full_name', $validated)) {
-                $mappedData['name'] = $validated['full_name'];
-            } elseif (array_key_exists('name', $validated)) {
-                $mappedData['name'] = $validated['name'];
+            if (!empty($mappedData)) {
+                $jobSeeker->update($mappedData);
             }
 
-            if (array_key_exists('gender', $validated)) {
-                $mappedData['jenis_kelamin'] = in_array($validated['gender'], ['L', 'Laki-laki']) ? 'Laki-laki' : 'Perempuan';
-            } elseif (array_key_exists('jenis_kelamin', $validated)) {
-                $mappedData['jenis_kelamin'] = $validated['jenis_kelamin'];
-            }
-
-            if (array_key_exists('birth_date', $validated) && !empty($validated['birth_date'])) {
-                $mappedData['umur'] = \Carbon\Carbon::parse($validated['birth_date'])->age;
-            } elseif (array_key_exists('umur', $validated)) {
-                $mappedData['umur'] = $validated['umur'];
-            }
-
-            if (array_key_exists('province_id', $validated)) {
-                $mappedData['province_id'] = $validated['province_id'];
-                $prov = Province::find($validated['province_id']);
-                if ($prov) $mappedData['provinsi'] = $prov->name;
-            }
-
-            if (array_key_exists('regency_id', $validated)) {
-                $mappedData['regency_id'] = $validated['regency_id'];
-                $reg = Regency::find($validated['regency_id']);
-                if ($reg) {
-                    $mappedData['kab_kota'] = $reg->name;
-                    if (!isset($mappedData['province_id']) && $reg->province_id) {
-                        $mappedData['province_id'] = $reg->province_id;
-                        $prov = Province::find($reg->province_id);
-                        if ($prov) $mappedData['provinsi'] = $prov->name;
-                    }
-                }
-            }
-
-            if (array_key_exists('education_level_id', $validated)) {
-                $mappedData['education_level_id'] = $validated['education_level_id'];
-                $edu = EducationLevel::find($validated['education_level_id']);
-                if ($edu) $mappedData['pendidikan'] = $edu->name;
-            }
-
-            if (array_key_exists('jurusan', $validated)) $mappedData['jurusan'] = $validated['jurusan'];
-            if (array_key_exists('nama_sekolah', $validated)) $mappedData['nama_sekolah'] = $validated['nama_sekolah'];
-            if (array_key_exists('experience', $validated)) $mappedData['experience'] = $validated['experience'];
-            if (array_key_exists('keahlian', $validated)) $mappedData['keahlian'] = $validated['keahlian'];
-            if (array_key_exists('sertifikasi', $validated)) $mappedData['sertifikasi'] = $validated['sertifikasi'];
-            if (array_key_exists('lembaga_pelatihan', $validated)) $mappedData['lembaga_pelatihan'] = $validated['lembaga_pelatihan'];
-            if (array_key_exists('progpel', $validated)) $mappedData['progpel'] = $validated['progpel'];
-            if (array_key_exists('status_bekerja', $validated)) $mappedData['status_bekerja'] = $validated['status_bekerja'];
-
-            DB::transaction(function () use ($jobSeeker, $mappedData, $hasSkills, $skillIds) {
-                if (!empty($mappedData)) {
-                    $jobSeeker->update($mappedData);
-                }
-
-                if ($hasSkills && is_array($skillIds)) {
-                    $syncData = [];
-                    foreach ($skillIds as $sId) {
-                        $syncData[$sId] = [
-                            'is_manual' => true,
-                            'source' => 'manual',
-                        ];
-                    }
-                    $jobSeeker->skills()->sync($syncData);
-                }
-            });
-
-            $jobSeeker->load([
-                'province:id,name',
-                'regency:id,name',
-                'educationLevel:id,name',
-                'skills:id,code,title,title_en,type',
-            ]);
+            $jobSeeker->load(['province:id,name', 'regency:id,name', 'educationLevel:id,name']);
 
             return response()->json([
                 'status' => 'success',
@@ -386,7 +290,7 @@ class JobSeekerController extends Controller
 
             return response()->json([
                 'status' => 'error',
-                'message' => 'Terjadi kesalahan sistem saat memperbarui profil: ' . $e->getMessage(),
+                'message' => 'Terjadi kesalahan sistem saat memperbarui profil.',
             ], 500);
         }
     }
