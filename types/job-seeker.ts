@@ -105,24 +105,6 @@ export interface JobSeeker {
   skills?: EscoSkillItem[];
 }
 
-export interface CreateJobSeekerPayload {
-  nik: string;
-  full_name: string;
-  phone: string;
-  birth_date: string;
-  gender: 'L' | 'P';
-  regency_id: string;
-  education_level_id: number;
-  study_field_group: string;
-  study_field_detail?: string;
-  experience_range: 'fresh_graduate' | '<1' | '1-3' | '3-5' | '>5';
-  desired_occupation?: string;
-  kbji_id?: number | null;
-  trainings?: TrainingItem[];
-  certifications?: CertificationItem[];
-  skills: number[];
-}
-
 export interface JobSeekerOptionsResponse {
   study_field_groups: string[];
   experience_ranges: string[];

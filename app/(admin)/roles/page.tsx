@@ -24,12 +24,17 @@ import {
   Layers,
 } from 'lucide-react';
 
+// Izin yang disembunyikan dari matriks (menu terkait juga disembunyikan di sidebar).
+// Status izin ini pada setiap peran tetap dipertahankan saat matriks disimpan.
+const HIDDEN_PERMISSIONS = ['mapping.kbji'];
+
 export default function RolesAndPermissionsMatrixPage() {
   const { hasPermission } = useAuth();
 
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissionsGrouped, setPermissionsGrouped] = useState<Record<string, Permission[]>>({});
   const [permissionsList, setPermissionsList] = useState<Permission[]>([]);
+  const [hiddenPermissionIds, setHiddenPermissionIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,8 +57,15 @@ export default function RolesAndPermissionsMatrixPage() {
       ]);
 
       setRoles(rolesData);
-      setPermissionsGrouped(permsData.grouped || {});
-      setPermissionsList(permsData.list || []);
+      const isVisible = (p: Permission) => !HIDDEN_PERMISSIONS.includes(p.name);
+      const visibleGrouped: Record<string, Permission[]> = {};
+      Object.entries(permsData.grouped || {}).forEach(([group, perms]) => {
+        const visible = perms.filter(isVisible);
+        if (visible.length > 0) visibleGrouped[group] = visible;
+      });
+      setPermissionsGrouped(visibleGrouped);
+      setPermissionsList((permsData.list || []).filter(isVisible));
+      setHiddenPermissionIds((permsData.list || []).filter((p) => !isVisible(p)).map((p) => p.id));
 
       // Inisialisasi state matriks
       const initialMap: Record<number, number[]> = {};
@@ -107,10 +119,14 @@ export default function RolesAndPermissionsMatrixPage() {
   // Toggle seluruh kolom role (Pilih Semua / Kosongkan)
   const handleToggleRoleColumn = (roleId: number, selectAll: boolean) => {
     setSaveSuccess(null);
-    setMatrixState((prev) => ({
-      ...prev,
-      [roleId]: selectAll ? permissionsList.map((p) => p.id) : [],
-    }));
+    setMatrixState((prev) => {
+      // Izin tersembunyi tidak ikut tercentang/terhapus oleh tombol Pilih Semua / Kosongkan
+      const keptHidden = (prev[roleId] || []).filter((id) => hiddenPermissionIds.includes(id));
+      return {
+        ...prev,
+        [roleId]: selectAll ? [...permissionsList.map((p) => p.id), ...keptHidden] : keptHidden,
+      };
+    });
   };
 
   // Toggle seluruh grup untuk role tertentu
@@ -325,7 +341,9 @@ export default function RolesAndPermissionsMatrixPage() {
 
                     {/* Kolom-kolom Role */}
                     {roles.map((role) => {
-                      const assignedCount = matrixState[role.id]?.length || 0;
+                      const assignedCount = (matrixState[role.id] || []).filter(
+                        (id) => !hiddenPermissionIds.includes(id)
+                      ).length;
                       const isSuperadmin = role.name === 'superadmin';
 
                       return (

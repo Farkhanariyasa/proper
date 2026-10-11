@@ -2,14 +2,15 @@
 
 namespace App\Http\Requests;
 
-use App\Models\JobSeeker;
+use App\Http\Requests\Concerns\JobSeekerFields;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Validation\Rule;
 
 class StoreJobSeekerRequest extends FormRequest
 {
+    use JobSeekerFields;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -19,58 +20,16 @@ class StoreJobSeekerRequest extends FormRequest
     }
 
     /**
-     * Get the validation rules that apply to the request.
+     * Kolom mengikuti tabel req_pk_pencaker. Nama, jenis kelamin, wilayah,
+     * dan pendidikan wajib diisi saat menambah profil baru.
      */
     public function rules(): array
     {
-        return [
-            'nik' => [
-                'required',
-                'numeric',
-                'digits:16',
-            ],
-            'full_name' => ['required', 'string', 'max:150'],
-            'phone' => ['required', 'string', 'max:20'],
-            'birth_date' => ['required', 'date', 'before:today'],
-            'gender' => ['required', 'in:L,P'],
-            'regency_id' => ['required', 'string', 'size:5', 'exists:regencies,id'],
-            'education_level_id' => ['required', 'integer', 'exists:education_levels,id'],
-            'study_field_group' => ['required', 'string', Rule::in(JobSeeker::STUDY_FIELD_GROUPS)],
-            'study_field_detail' => ['nullable', 'string', 'max:150'],
-            'experience_range' => ['required', 'string', Rule::in(JobSeeker::EXPERIENCE_RANGES)],
-            'desired_occupation' => ['nullable', 'string', 'max:150'],
-            'kbji_id' => ['nullable', 'integer', 'exists:kbji_classifications_2026,id'],
-            'trainings' => ['nullable', 'array'],
-            'trainings.*.name' => ['required_with:trainings', 'string', 'max:150'],
-            'trainings.*.organizer' => ['nullable', 'string', 'max:150'],
-            'trainings.*.year' => ['nullable', 'integer', 'min:1950', 'max:2100'],
-            'certifications' => ['nullable', 'array'],
-            'certifications.*.name' => ['required_with:certifications', 'string', 'max:150'],
-            'certifications.*.type' => ['nullable', 'string', 'max:100'],
-            'certifications.*.year' => ['nullable', 'integer', 'min:1950', 'max:2100'],
-            'skills' => ['required', 'array', 'min:1'],
-            'skills.*' => ['required', 'integer', 'exists:skill_nodes,id'],
-            'created_by' => ['nullable', 'exists:users,id'],
-        ];
-    }
-
-    /**
-     * Custom validation messages
-     */
-    public function messages(): array
-    {
-        return [
-            'nik.required' => 'NIK wajib diisi.',
-            'nik.digits' => 'NIK harus tepat 16 digit numerik.',
-            'nik.numeric' => 'NIK hanya boleh memuat angka numerik.',
-            'nik.unique' => 'NIK ini sudah terdaftar di sistem.',
-            'regency_id.exists' => 'Kabupaten/Kota yang dipilih tidak valid.',
-            'education_level_id.exists' => 'Jenjang pendidikan yang dipilih tidak valid.',
-            'study_field_group.in' => 'Rumpun bidang pendidikan harus sesuai pilihan standar.',
-            'experience_range.in' => 'Rentang pengalaman tidak valid.',
-            'skills.required' => 'Minimal pilih 1 keahlian (skill).',
-            'skills.*.exists' => 'Salah satu skill yang dipilih tidak terdaftar di sistem taksonomi ESCO.',
-        ];
+        $rules = $this->jobSeekerFieldRules();
+        foreach (['full_name', 'gender', 'province_id', 'regency_id', 'education_level_id'] as $required) {
+            array_unshift($rules[$required], 'required');
+        }
+        return $rules;
     }
 
     /**

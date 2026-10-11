@@ -9,7 +9,6 @@ import {
   Calendar,
   Briefcase,
   GraduationCap,
-  Layers,
   DollarSign,
   Users,
   CheckCircle2,
@@ -237,51 +236,7 @@ export default function LowonganDetailModal({
             )}
           </div>
 
-          {/* Keahlian yang Disyaratkan */}
-          <div>
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-blue-600" />
-                Spesifikasi Keahlian Formasi ({lowongan.skills?.length || 0})
-              </span>
-            </h4>
-
-            {lowongan.skills && lowongan.skills.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {lowongan.skills.map((sk) => (
-                  <div
-                    key={sk.id}
-                    className="p-3 rounded-lg border border-slate-200 bg-white hover:border-blue-300 transition-colors flex items-start justify-between gap-2"
-                  >
-                    <div>
-                      <div className="font-semibold text-slate-800 text-xs">{sk.title}</div>
-                      {sk.title_en && (
-                        <div className="text-[10px] text-slate-400 italic">{sk.title_en}</div>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                          sk.tipe_keahlian === 'wajib'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {sk.tipe_keahlian === 'wajib' ? 'Wajib' : 'Tambahan'}
-                      </span>
-                      <span className="text-[10px] text-slate-400 capitalize">
-                        Level: {sk.level_kemahiran}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-3 border border-dashed border-slate-200 rounded-lg text-slate-400 text-center text-xs">
-                Tidak ada keahlian khusus yang didaftarkan.
-              </div>
-            )}
-          </div>
+          {/* Spesifikasi Keahlian Formasi (skill ESCO) sementara disembunyikan. */}
 
           {/* Timeline & Penempatan */}
           <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
