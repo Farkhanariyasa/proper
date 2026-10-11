@@ -13,13 +13,17 @@ import {
   Briefcase,
   GraduationCap,
   MapPin,
+  Eye,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 import { JobSeeker, Province } from '@/types/job-seeker';
-import { getJobSeekers, getJobSeekerOptions } from '@/services/job-seeker';
+import { deleteJobSeeker, getJobSeekers, getJobSeekerOptions } from '@/services/job-seeker';
 import { getProvinces } from '@/services/wilayah';
 import JobSeekerFormModal from '@/components/job-seeker/JobSeekerFormModal';
 import JobSeekerDetailModal from '@/components/job-seeker/JobSeekerDetailModal';
 import AuthGuard from '@/components/auth/AuthGuard';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function ProfilSkillPage() {
@@ -50,6 +54,10 @@ export default function ProfilSkillPage() {
   const [error, setError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [detailSeekerId, setDetailSeekerId] = useState<number | null>(null);
+  const [editSeekerId, setEditSeekerId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Opsi provinsi untuk SearchableSelect
   const provinceOptions = useMemo(
@@ -103,6 +111,27 @@ export default function ProfilSkillPage() {
   useEffect(() => {
     loadJobSeekers(1);
   }, [loadJobSeekers]);
+
+  // Tombol hapus hanya membuka dialog; penghapusan dijalankan setelah dikonfirmasi
+  const handleDelete = (id: number, name?: string) => {
+    setDeleteError(null);
+    setDeleteTarget({ id, name: name || `ID ${id}` });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeletingId(deleteTarget.id);
+    setDeleteError(null);
+    try {
+      await deleteJobSeeker(deleteTarget.id);
+      setDeleteTarget(null);
+      loadJobSeekers(meta.current_page);
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : 'Gagal menghapus profil pencari kerja.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <AuthGuard requiredPermission="job_seekers.view">
@@ -216,12 +245,13 @@ export default function ProfilSkillPage() {
                 <th className="py-3 px-4">Domisili (Kab/Kota)</th>
                 <th className="py-3 px-4">Pendidikan & Rumpun</th>
                 <th className="py-3 px-4">Keahlian Utama</th>
+                <th className="py-3 px-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <Loader2 className="w-6 h-6 animate-spin text-[#0E385E]" />
                       <span className="text-xs">Memuat data pencari kerja...</span>
@@ -230,7 +260,7 @@ export default function ProfilSkillPage() {
                 </tr>
               ) : jobSeekers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-12 text-center text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
                     <p className="text-sm font-medium text-slate-500">
                       Belum ada profil pencari kerja yang cocok.
                     </p>
@@ -288,6 +318,51 @@ export default function ProfilSkillPage() {
                         Pengalaman: {item.experience || '-'}
                       </div>
                     </td>
+                    {/* Aksi (seragam dengan halaman Lowongan) */}
+                    <td
+                      className="py-3.5 px-4 text-right whitespace-nowrap"
+                      // Klik tombol aksi tidak ikut memicu klik baris (buka detail)
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setDetailSeekerId(item.id)}
+                          className="p-1.5 rounded-md text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          title="Lihat Detail Profil"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+
+                        {hasPermission('job_seekers.edit') && (
+                          <button
+                            type="button"
+                            onClick={() => setEditSeekerId(item.id)}
+                            className="p-1.5 rounded-md text-slate-600 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                            title="Edit Profil"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {hasPermission('job_seekers.delete') && (
+                          <button
+                            type="button"
+                            disabled={deletingId === item.id}
+                            onClick={() => handleDelete(item.id, item.name)}
+                            className="p-1.5 rounded-md text-slate-600 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                            title="Hapus Profil"
+                          >
+                            {deletingId === item.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -326,13 +401,11 @@ export default function ProfilSkillPage() {
         )}
       </div>
 
-      {/* Form Modal */}
+      {/* Form Tambah (data baru) */}
       <JobSeekerFormModal
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={() => {
-          loadJobSeekers(1);
-        }}
+        onSaved={() => loadJobSeekers(1)}
       />
 
       {/* Detail Modal */}
@@ -342,6 +415,35 @@ export default function ProfilSkillPage() {
         onDeleted={() => {
           loadJobSeekers(meta.current_page);
         }}
+        onEdit={(id) => {
+          setDetailSeekerId(null);
+          setEditSeekerId(id);
+        }}
+      />
+
+      {/* Konfirmasi Hapus */}
+      <ConfirmDialog
+        open={deleteTarget != null}
+        title="Hapus Profil Pencari Kerja"
+        message={
+          <>
+            Profil <strong className="text-slate-900">{deleteTarget?.name}</strong> akan dihapus permanen
+            beserta data skill-nya. Tindakan ini tidak dapat dibatalkan.
+          </>
+        }
+        confirmLabel="Ya, Hapus"
+        loading={deletingId != null}
+        error={deleteError}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      {/* Form Edit (komponen yang sama dengan Tambah) */}
+      <JobSeekerFormModal
+        isOpen={editSeekerId != null}
+        jobSeekerId={editSeekerId}
+        onClose={() => setEditSeekerId(null)}
+        onSaved={() => loadJobSeekers(meta.current_page)}
       />
     </div>
   </AuthGuard>

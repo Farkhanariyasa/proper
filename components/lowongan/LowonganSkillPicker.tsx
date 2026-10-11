@@ -114,7 +114,7 @@ export default function LowonganSkillPicker({
       <div className="relative">
         <input
           type="text"
-          placeholder="Cari keahlian standar ESCO (misal: Python, SQL, Analisis Data)..."
+          placeholder="Cari atau ketik keahlian (misal: Komunikasi, Sales, Excel, Canva)..."
           value={query}
           onFocus={() => setIsOpen(true)}
           onChange={(e) => {
@@ -136,7 +136,7 @@ export default function LowonganSkillPicker({
             {loading ? (
               <div className="p-3 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                Mencari taksonomi keahlian...
+                Mencari daftar keahlian...
               </div>
             ) : results.length > 0 ? (
               <ul className="divide-y divide-slate-100">
@@ -177,7 +177,7 @@ export default function LowonganSkillPicker({
               </div>
             ) : (
               <div className="p-3 text-center text-xs text-slate-400">
-                Ketik nama keahlian untuk memuat daftar taksonomi.
+                Ketik nama keahlian untuk memuat daftar rekomendasi.
               </div>
             )}
           </div>
@@ -220,8 +220,8 @@ export default function LowonganSkillPicker({
                       : 'border-slate-300 bg-white text-slate-700'
                   } focus:outline-hidden`}
                 >
-                  <option value="wajib">Wajib (Must-have)</option>
-                  <option value="tambahan">Tambahan (Nice-to-have)</option>
+                  <option value="wajib">Wajib (Bobot 1.0)</option>
+                  <option value="tambahan">Tambahan (Bobot 0.7)</option>
                 </select>
 
                 {/* Level Kemahiran */}

@@ -9,7 +9,6 @@ import {
   Calendar,
   Briefcase,
   GraduationCap,
-  Layers,
   DollarSign,
   Users,
   CheckCircle2,
@@ -131,24 +130,15 @@ export default function LowonganDetailModal({
 
         {/* Modal Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs sm:text-sm">
-          {/* Klasifikasi KBJI & Kompensasi */}
+          {/* Kompensasi & Penempatan */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-3.5 rounded-lg border border-blue-100 bg-blue-50/40 space-y-1">
-              <span className="text-[11px] font-bold text-blue-900 flex items-center gap-1">
-                <Briefcase className="w-3.5 h-3.5 text-blue-700" />
-                Standar Jabatan KBJI 2026:
+            <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/60 space-y-1">
+              <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-slate-600" />
+                Lokasi Penempatan:
               </span>
               <div className="font-semibold text-slate-900">
-                {lowongan.kbji ? (
-                  <>
-                    <span className="font-mono text-blue-700 font-bold mr-1.5">
-                      [{lowongan.kbji.code}]
-                    </span>
-                    {lowongan.kbji.title}
-                  </>
-                ) : (
-                  'Belum diklasifikasikan'
-                )}
+                {lowongan.regency?.name || '-'}, {lowongan.province?.name || '-'}
               </div>
             </div>
 
@@ -246,54 +236,7 @@ export default function LowonganDetailModal({
             )}
           </div>
 
-          {/* Keahlian ESCO yang Disyaratkan */}
-          <div>
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-blue-600" />
-                Spesifikasi Keahlian Standar ESCO ({lowongan.skills?.length || 0})
-              </span>
-              <span className="text-[10px] text-slate-500 font-normal lowercase">
-                digunakan untuk matching engine & gap analysis
-              </span>
-            </h4>
-
-            {lowongan.skills && lowongan.skills.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {lowongan.skills.map((sk) => (
-                  <div
-                    key={sk.id}
-                    className="p-3 rounded-lg border border-slate-200 bg-white hover:border-blue-300 transition-colors flex items-start justify-between gap-2"
-                  >
-                    <div>
-                      <div className="font-semibold text-slate-800 text-xs">{sk.title}</div>
-                      {sk.title_en && (
-                        <div className="text-[10px] text-slate-400 italic">{sk.title_en}</div>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                          sk.tipe_keahlian === 'wajib'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {sk.tipe_keahlian === 'wajib' ? 'Wajib' : 'Tambahan'}
-                      </span>
-                      <span className="text-[10px] text-slate-400 capitalize">
-                        Level: {sk.level_kemahiran}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-3 border border-dashed border-slate-200 rounded-lg text-slate-400 text-center text-xs">
-                Tidak ada keahlian khusus yang didaftarkan.
-              </div>
-            )}
-          </div>
+          {/* Spesifikasi Keahlian Formasi (skill ESCO) sementara disembunyikan. */}
 
           {/* Timeline & Penempatan */}
           <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">

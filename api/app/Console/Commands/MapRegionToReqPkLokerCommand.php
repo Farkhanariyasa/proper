@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Province;
 use App\Models\Regency;
-use App\Models\ReqPkLoker;
+use App\Models\LowonganKerja;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -31,7 +31,7 @@ class MapRegionToReqPkLokerCommand extends Command
     {
         $this->info('Memulai pemetaan wilayah lowongan kerja...');
 
-        $lokers = ReqPkLoker::whereNull('provinsi_id')->orWhereNull('regency_id')->get();
+        $lokers = LowonganKerja::whereNull('provinsi_id')->orWhereNull('regency_id')->get();
         $this->info('Ditemukan ' . $lokers->count() . ' lowongan yang belum dipetakan wilayahnya.');
 
         // Preload provinces and regencies mapping

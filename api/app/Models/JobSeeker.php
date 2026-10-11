@@ -110,4 +110,38 @@ class JobSeeker extends Model
             'esco_skill_id'
         )->withPivot(['is_manual', 'source'])->withTimestamps();
     }
+
+    public function getFullNameAttribute(): ?string
+    {
+        return $this->attributes['full_name'] ?? $this->attributes['name'] ?? 'Pencari Kerja';
+    }
+
+    public function getNikAttribute(): ?string
+    {
+        return $this->attributes['nik'] ?? $this->attributes['profile_id'] ?? '-';
+    }
+
+    public function getPhoneAttribute(): ?string
+    {
+        return $this->attributes['phone'] ?? '-';
+    }
+
+    public function getDesiredOccupationAttribute(): ?string
+    {
+        if (!empty($this->attributes['desired_occupation'])) {
+            return $this->attributes['desired_occupation'];
+        }
+        if (!empty($this->experience)) {
+            if (preg_match('/\[([^;\]]+)/', $this->experience, $m)) {
+                return trim($m[1]);
+            }
+        }
+        return $this->progpel ?? $this->jurusan ?? null;
+    }
+
+    public function kbji()
+    {
+        return $this->belongsTo(KbjiClassification::class, 'kbji_id');
+    }
 }
+

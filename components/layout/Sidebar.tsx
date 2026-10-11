@@ -25,6 +25,9 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
+// Menu "Data Matching" (Pemetaan KBJI & Pemetaan ESCO Skill) sementara disembunyikan
+const SHOW_DATA_MATCHING = false;
+
 interface SidebarProps {
   mobileOpen: boolean;
   onMobileClose: () => void;
@@ -379,8 +382,9 @@ export default function Sidebar({
             );
           })}
 
-          {/* 5. Data Matching (Hanya Tampil Jika Memiliki Izin) */}
-          {(hasRole('superadmin') || hasPermission('mapping.kbji')) && (
+          {/* 5. Data Matching — DISEMBUNYIKAN untuk semua pengguna (termasuk superadmin).
+              Untuk menampilkan lagi, ganti SHOW_DATA_MATCHING menjadi true. */}
+          {SHOW_DATA_MATCHING && (hasRole('superadmin') || hasPermission('mapping.kbji')) && (
             <div className="pt-3">
               <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-blue-300/70">
                 Data Matching

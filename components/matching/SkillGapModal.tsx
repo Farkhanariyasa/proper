@@ -13,6 +13,7 @@ import {
   GraduationCap,
   Send,
   BarChart3,
+  Target,
 } from 'lucide-react';
 import { PairwiseAnalysisResponse } from '@/types/matching';
 
@@ -105,6 +106,111 @@ export default function SkillGapModal({
             </div>
           </div>
 
+          {/* Rincian Evaluasi 5 Dimensi Multi-Kriteria */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <BarChart3 className="w-4 h-4 text-[#0E385E]" />
+                <span>Rincian Evaluasi 5 Dimensi Multi-Kriteria</span>
+              </h4>
+              <span className="text-[11px] text-slate-400 font-medium">Bobot Komposit Total: 100%</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {/* Dimensi 1: Kompetensi & Keahlian (40%) */}
+              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                  <span className="flex items-center gap-1 text-emerald-800">
+                    <Target className="w-3.5 h-3.5 text-emerald-600" />
+                    Kompetensi / Skill
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 bg-emerald-50 text-emerald-700 rounded font-bold">40%</span>
+                </div>
+                <div className="text-xl font-black text-slate-900">
+                  {data.score_breakdown?.skill_score ?? Math.round((matched_skills.length / Math.max(1, matched_skills.length + gap_skills.length)) * 100)}%
+                </div>
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-emerald-600 rounded-full" 
+                    style={{ width: `${data.score_breakdown?.skill_score ?? Math.round((matched_skills.length / Math.max(1, matched_skills.length + gap_skills.length)) * 100)}%` }} 
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  {matched_skills.length} dari {matched_skills.length + gap_skills.length} skill terpenuhi
+                </p>
+              </div>
+
+              {/* Dimensi 2: Kualifikasi Pendidikan (30%) */}
+              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                  <span className="flex items-center gap-1 text-purple-800">
+                    <GraduationCap className="w-3.5 h-3.5 text-purple-600" />
+                    Pendidikan
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 bg-purple-50 text-purple-700 rounded font-bold">30%</span>
+                </div>
+                <div className="text-xl font-black text-slate-900">
+                  {data.score_breakdown?.education_score ?? (data.education_match?.is_matched ? 100 : 0)}%
+                </div>
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-purple-600 rounded-full" 
+                    style={{ width: `${data.score_breakdown?.education_score ?? (data.education_match?.is_matched ? 100 : 0)}%` }} 
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  {data.education_match?.is_matched ? 'Memenuhi Syarat' : 'Di Bawah Syarat (0%)'}
+                </p>
+              </div>
+
+              {/* Dimensi 3: Pengalaman Kerja (20%) */}
+              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                  <span className="flex items-center gap-1 text-amber-800">
+                    <Layers className="w-3.5 h-3.5 text-amber-600" />
+                    Pengalaman Kerja
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 bg-amber-50 text-amber-700 rounded font-bold">20%</span>
+                </div>
+                <div className="text-xl font-black text-slate-900">
+                  {data.score_breakdown?.experience_score ?? 80}%
+                </div>
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-amber-500 rounded-full" 
+                    style={{ width: `${data.score_breakdown?.experience_score ?? 80}%` }} 
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Masa kerja & relevansi rekam jejak industri
+                </p>
+              </div>
+
+              {/* Dimensi 4: Wilayah & Lokasi (10%) */}
+              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                  <span className="flex items-center gap-1 text-indigo-800">
+                    <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                    Lokasi Wilayah
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 bg-indigo-50 text-indigo-700 rounded font-bold">10%</span>
+                </div>
+                <div className="text-xl font-black text-slate-900">
+                  {data.score_breakdown?.location_score ?? 100}%
+                </div>
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-indigo-600 rounded-full" 
+                    style={{ width: `${data.score_breakdown?.location_score ?? 100}%` }} 
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Kesesuaian domisili dengan lokasi penempatan
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Profil Kandidat vs Spesifikasi Lowongan */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Kartu Kandidat */}
@@ -118,14 +224,6 @@ export default function SkillGapModal({
                 <div className="text-xs text-slate-500 font-mono">NIK: {candidate.nik}</div>
               </div>
               <div className="space-y-1 text-xs text-slate-600 pt-1">
-                {candidate.kbji && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-blue-700 font-bold bg-blue-50 px-1 rounded text-[10px]">
-                      {candidate.kbji.code}
-                    </span>
-                    <span className="truncate">{candidate.kbji.title}</span>
-                  </div>
-                )}
                 <div className="flex items-center gap-1.5">
                   <GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span>{candidate.education_level || '-'}</span>
@@ -152,14 +250,6 @@ export default function SkillGapModal({
                 <div className="text-xs font-semibold text-slate-700">{job.nama_perusahaan}</div>
               </div>
               <div className="space-y-1 text-xs text-slate-600 pt-1">
-                {job.kbji && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-blue-700 font-bold bg-blue-50 px-1 rounded text-[10px]">
-                      {job.kbji.code}
-                    </span>
-                    <span className="truncate">{job.kbji.title}</span>
-                  </div>
-                )}
                 <div className="flex items-center gap-1.5">
                   <Briefcase className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span>
@@ -174,41 +264,21 @@ export default function SkillGapModal({
             </div>
           </div>
 
-          {/* Status Keselarasan KBJI (2 Level Wajib) */}
-          {data.kbji_match && (
-            <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2.5">
-                <div className={`p-2 rounded-lg ${
-                  data.kbji_match.match_level === 'exact'
-                    ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-blue-100 text-blue-700'
-                }`}>
-                  <Briefcase className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
-                    <span>Kesesuaian Profesi KBJI:</span>
-                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${
-                      data.kbji_match.match_level === 'exact'
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                        : 'bg-blue-50 text-blue-800 border-blue-200'
-                    }`}>
-                      {data.kbji_match.label}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {data.kbji_match.match_level === 'exact'
-                      ? 'Target jabatan pelamar dan formasi lowongan memiliki klasifikasi KBJI yang identik persis.'
-                      : 'Target jabatan pelamar dan formasi lowongan berada pada 4-digit sub-golongan profesi yang sama.'}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right shrink-0">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Skor Keselarasan</span>
-                <span className="text-sm font-black text-[#0E385E]">{data.kbji_match.compatibility_score}%</span>
-              </div>
+          {/* Keterangan Bobot Wajib & Tambahan */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600 bg-slate-50 border border-slate-200/90 rounded-xl px-3.5 py-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-slate-700">Aturan Bobot Keahlian:</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 uppercase">
+                Wajib (Bobot 1.0)
+              </span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 uppercase">
+                Tambahan (Bobot 0.7)
+              </span>
             </div>
-          )}
+            <div className="text-[11px] text-emerald-700 font-medium">
+              Pencocokan Semantik & Konsep Industri (Bebas ID Taksonomi)
+            </div>
+          </div>
 
           {/* Rincian Komparasi Dua Kolom: Matched vs Gap */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -239,10 +309,11 @@ export default function SkillGapModal({
                           className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${
                             sk.tipe_keahlian === 'wajib'
                               ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                              : 'bg-slate-100 text-slate-600'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
                           }`}
+                          title={sk.tipe_keahlian === 'wajib' ? 'Keahlian Wajib (Bobot 1.0)' : 'Keahlian Tambahan (Bobot 0.7)'}
                         >
-                          {sk.tipe_keahlian}
+                          {sk.tipe_keahlian === 'wajib' ? 'Wajib' : 'Tambahan'}
                         </span>
                       </div>
 
@@ -296,8 +367,9 @@ export default function SkillGapModal({
                           className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${
                             sk.tipe_keahlian === 'wajib'
                               ? 'bg-red-50 text-red-700 border border-red-200'
-                              : 'bg-slate-100 text-slate-600'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
                           }`}
+                          title={sk.tipe_keahlian === 'wajib' ? 'Keahlian Wajib (Bobot 1.0)' : 'Keahlian Tambahan (Bobot 0.7)'}
                         >
                           {sk.tipe_keahlian === 'wajib' ? 'Wajib Dimiliki' : 'Tambahan'}
                         </span>

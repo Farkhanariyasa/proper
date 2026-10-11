@@ -68,12 +68,24 @@ class LowonganResource extends JsonResource
             }),
             'skills' => $this->whenLoaded('skills', function () {
                 return $this->skills->map(function ($s) {
+                    $level = $s->pivot->level_kemahiran ?? null;
+                    if (!$level || !in_array($level, ['pemula', 'menengah', 'ahli'])) {
+                        $skor = is_numeric($s->pivot->skor) ? (float) $s->pivot->skor : 0.7;
+                        if ($skor >= 0.85) {
+                            $level = 'ahli';
+                        } elseif ($skor >= 0.5) {
+                            $level = 'menengah';
+                        } else {
+                            $level = 'pemula';
+                        }
+                    }
+
                     return [
                         'id' => $s->id,
                         'title' => $s->title,
                         'title_en' => $s->title_en,
-                        'tipe_keahlian' => $s->pivot->tipe_keahlian,
-                        'level_kemahiran' => $s->pivot->skor ?? 'N/A', // fall back if skor is empty
+                        'tipe_keahlian' => $s->pivot->tipe_keahlian ?? 'wajib',
+                        'level_kemahiran' => $level,
                     ];
                 });
             }),

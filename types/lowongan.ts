@@ -69,7 +69,7 @@ export interface LowonganItem {
 export interface CreateLowonganPayload {
   judul_lowongan: string;
   nama_perusahaan: string;
-  kbji_id: number;
+  kbji_id?: number;
   deskripsi_pekerjaan: string;
   tipe_pekerjaan: string;
   sistem_kerja: string;
@@ -91,7 +91,7 @@ export interface CreateLowonganPayload {
   status_lowongan?: LowonganStatus;
   tanggal_buka?: string;
   tanggal_tutup: string;
-  skills: Array<{
+  skills?: Array<{
     esco_skill_id: number;
     tipe_keahlian: 'wajib' | 'tambahan';
     level_kemahiran: 'pemula' | 'menengah' | 'ahli';

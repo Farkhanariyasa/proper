@@ -5,37 +5,41 @@ import {
   X,
   User,
   MapPin,
-  Briefcase,
   GraduationCap,
   Calendar,
   Phone,
   BookOpen,
   Award,
   Loader2,
-  CheckCircle2,
   Target,
   Trash2,
+  Pencil,
 } from 'lucide-react';
 import Link from 'next/link';
 import { JobSeeker } from '@/types/job-seeker';
 import { getJobSeekerDetail, deleteJobSeeker } from '@/services/job-seeker';
 import { useAuth } from '@/hooks/useAuth';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 interface JobSeekerDetailModalProps {
   jobSeekerId: number | null;
   onClose: () => void;
   onDeleted?: () => void;
+  onEdit?: (id: number) => void;
 }
 
 export default function JobSeekerDetailModal({
   jobSeekerId,
   onClose,
   onDeleted,
+  onEdit,
 }: JobSeekerDetailModalProps) {
   const { hasPermission } = useAuth();
   const [data, setData] = useState<JobSeeker | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -61,20 +65,25 @@ export default function JobSeekerDetailModal({
     };
   }, [jobSeekerId]);
 
-  const handleDelete = async () => {
+  // Tombol hapus hanya membuka dialog konfirmasi
+  const handleDelete = () => {
     if (!jobSeekerId || !data) return;
-    const confirmName = data.name || data.full_name || 'kandidat ini';
-    if (!window.confirm(`Apakah Anda yakin ingin menghapus profil pekerja "${confirmName}"? Data yang dihapus tidak dapat dipulihkan.`)) {
-      return;
-    }
+    setDeleteError(null);
+    setConfirmOpen(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!jobSeekerId) return;
     setIsDeleting(true);
+    setDeleteError(null);
     try {
       await deleteJobSeeker(jobSeekerId);
+      setConfirmOpen(false);
       onDeleted?.();
       onClose();
-    } catch (err: any) {
-      alert(err.message || 'Gagal menghapus profil pencari kerja');
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : 'Gagal menghapus profil pencari kerja.');
+    } finally {
       setIsDeleting(false);
     }
   };
@@ -204,43 +213,8 @@ export default function JobSeekerDetailModal({
                 </div>
               </div>
 
-              {/* Skills ESCO */}
-              <div className="p-4 rounded-lg bg-white border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div className="flex items-center gap-2 text-slate-800 font-semibold text-xs sm:text-sm">
-                    <Briefcase className="w-4 h-4 text-[#0E385E]" />
-                    <span>Keahlian & Kompetensi ESCO</span>
-                  </div>
-                  <span className="text-xs text-slate-500">
-                    {data.skills?.length || 0} Keahlian Terverifikasi
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {data.skills && data.skills.length > 0 ? (
-                    data.skills.map((skill: any) => {
-                      const src = skill.source || skill.pivot?.source;
-                      return (
-                        <span
-                          key={skill.id}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-sky-50 text-[#0E385E] border border-sky-200 shadow-2xs"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>{skill.title}</span>
-                          {src && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-white text-slate-600 border border-slate-200 font-normal">
-                              {src}
-                            </span>
-                          )}
-                        </span>
-                      );
-                    })
-                  ) : (
-                    <span className="text-xs text-slate-400 italic">
-                      Tidak ada skill terverifikasi yang terdaftar.
-                    </span>
-                  )}
-                </div>
-              </div>
+              {/* Daftar skill ESCO (pencaker_esco_skills) sengaja tidak ditampilkan:
+                  keahlian pencaker ditampilkan sebagai teks (kolom keahlian) di bawah. */}
 
               {/* Trainings & Certifications (Raw Data) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -290,7 +264,7 @@ export default function JobSeekerDetailModal({
 
         {/* Footer */}
         <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
-          <div>
+          <div className="flex items-center gap-2">
             {hasPermission('job_seekers.delete') && data && (
               <button
                 type="button"
@@ -304,6 +278,16 @@ export default function JobSeekerDetailModal({
                   <Trash2 className="w-4 h-4 text-red-600" />
                 )}
                 <span>Hapus Profil</span>
+              </button>
+            )}
+            {onEdit && hasPermission('job_seekers.edit') && data && jobSeekerId != null && (
+              <button
+                type="button"
+                onClick={() => onEdit(jobSeekerId)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-slate-300 bg-white text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100"
+              >
+                <Pencil className="w-4 h-4" />
+                Edit Profil
               </button>
             )}
           </div>
@@ -326,6 +310,23 @@ export default function JobSeekerDetailModal({
           </div>
         </div>
       </div>
+
+      {/* Konfirmasi Hapus */}
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Hapus Profil Pencari Kerja"
+        message={
+          <>
+            Profil <strong className="text-slate-900">{data?.name || data?.full_name || 'ini'}</strong> akan dihapus
+            permanen beserta data skill-nya. Tindakan ini tidak dapat dibatalkan.
+          </>
+        }
+        confirmLabel="Ya, Hapus"
+        loading={isDeleting}
+        error={deleteError}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

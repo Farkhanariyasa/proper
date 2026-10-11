@@ -6,7 +6,7 @@ import {
   Users, CheckCircle2, ChevronRight, Search, Briefcase, MapPin, Target,
   Loader2, ArrowRight, Save, Plus, X, Building2, AlertTriangle, AlertCircle,
   RefreshCw, Sparkles, Award, FileText, Check, LayoutList, Table as TableIcon,
-  Maximize2, CheckCheck
+  Maximize2, CheckCheck, BarChart3, GraduationCap, Layers, Compass, User, Phone
 } from 'lucide-react';
 import { 
   getJobSeekers, getJobSeekerDetail, getJobSeekerSkills, 
@@ -176,13 +176,36 @@ function MatchingWizard() {
     }
   }, [selectedProvinsi]);
 
+  // Filter anti-redundansi: buang pecahan kata tunggal jika sudah ada frasa utuh (misal 'Technical', 'Support' jika ada 'Technical Support & Client Service')
+  const filterRedundantSkills = (skills: any[]) => {
+    if (!Array.isArray(skills)) return [];
+    const multiWord = skills
+      .map(s => (s.title || '').trim().toLowerCase())
+      .filter(t => t.split(/\s+/).length >= 2);
+
+    if (multiWord.length === 0) return skills;
+
+    return skills.filter(s => {
+      const title = (s.title || '').trim().toLowerCase();
+      const words = title.split(/\s+/);
+      if (words.length === 1 && words[0].length >= 2) {
+        const isRedundant = multiWord.some(phrase => {
+          const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          return new RegExp(`\\b${escaped}\\b`, 'i').test(phrase);
+        });
+        if (isRedundant) return false;
+      }
+      return true;
+    });
+  };
+
   // Load skills when continuing to step 2 (auto-extracted from keahlian, experience, sertifikasi)
   const handleProceedToStep2 = async () => {
     if (!selectedPencakerId) return;
     setIsLoading(true);
     try {
       const res = await getJobSeekerSkills(selectedPencakerId);
-      setPencakerSkills(res.data || []);
+      setPencakerSkills(filterRedundantSkills(res.data || []));
       setExtractionMeta(res.meta || null);
       setStep(2);
     } catch (e) {
@@ -198,7 +221,7 @@ function MatchingWizard() {
     setIsExtracting(true);
     try {
       const res = await extractJobSeekerSkills(selectedPencakerId);
-      setPencakerSkills(res.data || []);
+      setPencakerSkills(filterRedundantSkills(res.data || []));
       setExtractionMeta(res.meta || null);
     } catch (e) {
       alert("Gagal melakukan ekstraksi ulang skill");
@@ -239,23 +262,35 @@ function MatchingWizard() {
     );
   }, [selectedSeeker, pencakerList]);
 
-  const handleSearchSkill = async () => {
-    if (skillQuery.length < 3) return;
-    try {
-      const res = await searchEscoSkills(skillQuery);
-      setSkillResults(res);
-    } catch (e) {
-      console.error(e);
+  const handleAddFreeTextSkill = (text: string) => {
+    const clean = text.trim();
+    if (!clean) return;
+    if (!pencakerSkills.some(s => (s.title || '').toLowerCase() === clean.toLowerCase())) {
+      setPencakerSkills([
+        ...pencakerSkills, 
+        { 
+          id: Date.now(), 
+          title: clean, 
+          source: 'manual', 
+          is_manual: true,
+          pivot: { source: 'manual', is_manual: true } 
+        }
+      ]);
     }
+    setSkillQuery('');
+    setSkillResults([]);
   };
 
   const handleAddSkill = (skill: any) => {
-    if (!pencakerSkills.find(s => s.id === skill.id)) {
+    const title = skill.title || skill.name || '';
+    if (!pencakerSkills.find(s => s.id === skill.id || (s.title && s.title.toLowerCase() === title.toLowerCase()))) {
       setPencakerSkills([
         ...pencakerSkills, 
         { 
           ...skill, 
+          title,
           source: 'manual', 
+          is_manual: true,
           pivot: { ...skill.pivot, source: 'manual', is_manual: true } 
         }
       ]);
@@ -271,7 +306,7 @@ function MatchingWizard() {
   const handleSaveSkills = async () => {
     setIsLoading(true);
     try {
-      await updateJobSeekerSkills(selectedPencakerId, pencakerSkills.map(s => s.id));
+      await updateJobSeekerSkills(selectedPencakerId, pencakerSkills.map(s => s.title || s.id));
       setStep(3);
     } catch (e) {
       alert("Gagal menyimpan data skill");
@@ -297,7 +332,7 @@ function MatchingWizard() {
         pekerjaan: jobTitleQuery.trim(),
         provinsi_id: selectedProvinsi || undefined,
         kabkota_id: selectedKabkota || undefined,
-        skills: pencakerSkills.map(s => s.id),
+        skills: pencakerSkills.map(s => s.title || s.id),
         filter_pendidikan: true,
       });
       const list = Array.isArray(result) ? result : (result?.data || []);
@@ -333,7 +368,7 @@ function MatchingWizard() {
       const result: any = await recommendLowonganApi({
         pencaker_id: Number(selectedPencakerId),
         pekerjaan: jobTitleQuery.trim(),
-        skills: pencakerSkills.map(s => s.id),
+        skills: pencakerSkills.map(s => s.title || s.id),
         filter_pendidikan: filterPendidikan ? true : undefined,
       });
       const list = Array.isArray(result) ? result : (result?.data || []);
@@ -713,54 +748,75 @@ function MatchingWizard() {
                 )}
               </div>
 
-              {/* Tambah Keahlian Manual */}
+              {/* Tambah Keahlian Manual (Bebas Ketik) */}
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <h3 className="font-semibold text-slate-800 text-sm">Tambah Skill ESCO Manual</h3>
-                  <p className="text-xs text-slate-500">Cari dari 13.900+ taksonomi keahlian standar ESCO.</p>
+                  <h3 className="font-semibold text-slate-800 text-sm">Tambah Keahlian Manual</h3>
+                  <p className="text-xs text-slate-500">Ketik kompetensi keahlian apa saja lalu tekan Enter atau klik Tambah.</p>
                 </div>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Search className="h-4 w-4 text-slate-400" />
-                  </div>
-                  <input 
-                    type="text" 
-                    value={skillQuery}
-                    onChange={e => {
-                      setSkillQuery(e.target.value);
-                      if (e.target.value.length >= 3) {
-                        searchEscoSkills(e.target.value, 10).then(res => setSkillResults(res));
-                      } else {
-                        setSkillResults([]);
-                      }
-                    }}
-                    placeholder="Ketik nama skill minimal 3 huruf..."
-                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-sky-500 focus:border-sky-500 bg-white shadow-xs"
-                    autoComplete="off"
-                  />
-                  
-                  {skillResults.length > 0 && (
-                    <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100">
-                      {skillResults.map(res => (
-                        <div key={res.id} className="p-3 flex justify-between items-center hover:bg-slate-50 transition-colors">
-                          <div>
-                            <p className="text-sm font-medium text-slate-800">{res.title}</p>
-                            <p className="text-xs text-slate-500">{res.type}</p>
-                          </div>
-                          <button 
-                            onClick={() => {
-                              handleAddSkill(res);
-                              setSkillQuery('');
-                              setSkillResults([]);
-                            }} 
-                            className="text-sky-600 hover:bg-sky-50 p-1.5 rounded-md border border-transparent hover:border-sky-200 transition-colors"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Target className="h-4 w-4 text-slate-400" />
                     </div>
-                  )}
+                    <input 
+                      type="text" 
+                      value={skillQuery}
+                      onChange={e => setSkillQuery(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (skillQuery.trim().length >= 2) {
+                            handleAddFreeTextSkill(skillQuery);
+                          }
+                        }
+                      }}
+                      placeholder="Ketik keahlian bebas (misal: Komunikasi, Canva, Excel, Sales)..."
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-sky-500 focus:border-sky-500 bg-white shadow-xs"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={skillQuery.trim().length < 2}
+                    onClick={() => handleAddFreeTextSkill(skillQuery)}
+                    className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-medium text-xs rounded-lg transition-colors shadow-xs shrink-0 flex items-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Tambah</span>
+                  </button>
+                </div>
+
+                {/* Saran Keahlian Cepat / Populer */}
+                <div className="space-y-2 pt-1">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                    Saran Cepat Keahlian Industri:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      'Microsoft Excel', 'Komunikasi', 'Pelayanan Pelanggan', 
+                      'Administrasi', 'Sales & Penjualan', 'Canva / Desain', 
+                      'Bahasa Inggris', 'Public Speaking', 'Digital Marketing'
+                    ].map(sug => {
+                      const already = pencakerSkills.some(s => (s.title || '').toLowerCase() === sug.toLowerCase());
+                      return (
+                        <button
+                          key={sug}
+                          type="button"
+                          disabled={already}
+                          onClick={() => handleAddFreeTextSkill(sug)}
+                          className={`text-xs px-2.5 py-1 rounded-md border transition-all flex items-center gap-1 ${
+                            already 
+                              ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                              : 'bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-700 border-slate-200 hover:border-sky-300 shadow-2xs'
+                          }`}
+                        >
+                          <Plus className="w-3 h-3 text-slate-400" />
+                          <span>{sug}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1072,7 +1128,6 @@ function MatchingWizard() {
                         <th className="py-3.5 px-4">Posisi Lowongan & Perusahaan</th>
                         <th className="py-3.5 px-4">Pendidikan</th>
                         <th className="py-3.5 px-4">Lokasi Penempatan</th>
-                        <th className="py-3.5 px-4">Kode KBJI</th>
                         <th className="py-3.5 px-4 text-center">Skor Match</th>
                         <th className="py-3.5 px-4 text-center">Skill Cocok</th>
                         <th className="py-3.5 px-4 text-center">Status</th>
@@ -1138,15 +1193,6 @@ function MatchingWizard() {
                                   <span>{rec.lowongan.regency?.name || '-'}, {rec.lowongan.province?.name || '-'}</span>
                                 </div>
                               </td>
-                              <td className="py-4 px-4 text-slate-600 font-mono text-[11px]">
-                                {rec.lowongan.kbji?.code ? (
-                                  <span title={rec.lowongan.kbji?.name}>
-                                    {rec.lowongan.kbji?.code}
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-400 italic">-</span>
-                                )}
-                              </td>
                               <td className="py-4 px-4 text-center">
                                 <span className={`inline-block px-2.5 py-1 rounded-full font-extrabold text-xs border ${scoreBadgeClass}`}>
                                   {rec.match_score}%
@@ -1164,17 +1210,21 @@ function MatchingWizard() {
                                     <Check className="w-3 h-3 text-emerald-600" />
                                     Direkomendasikan
                                   </span>
+                                ) : rec.match_score >= 100 ? (
+                                  <span className="inline-flex items-center gap-1 text-emerald-800 font-bold bg-emerald-100 px-2.5 py-0.5 rounded-full text-[10px] border border-emerald-300">
+                                    Perfect Match (100%)
+                                  </span>
                                 ) : rec.match_score >= 70 ? (
-                                  <span className="inline-flex items-center gap-1 text-emerald-700 font-medium bg-emerald-50/60 px-2.5 py-0.5 rounded-full text-[10px] border border-emerald-100">
-                                    Sangat Cocok
+                                  <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-full text-[10px] border border-emerald-200">
+                                    High Match ({rec.match_score}%)
                                   </span>
                                 ) : rec.match_score >= 40 ? (
-                                  <span className="inline-flex items-center gap-1 text-sky-700 font-medium bg-sky-50 px-2.5 py-0.5 rounded-full text-[10px] border border-sky-100">
-                                    Cukup Sesuai
+                                  <span className="inline-flex items-center gap-1 text-amber-700 font-semibold bg-amber-50 px-2.5 py-0.5 rounded-full text-[10px] border border-amber-200">
+                                    Gap Match ({rec.match_score}%)
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1 text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full text-[10px]">
-                                    Perlu Pelatihan
+                                  <span className="inline-flex items-center gap-1 text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full text-[10px] border border-slate-200">
+                                    Low Match ({rec.match_score}%)
                                   </span>
                                 )}
                               </td>
@@ -1254,15 +1304,25 @@ function MatchingWizard() {
         )}
       </div>
 
-      {/* Modal Detail Rekomendasi & Analisis Gap Skill (Bebas Emoticon) */}
+      {/* Modal Detail Rekomendasi & Analisis Multi-Kriteria */}
       {isDetailModalOpen && selectedRecommendation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl relative">
+          <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col shadow-2xl relative">
             
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
+            {/* Header Modal */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-white">
               <div>
-                <h2 className="text-xl font-bold text-slate-800">Detail Rekomendasi Lowongan</h2>
-                <p className="text-xs text-slate-500">Analisis kecocokan profil kandidat dengan kualifikasi formasi lowongan</p>
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-[#0E385E]/10 text-[#0E385E]">
+                    <Layers className="w-5 h-5" />
+                  </span>
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900">
+                    Evaluasi Hasil Rekomendasi & Analisis Multi-Kriteria
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Perhitungan komprehensif berdasarkan 4 dimensi: Kompetensi/Skill (40%), Pendidikan (30%), Pengalaman (20%), dan Lokasi (10%)
+                </p>
               </div>
               <button 
                 onClick={() => setIsDetailModalOpen(false)}
@@ -1273,56 +1333,303 @@ function MatchingWizard() {
             </div>
 
             <div className="p-6 overflow-y-auto bg-slate-50 flex-1 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* 1. Skor Komposit Utama */}
+              <div className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        Tingkat Kesesuaian Komposit
+                      </span>
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
+                        selectedRecommendation.match_score >= 100
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                          : selectedRecommendation.match_score >= 70
+                          ? 'bg-blue-50 text-blue-800 border-blue-300'
+                          : selectedRecommendation.match_score >= 40
+                          ? 'bg-amber-50 text-amber-800 border-amber-300'
+                          : 'bg-slate-100 text-slate-700 border-slate-300'
+                      }`}>
+                        {selectedRecommendation.match_score >= 100
+                          ? '1. Perfect Match (100%)'
+                          : selectedRecommendation.match_score >= 70
+                          ? '2. High Match (70% - 99%)'
+                          : selectedRecommendation.match_score >= 40
+                          ? '3. Gap Match (40% - 69%)'
+                          : '4. Low Match (< 40%)'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      {selectedRecommendation.classification?.description || (
+                        selectedRecommendation.match_score >= 100
+                          ? 'Kandidat memiliki kesesuaian sempurna pada kompetensi dan seluruh kualifikasi industri.'
+                          : selectedRecommendation.match_score >= 70
+                          ? 'Tingkat kesesuaian tinggi. Kandidat memenuhi sebagian besar syarat inti dan siap ditempatkan.'
+                          : selectedRecommendation.match_score >= 40
+                          ? 'Kandidat potensial dengan kesenjangan kompetensi spesifik (Gap Match). Direkomendasikan untuk program pelatihan / upskilling.'
+                          : 'Tingkat kesesuaian relatif rendah terhadap kualifikasi posisi ini.'
+                      )}
+                    </p>
+                    <p className="text-[11px] text-slate-400 italic">
+                      Formula Multi-Kriteria: (40% Kompetensi) + (30% Pendidikan) + (20% Pengalaman) + (10% Lokasi)
+                    </p>
+                  </div>
+
+                  <div className="sm:text-right shrink-0 border-t sm:border-t-0 sm:border-l border-slate-100 pt-3 sm:pt-0 sm:pl-6">
+                    <div className="text-4xl sm:text-5xl font-black text-[#0E385E] tracking-tight">
+                      {selectedRecommendation.match_score}%
+                    </div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">
+                      Total Composite Match Score
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Rincian Evaluasi 4 Dimensi Multi-Kriteria */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <BarChart3 className="w-4 h-4 text-[#0E385E]" />
+                    <span>Rincian Evaluasi 4 Dimensi Multi-Kriteria</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400 font-medium">Bobot Komposit Total: 100%</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Dimensi 1: Kompetensi & Keahlian (40%) */}
+                  <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                      <span className="flex items-center gap-1.5 text-emerald-800">
+                        <Target className="w-3.5 h-3.5 text-emerald-600" />
+                        Kompetensi / Skill
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded font-bold">40%</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900">
+                      {selectedRecommendation.score_breakdown?.skill_score ?? Math.round((selectedRecommendation.matched_skills_count / Math.max(1, selectedRecommendation.lowongan.skills?.length || 1)) * 100)}%
+                    </div>
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-emerald-600 rounded-full transition-all" 
+                        style={{ width: `${selectedRecommendation.score_breakdown?.skill_score ?? Math.round((selectedRecommendation.matched_skills_count / Math.max(1, selectedRecommendation.lowongan.skills?.length || 1)) * 100)}%` }} 
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      {selectedRecommendation.matched_skills_count} dari {selectedRecommendation.lowongan.skills?.length || selectedRecommendation.matched_skills_count} skill lowongan terpenuhi
+                    </p>
+                  </div>
+
+                  {/* Dimensi 2: Kualifikasi Pendidikan (30%) */}
+                  <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                      <span className="flex items-center gap-1.5 text-purple-800">
+                        <GraduationCap className="w-3.5 h-3.5 text-purple-600" />
+                        Pendidikan
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded font-bold">30%</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900">
+                      {selectedRecommendation.score_breakdown?.education_score ?? (selectedRecommendation.education_match?.is_matched ? 100 : 0)}%
+                    </div>
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-purple-600 rounded-full transition-all" 
+                        style={{ width: `${selectedRecommendation.score_breakdown?.education_score ?? (selectedRecommendation.education_match?.is_matched ? 100 : 0)}%` }} 
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      {selectedRecommendation.education_match?.is_matched ? 'Memenuhi Syarat' : 'Di Bawah Syarat (0%)'}
+                    </p>
+                  </div>
+
+                  {/* Dimensi 3: Pengalaman Kerja (20%) */}
+                  <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                      <span className="flex items-center gap-1.5 text-amber-800">
+                        <Award className="w-3.5 h-3.5 text-amber-600" />
+                        Pengalaman Kerja
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded font-bold">20%</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900">
+                      {selectedRecommendation.score_breakdown?.experience_score ?? 80}%
+                    </div>
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-amber-500 rounded-full transition-all" 
+                        style={{ width: `${selectedRecommendation.score_breakdown?.experience_score ?? 80}%` }} 
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      Masa kerja & relevansi rekam jejak industri
+                    </p>
+                  </div>
+
+                  {/* Dimensi 4: Wilayah & Lokasi (10%) */}
+                  <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
+                      <span className="flex items-center gap-1.5 text-indigo-800">
+                        <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                        Lokasi Wilayah
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded font-bold">10%</span>
+                    </div>
+                    <div className="text-2xl font-black text-slate-900">
+                      {selectedRecommendation.score_breakdown?.location_score ?? 100}%
+                    </div>
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-indigo-600 rounded-full transition-all" 
+                        style={{ width: `${selectedRecommendation.score_breakdown?.location_score ?? 100}%` }} 
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      Kesesuaian domisili dengan lokasi industri
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Komparasi Berdampingan: Profil Pencari Kerja vs Profil Lowongan */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 
-                {/* Kolom Kiri: Profil Loker */}
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                  <h3 className="font-semibold text-slate-800 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-                    <Briefcase className="w-5 h-5 text-sky-500" /> Profil Lowongan
-                  </h3>
-                  <div className="space-y-4">
+                {/* Kolom Kiri: Profil Pencari Kerja (Kandidat) */}
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                      <User className="w-5 h-5 text-indigo-500" /> Profil Pencari Kerja (Kandidat)
+                    </h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200">
+                      Kandidat Terpilih
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-3.5 text-xs">
                     <div>
-                      <p className="text-xs text-slate-500 mb-1 font-medium">Posisi / Jabatan</p>
-                      <p className="font-semibold text-slate-800 text-base">
-                        {selectedRecommendation.lowongan.judul_pekerjaan || selectedRecommendation.lowongan.judul_lowongan}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 mb-1 font-medium">Perusahaan</p>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
-                        <p className="text-sm font-medium text-slate-700">{selectedRecommendation.lowongan.nama_perusahaan}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 mb-1 font-medium">Lokasi</p>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                        <p className="text-sm font-medium text-slate-700">
-                          {selectedRecommendation.lowongan.regency?.name}, {selectedRecommendation.lowongan.province?.name}
+                      <p className="text-slate-400 font-medium">Nama Lengkap & NIK</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <p className="font-bold text-slate-800 text-sm">
+                          {selectedSeeker?.name || selectedSeeker?.full_name || 'Pencari Kerja'}
                         </p>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                          NIK: {selectedSeeker?.nik || selectedSeeker?.profile_id || '-'}
+                        </span>
                       </div>
                     </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-slate-400 font-medium">Kontak / No. Telepon</p>
+                        <div className="flex items-center gap-1.5 mt-0.5 text-slate-700 font-medium">
+                          <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{selectedSeeker?.phone || '-'}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-slate-400 font-medium">Domisili / Wilayah</p>
+                        <div className="flex items-center gap-1.5 mt-0.5 text-slate-700 font-medium">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate" title={`${selectedSeeker?.kab_kota_name || selectedSeeker?.kab_kota || ''}, ${selectedSeeker?.provinsi_name || selectedSeeker?.provinsi || ''}`}>
+                            {selectedSeeker?.kab_kota_name || selectedSeeker?.kab_kota || selectedSeeker?.provinsi_name || selectedSeeker?.provinsi || 'Indonesia'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
                     <div>
-                      <p className="text-xs text-slate-500 mb-1 font-medium">Kode KBJI</p>
-                      <p className="text-sm font-medium text-slate-700">
-                        {selectedRecommendation.lowongan.kbji?.code} - {selectedRecommendation.lowongan.kbji?.name}
+                      <p className="text-slate-400 font-medium">Pendidikan Terakhir & Jurusan</p>
+                      <div className="flex items-center gap-1.5 mt-0.5 text-slate-800 font-semibold">
+                        <GraduationCap className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                        <span>
+                          {selectedSeeker?.pendidikan || selectedRecommendation.education_match?.candidate_level_name || 'Belum Terdata'}
+                          {selectedSeeker?.jurusan ? ` (${selectedSeeker.jurusan})` : ''}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-slate-400 font-medium">Pengalaman / Rekam Jejak</p>
+                      <div className="flex items-start gap-1.5 mt-0.5 text-slate-700">
+                        <Award className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                        <span className="line-clamp-2 text-slate-600">
+                          {selectedSeeker?.experience || selectedSeeker?.status_bekerja || 'Fresh Graduate / Belum Ada Riwayat'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Keahlian Terdaftar di Profil */}
+                    <div>
+                      <p className="text-slate-400 font-medium mb-1.5">Keahlian Profil / CV:</p>
+                      {pencakerSkills && pencakerSkills.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5 max-h-[85px] overflow-y-auto custom-scrollbar">
+                          {pencakerSkills.map((sk: any, idx: number) => (
+                            <span 
+                              key={`psk-${idx}`} 
+                              className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                            >
+                              {sk.title || sk.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-slate-500 italic text-[11px]">{selectedSeeker?.keahlian || 'Belum ada data keahlian'}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Kolom Kanan: Profil & Persyaratan Lowongan */}
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                      <Briefcase className="w-5 h-5 text-sky-500" /> Profil & Persyaratan Lowongan
+                    </h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 font-bold border border-sky-200">
+                      Formasi Industri
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-3.5 text-xs">
+                    <div>
+                      <p className="text-slate-400 font-medium">Posisi / Judul Formasi</p>
+                      <p className="font-bold text-slate-800 text-sm mt-0.5">
+                        {selectedRecommendation.lowongan.judul_pekerjaan || selectedRecommendation.lowongan.judul_lowongan}
                       </p>
                     </div>
 
                     <div>
-                      <p className="text-xs text-slate-500 mb-1 font-medium">Syarat Pendidikan Lowongan</p>
-                      <div className="flex items-center gap-2">
-                        <Award className="w-4 h-4 text-slate-400 shrink-0" />
-                        <p className="text-sm font-semibold text-slate-800">
+                      <p className="text-slate-400 font-medium">Perusahaan Pemberi Kerja</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
+                        <p className="font-semibold text-slate-700 text-xs">{selectedRecommendation.lowongan.nama_perusahaan}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-slate-400 font-medium">Lokasi Penempatan</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                        <p className="text-slate-700 text-xs">
+                          {selectedRecommendation.lowongan.regency?.name || selectedRecommendation.lowongan.kab_kota || ''}, {selectedRecommendation.lowongan.province?.name || selectedRecommendation.lowongan.provinsi || ''}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-slate-400 font-medium">Syarat Pendidikan Minimal</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <GraduationCap className="w-4 h-4 text-slate-400 shrink-0" />
+                        <p className="font-semibold text-slate-800 text-xs">
                           {selectedRecommendation.lowongan.education_level?.name || selectedRecommendation.education_match?.required_level_name || 'Semua Jenjang'}
                         </p>
                       </div>
                     </div>
 
-                    {/* Evaluasi Kesesuaian Pendidikan */}
+                    {/* Status Evaluasi Pendidikan */}
                     {selectedRecommendation.education_match && (
-                      <div className={`p-3 rounded-lg border text-xs ${
+                      <div className={`p-3 rounded-lg border ${
                         selectedRecommendation.education_match.is_matched 
                           ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900' 
                           : 'bg-rose-50/80 border-rose-200 text-rose-900'
@@ -1335,7 +1642,7 @@ function MatchingWizard() {
                           )}
                           <div className="space-y-0.5">
                             <p className="font-bold">
-                              {selectedRecommendation.education_match.is_matched ? 'Kualifikasi Pendidikan Terpenuhi' : 'Pendidikan Di Bawah Syarat'}
+                              {selectedRecommendation.education_match.is_matched ? 'Kualifikasi Pendidikan Terpenuhi' : 'Pendidikan Di Bawah Syarat Minimal'}
                             </p>
                             <p className="text-[11px] opacity-90">
                               Kandidat: <strong>{selectedSeeker?.pendidikan || selectedRecommendation.education_match.candidate_level_name}</strong> • Lowongan: <strong>{selectedRecommendation.education_match.required_level_name}</strong>
@@ -1347,97 +1654,137 @@ function MatchingWizard() {
                         </div>
                       </div>
                     )}
-                    
-                    <div className="bg-sky-50 border border-sky-100 rounded-lg p-4 mt-4 text-center">
-                      <p className="text-xs text-sky-700 font-bold uppercase tracking-wider mb-1">Skor Kecocokan Skill</p>
-                      <div className="text-3xl font-extrabold text-[#0E385E]">{selectedRecommendation.match_score}%</div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        {selectedRecommendation.matched_skills_count} dari {selectedRecommendation.lowongan.skills?.length || 0} skill lowongan terpenuhi
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Kolom Kanan: Analisis Skill Gap */}
-                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-                  <h3 className="font-semibold text-slate-800 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
-                    <Target className="w-5 h-5 text-emerald-500" /> Analisis Gap Skill
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <p className="text-xs text-slate-600">
-                      Perbandingan skill yang disyaratkan oleh lowongan dengan profil keahlian {selectedSeeker?.name || 'kandidat'}.
-                    </p>
-
-                    <div className="space-y-3 max-h-[340px] overflow-y-auto pr-2 custom-scrollbar">
-                      {(!selectedRecommendation.lowongan.skills || selectedRecommendation.lowongan.skills.length === 0) ? (
-                        <div className="text-center py-6 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                          <p className="text-xs text-slate-500">Lowongan ini tidak mensyaratkan taksonomi skill spesifik di sistem.</p>
-                        </div>
-                      ) : (
-                        selectedRecommendation.lowongan.skills.map((skill: any) => {
-                          const matchedItem = pencakerSkills.find(ps => ps.id === skill.id || ps.esco_skill_id === skill.id);
-                          const isMatch = !!matchedItem;
-                          const rawSource = matchedItem?.source || matchedItem?.pivot?.source || (matchedItem?.pivot?.is_manual ? 'manual' : '');
-                          
-                          let sourceLabel = '';
-                          let sourceIcon = null;
-                          if (rawSource.includes('experience')) {
-                            sourceLabel = 'Pengalaman';
-                            sourceIcon = <Briefcase className="w-3 h-3 text-emerald-600 inline mr-1" />;
-                          } else if (rawSource.includes('sertifikasi')) {
-                            sourceLabel = 'Sertifikasi';
-                            sourceIcon = <Award className="w-3 h-3 text-purple-600 inline mr-1" />;
-                          } else if (rawSource.includes('keahlian')) {
-                            sourceLabel = 'Keahlian';
-                            sourceIcon = <Target className="w-3 h-3 text-sky-600 inline mr-1" />;
-                          } else if (rawSource.includes('manual')) {
-                            sourceLabel = 'Manual';
-                            sourceIcon = <FileText className="w-3 h-3 text-amber-600 inline mr-1" />;
-                          }
-                          
-                          return (
-                            <div key={skill.id} className={`p-3 rounded-lg border ${isMatch ? 'bg-emerald-50/70 border-emerald-200' : 'bg-rose-50/60 border-rose-200'}`}>
-                              <div className="flex gap-3">
-                                <div className="mt-0.5">
-                                  {isMatch ? (
-                                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                                  ) : (
-                                    <AlertCircle className="w-5 h-5 text-rose-500" />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className={`text-xs font-semibold ${isMatch ? 'text-emerald-900' : 'text-rose-900'}`}>
-                                    {skill.title || skill.name}
-                                  </p>
-                                  <div className="text-[11px] mt-1 flex flex-wrap items-center gap-1.5">
-                                    {isMatch ? (
-                                      <>
-                                        <span className="text-emerald-700 font-medium">Cocok dengan profil kandidat</span>
-                                        {sourceLabel && (
-                                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white text-emerald-800 border border-emerald-200 shadow-2xs font-normal inline-flex items-center">
-                                            {sourceIcon}
-                                            Sumber: {sourceLabel}
-                                          </span>
-                                        )}
-                                      </>
-                                    ) : (
-                                      <span className="text-rose-600 font-medium">Belum ada di profil (Area Pelatihan/Gap)</span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
                   </div>
                 </div>
 
               </div>
 
-              {/* Deskripsi & Kualifikasi Formasi */}
+              {/* 4. Analisis Kesenjangan Skill (Gap Analysis) & Kebutuhan Pelatihan Kerja */}
+              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
+                      <Target className="w-5 h-5 text-emerald-500" /> Analisis Kesenjangan Skill (Gap Analysis)
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Rincian kesesuaian skill kandidat vs lowongan industri. Area gap dijadikan prioritas pelatihan kerja.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-600">
+                    <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">Bobot Wajib (1.0)</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">Bobot Tambahan (0.7)</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Sub-kolom 1: Skill yang Cocok / Terpenuhi di Profil */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-emerald-800 pb-1 border-b border-emerald-100">
+                      <span className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>Keahlian Terpenuhi ({selectedRecommendation.matched_skills?.length || 0})</span>
+                      </span>
+                      <span className="text-[10px] font-medium text-emerald-700">Sesuai Profil</span>
+                    </div>
+
+                    <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
+                      {selectedRecommendation.matched_skills && selectedRecommendation.matched_skills.length > 0 ? (
+                        selectedRecommendation.matched_skills.map((ms: any, idx: number) => (
+                          <div key={`ms-${idx}-${ms.id || ms.title}`} className="p-3 rounded-lg border bg-emerald-50/70 border-emerald-200 space-y-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-start gap-2">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                                <div>
+                                  <span className="text-xs font-semibold text-emerald-950 block leading-snug">
+                                    {ms.title}
+                                  </span>
+                                  {ms.matched_with && ms.matched_with.toLowerCase() !== ms.title.toLowerCase() && (
+                                    <span className="text-[10px] text-emerald-700 italic block mt-0.5">
+                                      (Padanan: {ms.matched_with})
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${
+                                ms.tipe_keahlian === 'wajib'
+                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  : 'bg-slate-100 text-slate-600 border border-slate-200'
+                              }`}>
+                                {ms.tipe_keahlian === 'wajib' ? 'Wajib' : 'Tambahan'}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500 pt-0.5 pl-5.5">
+                              <span className="bg-emerald-100/80 text-emerald-800 px-1.5 py-0.2 rounded font-medium">
+                                {ms.match_type || 'Keahlian Terpenuhi'}
+                              </span>
+                              {ms.level_kemahiran && (
+                                <span className="text-slate-400 capitalize">
+                                  Tingkat: {ms.level_kemahiran}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-6 bg-slate-50 rounded-lg border border-dashed border-slate-200 text-xs text-slate-400">
+                          Belum ada keahlian yang cocok secara spesifik
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sub-kolom 2: Skill Gap (Kebutuhan Pelatihan Kerja) */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-rose-800 pb-1 border-b border-rose-100">
+                      <span className="flex items-center gap-1.5">
+                        <AlertCircle className="w-4 h-4 text-rose-600" />
+                        <span>Kesenjangan Skill / Gap ({selectedRecommendation.gap_skills?.length || 0})</span>
+                      </span>
+                      <span className="text-[10px] font-medium text-rose-700">Prioritas Pelatihan</span>
+                    </div>
+
+                    <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1 custom-scrollbar">
+                      {selectedRecommendation.gap_skills && selectedRecommendation.gap_skills.length > 0 ? (
+                        selectedRecommendation.gap_skills.map((gs: any, idx: number) => (
+                          <div key={`gs-${idx}-${gs.id || gs.title}`} className="p-3 rounded-lg border bg-rose-50/60 border-rose-200 space-y-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-start gap-2">
+                                <AlertCircle className="w-3.5 h-3.5 text-rose-500 mt-0.5 shrink-0" />
+                                <span className="text-xs font-semibold text-rose-950 block leading-snug">
+                                  {gs.title}
+                                </span>
+                              </div>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${
+                                gs.tipe_keahlian === 'wajib'
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                  : 'bg-slate-100 text-slate-600 border border-slate-200'
+                              }`}>
+                                {gs.tipe_keahlian === 'wajib' ? 'Wajib Dimiliki' : 'Tambahan'}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500 pt-0.5 pl-5.5">
+                              <span className="text-rose-700 bg-rose-100/70 px-1.5 py-0.2 rounded font-semibold">
+                                Area Pelatihan Kerja
+                              </span>
+                              {gs.level_kemahiran && (
+                                <span className="text-slate-400 capitalize">
+                                  Ekspektasi: {gs.level_kemahiran}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-6 bg-emerald-50/50 rounded-lg border border-dashed border-emerald-200 text-xs text-emerald-700 font-medium">
+                          Seluruh kualifikasi skill lowongan ini telah terpenuhi! (Tidak ada gap)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Deskripsi & Kualifikasi Formasi */}
               {(selectedRecommendation.lowongan.deskripsi_pekerjaan || selectedRecommendation.lowongan.kualifikasi) && (
                 <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
                   <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
